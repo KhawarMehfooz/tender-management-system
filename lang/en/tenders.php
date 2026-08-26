@@ -56,6 +56,7 @@ return [
         'meta_heading' => 'Record history',
         'unknown_actor' => 'Unknown user',
         'status_change_from' => 'From',
+        'money_eur' => '€:amount',
     ],
     'status' => [
         'intake' => 'Intake',

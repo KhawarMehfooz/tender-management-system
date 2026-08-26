@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Tenders\Schemas;
 
+use App\Enums\Right;
+use App\Models\Tender;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ViewEntry;
 use Filament\Schemas\Components\Section;
@@ -38,6 +40,12 @@ class TenderInfolist
                         TextEntry::make('submission_deadline')
                             ->label(__('tenders.fields.submission_deadline'))
                             ->dateTime(),
+                        TextEntry::make('estimated_contract_volume')
+                            ->label(__('tenders.fields.estimated_contract_volume'))
+                            ->formatStateUsing(fn (Tender $record): string => $record->estimated_contract_volume_unknown
+                                ? __('tenders.fields.estimated_contract_volume_unknown')
+                                : __('tenders.infolist.money_eur', ['amount' => number_format((float) $record->estimated_contract_volume, 2)]))
+                            ->visible(fn (): bool => auth()->user()?->can(Right::SEE_PRICES->value) ?? false),
                     ])
                     ->columns(2),
 

@@ -63,8 +63,35 @@ Progress within M1:
   a `ViewAction` on the table and on `EditTender`'s header) showing an overview section and a
   "Status history" section (`RepeatableEntry` over the `statusChanges` relation: changed_at,
   from/to, actor, reason) — this is the audit log's only UI surface right now.
-- [ ] Field-level rights enforcement wired into the Tender resource (the view page now exists to
-  host it).
+- [x] Field-level rights enforcement wired into the Tender resource: `estimated_contract_volume`
+  (the only price-bearing field on `Tender` today — margins/competitor-data/employee-stats
+  fields don't exist until M5/M10/M11, so `see-margins`/`see-competitor-data`/
+  `view-employee-statistics` have nothing to gate yet on this resource) is gated behind the
+  `see-prices` right (`App\Enums\Right`) in three places: `TenderForm` (both the amount field
+  and its `_unknown` companion toggle hidden via `->visible()`), `TenderInfolist` (a new
+  gated `TextEntry` on the Overview section, formatted as either the money value or "unknown"),
+  and — since a Livewire request can smuggle a value into a hidden field's state — server-side
+  stripping in `CreateTender::mutateFormDataBeforeCreate()` /
+  `EditTender::mutateFormDataBeforeSave()` that unsets both keys whenever the acting user lacks
+  the right, per [[permissions]]'s "never trust UI hiding alone" rule. `execute-final-submission`
+  has no action to gate yet (final submission doesn't exist until M5/M8). Tests in
+  `TenderResourceTest` cover: field hidden/visible on the form by right, smuggled value stripped
+  on both create and edit, and the view-page entry hidden/visible by right.
+- [ ] Category-scoped views: idea.md M1 requires management to span all service categories at
+  once while category-level users stay scoped to their own category/categories. Not built yet
+  — `TendersTable`/`ListTenders` currently show every tender to every authenticated user
+  regardless of role.
+- [ ] Archive/invalid field: idea.md M1 requires archiving/flagging-invalid to be its own field
+  (e.g. `is_archived`/`invalidity_reason`), separate from `TenderStatus` — a won tender must
+  stay archivable later, so this can't be folded into `changeStatusTo()`'s transition map. Not
+  built yet — no such column exists on `tenders` today.
+- [ ] Admin hard-delete of junk tenders: idea.md M1 requires a distinct, admin-gated hard-delete
+  action (logged reason: who/when/why, captured before the row is removed) for true
+  technical-junk entries. `TenderResource::canDelete()`/`canDeleteAny()` currently return
+  `false` unconditionally (see [[resources]]) — that's the correct default for the regular
+  resource, but the separate admin path doesn't exist yet.
+
+These three are the remaining open M1 acceptance points.
 
 Update the checklist above as work lands, and flip the milestone line when M1's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the

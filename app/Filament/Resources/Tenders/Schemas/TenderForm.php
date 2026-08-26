@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tenders\Schemas;
 
+use App\Enums\Right;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
 use App\Models\Source;
@@ -138,7 +139,8 @@ class TenderForm
                                     ->label(__('tenders.fields.estimated_contract_volume'))
                                     ->numeric()
                                     ->prefix('€')
-                                    ->disabled(fn (Get $get): bool => (bool) $get('estimated_contract_volume_unknown')),
+                                    ->disabled(fn (Get $get): bool => (bool) $get('estimated_contract_volume_unknown'))
+                                    ->visible(fn (): bool => auth()->user()?->can(Right::SEE_PRICES->value) ?? false),
                                 Toggle::make('estimated_contract_volume_unknown')
                                     ->label(__('tenders.fields.estimated_contract_volume_unknown'))
                                     ->inline(false)
@@ -147,7 +149,8 @@ class TenderForm
                                         if ($state) {
                                             $set('estimated_contract_volume', null);
                                         }
-                                    }),
+                                    })
+                                    ->visible(fn (): bool => auth()->user()?->can(Right::SEE_PRICES->value) ?? false),
                                 TextInput::make('contract_term')
                                     ->label(__('tenders.fields.contract_term'))
                                     ->prefixIcon(Heroicon::OutlinedClock),

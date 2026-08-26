@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Right;
 use App\Enums\TenderStatus;
 use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
@@ -12,6 +13,7 @@ use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Tender;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 
@@ -115,6 +117,74 @@ describe('status change action', function () {
 
         Livewire::test(ListTenders::class)
             ->assertActionHidden(TestAction::make('changeStatus')->table($tender));
+    });
+});
+
+describe('field-level rights: estimated contract volume', function () {
+    it('hides the price fields on the create form from a user without the see-prices right', function () {
+        Livewire::test(CreateTender::class)
+            ->assertFormFieldIsHidden('estimated_contract_volume')
+            ->assertFormFieldIsHidden('estimated_contract_volume_unknown');
+    });
+
+    it('shows the price fields on the create form to a user with the see-prices right', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::SEE_PRICES->value);
+
+        Livewire::test(CreateTender::class)
+            ->assertFormFieldIsVisible('estimated_contract_volume')
+            ->assertFormFieldIsVisible('estimated_contract_volume_unknown');
+    });
+
+    it('strips a smuggled price value server-side when creating without the see-prices right', function () {
+        $category = ServiceCategory::factory()->create(['code' => 'SEC']);
+        $sector = Sector::factory()->create();
+        $procedure = ProcurementProcedure::factory()->create();
+        $source = Source::factory()->create();
+
+        Livewire::test(CreateTender::class)
+            ->fillForm([
+                'title' => 'Guarding services for the harbour',
+                'contracting_authority' => 'City of Example',
+                'service_category_id' => $category->id,
+                'sector_id' => $sector->id,
+                'procurement_procedure_id' => $procedure->id,
+                'source_id' => $source->id,
+                'submission_deadline' => now()->addWeeks(2),
+                'estimated_contract_volume' => 250000,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $tender = Tender::where('title', 'Guarding services for the harbour')->firstOrFail();
+        expect($tender->estimated_contract_volume)->toBeNull();
+    });
+
+    it('strips a smuggled price value server-side when editing without the see-prices right', function () {
+        $tender = Tender::factory()->create(['estimated_contract_volume' => null]);
+
+        Livewire::test(EditTender::class, ['record' => $tender->getRouteKey()])
+            ->fillForm(['estimated_contract_volume' => 999999])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        expect($tender->refresh()->estimated_contract_volume)->toBeNull();
+    });
+
+    it('hides the price entry on the view page from a user without the see-prices right', function () {
+        $tender = Tender::factory()->create(['estimated_contract_volume' => 42000]);
+
+        Livewire::test(ViewTender::class, ['record' => $tender->getRouteKey()])
+            ->assertDontSee('42,000.00');
+    });
+
+    it('shows the price entry on the view page to a user with the see-prices right', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::SEE_PRICES->value);
+        $tender = Tender::factory()->create(['estimated_contract_volume' => 42000]);
+
+        Livewire::test(ViewTender::class, ['record' => $tender->getRouteKey()])
+            ->assertSee('42,000.00');
     });
 });
 
