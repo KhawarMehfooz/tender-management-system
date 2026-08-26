@@ -19,6 +19,9 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolesAndPermissionsSeeder::class);
         $this->call(ServiceCategorySeeder::class);
+        $this->call(SourceSeeder::class);
+        $this->call(CpvCodeSeeder::class);
+        $this->call(NutsCodeSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $admin = User::query()->updateOrCreate(
