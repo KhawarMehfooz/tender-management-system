@@ -8,11 +8,42 @@ the build currently stands so an assistant knows what's in scope right now vs. n
 vs. explicitly deferred.
 
 **M1 — Foundation is complete.** **M2 — Team & Tasks** is now in progress, started at the
-user's explicit request. Team assignment (below) is done; tasks with dependencies, the
-final-submission dependency gate, and the notification centre are not started — don't begin
-them without the user asking explicitly.
+user's explicit request. Team assignment and the core Task feature (below) are done; task
+attachments, comments, cross-task dependencies, the final-submission dependency gate, and the
+notification centre are not started — don't begin them without the user asking explicitly.
 
 Progress within M2:
+- [x] Tasks (core slice — attachments/comments/dependencies/final-submission-gate explicitly
+  deferred): `Task` model/migration (`tender_id` required FK `cascadeOnDelete`; `owner_id`/
+  `creator_id` required, `reviewer_id` nullable, all `restrictOnDelete` to `users`; `priority`
+  → `App\Enums\TaskPriority` low/medium/high/urgent; `status` → `App\Enums\TaskStatus`
+  open/in-progress/waiting-on-another-task/in-review/correction-required/done, forward-with-
+  review-loop transition map mirroring `TenderStatus`, enforced by `Task::changeStatusTo()`
+  which also stamps `completion_date` on reaching `done`). `TaskChecklistItem` (`hasMany`,
+  `Repeater::make('checklistItems')->relationship()`) and `task_participants` (plain
+  `belongsToMany` — no functional-role dimension, unlike tender team members) round out the
+  core fields from idea.md's field list. `task_status_changes` + `TaskStatusChange` mirror
+  `tender_status_changes`/`TenderStatusChange` byte-for-byte as the audit trail. "Overdue" is
+  deliberately **not** a stored status — `Task::isOverdue()` computes
+  `due_date->isPast() && status !== DONE`, same "separate axis, no background job needed"
+  reasoning as Tender's archived/invalid fields (see [[resources-tenders]]).
+  Authorization reuses `TenderForm::canManageTeam()`'s exact role set (team lead/department
+  head/super admin) via a new `TaskForm::canManageTask()`, gating owner/reviewer/participants
+  the same disabled-not-hidden + belt-and-braces-mutate-hook pattern as Tender's team step;
+  status transitions are open to that same group. `TaskResource` (list/create/edit/view, no
+  hard-delete path — nothing in idea.md calls for one the way Tender's junk-entry escape hatch
+  exists) plus a `TasksRelationManager` on `TenderResource` for browsing/managing a tender's
+  tasks in place. Category scoping needed a new `App\Models\Scopes\TaskTenderCategoryScope`
+  (Task has no `service_category_id` of its own; relation-manager access inherits scoping for
+  free via the already-scoped parent `Tender`, but the standalone `TaskResource`'s direct
+  `Task::query()` needed its own scope re-deriving the restriction via `whereRelation('tender',
+  'service_category_id', ...)` — see [[scopes-models]]). Tests in `TaskTest.php` (status
+  chain, overdue, cascade delete, lookup delete protection) and
+  `Filament/Resources/TaskResourceTest.php` (creation, deletion, status-change action,
+  assignment gating, checklist, view page, category scoping, relation manager — including that
+  Filament v4's read-only-relation-managers-on-ViewRecord-pages default means the relation
+  manager is browse-only on `ViewTender` and live on `EditTender`, left as the framework
+  default rather than overridden).
 - [x] Team assignment: one required tender owner (`Tender.owner_id`, NOT NULL FK to `users`,
   `restrictOnDelete`) plus any number of team members in functional roles
   (`App\Enums\TeamRole`: calculation/concept/evidence-documents/quality-control/

@@ -6,6 +6,7 @@ use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
+use App\Filament\Resources\Tenders\RelationManagers\TasksRelationManager;
 use App\Filament\Resources\Tenders\Schemas\TenderForm;
 use App\Filament\Resources\Tenders\Schemas\TenderInfolist;
 use App\Filament\Resources\Tenders\Tables\TendersTable;
@@ -73,7 +74,7 @@ class TenderResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            TasksRelationManager::class,
         ];
     }
 

@@ -238,6 +238,14 @@ class Tender extends Model
     }
 
     /**
+     * @return HasMany<Task, $this>
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function archivedBy(): BelongsTo

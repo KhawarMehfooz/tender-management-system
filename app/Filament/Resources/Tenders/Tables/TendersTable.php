@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Enums\TenderStatus;
 use App\Models\Tender;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
@@ -87,106 +88,108 @@ class TendersTable
                     ),
             ])
             ->recordActions([
-                Action::make('changeStatus')
-                    ->label(__('tenders.actions.change_status'))
-                    ->icon(Heroicon::OutlinedArrowPath)
-                    ->color('gray')
-                    ->visible(fn (Tender $record): bool => $record->status->allowedTransitions() !== [])
-                    ->modalWidth(Width::Medium)
-                    ->schema(fn (Tender $record) => [
-                        Select::make('status')
-                            ->label(__('tenders.fields.status'))
-                            ->prefixIcon(Heroicon::OutlinedFlag)
-                            ->options(fn () => collect($record->status->allowedTransitions())
-                                ->mapWithKeys(fn (TenderStatus $status) => [$status->value => $status->getLabel()]))
-                            ->required(),
-                        Textarea::make('reason')
-                            ->label(__('tenders.fields.status_change_reason'))
-                            ->rows(2),
-                    ])
-                    ->action(function (Tender $record, array $data): void {
-                        $record->changeStatusTo(TenderStatus::from($data['status']), auth()->user(), $data['reason'] ?? null);
-                    })
-                    ->successNotification(
-                        Notification::make()
-                            ->success()
-                            ->title(__('tenders.actions.change_status_success')),
-                    ),
-                Action::make('archive')
-                    ->label(__('tenders.actions.archive'))
-                    ->icon(Heroicon::OutlinedArchiveBox)
-                    ->color('gray')
-                    ->visible(fn (Tender $record): bool => ! $record->is_archived)
-                    ->requiresConfirmation()
-                    ->action(fn (Tender $record) => $record->archive(auth()->user()))
-                    ->successNotification(
-                        Notification::make()
-                            ->success()
-                            ->title(__('tenders.actions.archive_success')),
-                    ),
-                Action::make('unarchive')
-                    ->label(__('tenders.actions.unarchive'))
-                    ->icon(Heroicon::OutlinedArchiveBoxXMark)
-                    ->color('gray')
-                    ->visible(fn (Tender $record): bool => $record->is_archived)
-                    ->requiresConfirmation()
-                    ->action(fn (Tender $record) => $record->unarchive())
-                    ->successNotification(
-                        Notification::make()
-                            ->success()
-                            ->title(__('tenders.actions.unarchive_success')),
-                    ),
-                Action::make('markInvalid')
-                    ->label(__('tenders.actions.mark_invalid'))
-                    ->icon(Heroicon::OutlinedNoSymbol)
-                    ->color('danger')
-                    ->visible(fn (Tender $record): bool => ! $record->isInvalid())
-                    ->modalWidth(Width::Medium)
-                    ->schema([
-                        Textarea::make('reason')
-                            ->label(__('tenders.fields.invalidity_reason'))
-                            ->rows(2)
-                            ->required(),
-                    ])
-                    ->action(fn (Tender $record, array $data) => $record->markInvalid(auth()->user(), $data['reason']))
-                    ->successNotification(
-                        Notification::make()
-                            ->success()
-                            ->title(__('tenders.actions.mark_invalid_success')),
-                    ),
-                Action::make('clearInvalidFlag')
-                    ->label(__('tenders.actions.clear_invalid_flag'))
-                    ->icon(Heroicon::OutlinedCheckCircle)
-                    ->color('gray')
-                    ->visible(fn (Tender $record): bool => $record->isInvalid())
-                    ->requiresConfirmation()
-                    ->action(fn (Tender $record) => $record->clearInvalidFlag())
-                    ->successNotification(
-                        Notification::make()
-                            ->success()
-                            ->title(__('tenders.actions.clear_invalid_flag_success')),
-                    ),
-                ViewAction::make(),
-                EditAction::make(),
-                Action::make('hardDelete')
-                    ->label(__('tenders.actions.hard_delete'))
-                    ->icon(Heroicon::OutlinedTrash)
-                    ->color('danger')
-                    ->visible(fn (): bool => auth()->user()?->hasRole(RoleName::SUPER_ADMIN) ?? false)
-                    ->modalWidth(Width::Medium)
-                    ->requiresConfirmation()
-                    ->schema([
-                        Textarea::make('reason')
-                            ->label(__('tenders.fields.hard_delete_reason'))
-                            ->rows(2)
-                            ->required(),
-                    ])
-                    ->action(fn (Tender $record, array $data) => $record->hardDelete(auth()->user(), $data['reason']))
-                    ->successNotification(
-                        Notification::make()
-                            ->success()
-                            ->title(__('tenders.actions.hard_delete_success')),
-                    ),
+                ActionGroup::make([
+                    Action::make('changeStatus')
+                        ->label(__('tenders.actions.change_status'))
+                        ->icon(Heroicon::OutlinedArrowPath)
+                        ->color('gray')
+                        ->visible(fn (Tender $record): bool => $record->status->allowedTransitions() !== [])
+                        ->modalWidth(Width::Medium)
+                        ->schema(fn (Tender $record) => [
+                            Select::make('status')
+                                ->label(__('tenders.fields.status'))
+                                ->prefixIcon(Heroicon::OutlinedFlag)
+                                ->options(fn () => collect($record->status->allowedTransitions())
+                                    ->mapWithKeys(fn (TenderStatus $status) => [$status->value => $status->getLabel()]))
+                                ->required(),
+                            Textarea::make('reason')
+                                ->label(__('tenders.fields.status_change_reason'))
+                                ->rows(2),
+                        ])
+                        ->action(function (Tender $record, array $data): void {
+                            $record->changeStatusTo(TenderStatus::from($data['status']), auth()->user(), $data['reason'] ?? null);
+                        })
+                        ->successNotification(
+                            Notification::make()
+                                ->success()
+                                ->title(__('tenders.actions.change_status_success')),
+                        ),
+                    Action::make('archive')
+                        ->label(__('tenders.actions.archive'))
+                        ->icon(Heroicon::OutlinedArchiveBox)
+                        ->color('gray')
+                        ->visible(fn (Tender $record): bool => ! $record->is_archived)
+                        ->requiresConfirmation()
+                        ->action(fn (Tender $record) => $record->archive(auth()->user()))
+                        ->successNotification(
+                            Notification::make()
+                                ->success()
+                                ->title(__('tenders.actions.archive_success')),
+                        ),
+                    Action::make('unarchive')
+                        ->label(__('tenders.actions.unarchive'))
+                        ->icon(Heroicon::OutlinedArchiveBoxXMark)
+                        ->color('gray')
+                        ->visible(fn (Tender $record): bool => $record->is_archived)
+                        ->requiresConfirmation()
+                        ->action(fn (Tender $record) => $record->unarchive())
+                        ->successNotification(
+                            Notification::make()
+                                ->success()
+                                ->title(__('tenders.actions.unarchive_success')),
+                        ),
+                    Action::make('markInvalid')
+                        ->label(__('tenders.actions.mark_invalid'))
+                        ->icon(Heroicon::OutlinedNoSymbol)
+                        ->color('danger')
+                        ->visible(fn (Tender $record): bool => ! $record->isInvalid())
+                        ->modalWidth(Width::Medium)
+                        ->schema([
+                            Textarea::make('reason')
+                                ->label(__('tenders.fields.invalidity_reason'))
+                                ->rows(2)
+                                ->required(),
+                        ])
+                        ->action(fn (Tender $record, array $data) => $record->markInvalid(auth()->user(), $data['reason']))
+                        ->successNotification(
+                            Notification::make()
+                                ->success()
+                                ->title(__('tenders.actions.mark_invalid_success')),
+                        ),
+                    Action::make('clearInvalidFlag')
+                        ->label(__('tenders.actions.clear_invalid_flag'))
+                        ->icon(Heroicon::OutlinedCheckCircle)
+                        ->color('gray')
+                        ->visible(fn (Tender $record): bool => $record->isInvalid())
+                        ->requiresConfirmation()
+                        ->action(fn (Tender $record) => $record->clearInvalidFlag())
+                        ->successNotification(
+                            Notification::make()
+                                ->success()
+                                ->title(__('tenders.actions.clear_invalid_flag_success')),
+                        ),
+                    ViewAction::make(),
+                    EditAction::make(),
+                    Action::make('hardDelete')
+                        ->label(__('tenders.actions.hard_delete'))
+                        ->icon(Heroicon::OutlinedTrash)
+                        ->color('danger')
+                        ->visible(fn (): bool => auth()->user()?->hasRole(RoleName::SUPER_ADMIN) ?? false)
+                        ->modalWidth(Width::Medium)
+                        ->requiresConfirmation()
+                        ->schema([
+                            Textarea::make('reason')
+                                ->label(__('tenders.fields.hard_delete_reason'))
+                                ->rows(2)
+                                ->required(),
+                        ])
+                        ->action(fn (Tender $record, array $data) => $record->hardDelete(auth()->user(), $data['reason']))
+                        ->successNotification(
+                            Notification::make()
+                                ->success()
+                                ->title(__('tenders.actions.hard_delete_success')),
+                        ),
+                ]),
             ]);
     }
 }

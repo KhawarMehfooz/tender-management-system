@@ -1,0 +1,63 @@
+<?php
+
+return [
+    'label' => 'Task',
+    'plural_label' => 'Tasks',
+    'form' => [
+        'sections' => [
+            'details' => 'Details',
+            'assignment' => 'Assignment',
+            'dates' => 'Dates',
+            'checklist' => 'Checklist',
+        ],
+    ],
+    'fields' => [
+        'tender_id' => 'Tender',
+        'title' => 'Title',
+        'description' => 'Description',
+        'priority' => 'Priority',
+        'status' => 'Status',
+        'status_change_reason' => 'Reason',
+        'owner_id' => 'Owner',
+        'reviewer_id' => 'Reviewer',
+        'creator_id' => 'Created by',
+        'participants' => 'Participants',
+        'start_date' => 'Start date',
+        'due_date' => 'Due date',
+        'completion_date' => 'Completion date',
+        'is_overdue' => 'Overdue',
+        'checklist_items' => 'Checklist items',
+        'checklist_item_description' => 'Description',
+        'checklist_item_done' => 'Done',
+        'created_at' => 'Created at',
+        'updated_at' => 'Updated at',
+    ],
+    'status' => [
+        'open' => 'Open',
+        'in-progress' => 'In progress',
+        'waiting-on-another-task' => 'Waiting on another task',
+        'in-review' => 'In review',
+        'correction-required' => 'Correction required',
+        'done' => 'Done',
+    ],
+    'priority' => [
+        'low' => 'Low',
+        'medium' => 'Medium',
+        'high' => 'High',
+        'urgent' => 'Urgent',
+    ],
+    'actions' => [
+        'change_status' => 'Change status',
+        'change_status_success' => 'Status updated',
+        'add_checklist_item' => 'Add checklist item',
+    ],
+    'infolist' => [
+        'overview_heading' => 'Overview',
+        'assignment_heading' => 'Assignment',
+        'checklist_heading' => 'Checklist',
+        'status_history_heading' => 'Status history',
+        'meta_heading' => 'Record history',
+        'status_change_from' => 'from',
+        'unknown_actor' => 'Unknown',
+    ],
+];
