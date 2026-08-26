@@ -7,8 +7,9 @@ Full milestone specs live in [idea.md](../../idea.md) (M1–M13). This file just
 the build currently stands so an assistant knows what's in scope right now vs. not-yet-built
 vs. explicitly deferred.
 
-**Current milestone: M1 — Foundation** (auth, permissions, service categories, tender master
-data, lifecycle state machine).
+**M1 — Foundation is complete.** Next up: **M2 — Team & Tasks** (tender team assignment, tasks
+with dependencies, the final-submission dependency gate, notification centre) — not started,
+don't begin it without the user asking explicitly.
 
 Progress within M1:
 - [x] Roles & rights: `spatie/laravel-permission` (UUID-adapted, see [[models]]/[[seeders]]),
@@ -89,17 +90,29 @@ Progress within M1:
   `TenderResourceTest`'s "category-scoped views" group cover: management sees all, a scoped
   user sees only their own, foreign view/edit blocked, and create is pinned to the user's own
   category despite a different submitted value.
-- [ ] Archive/invalid field: idea.md M1 requires archiving/flagging-invalid to be its own field
-  (e.g. `is_archived`/`invalidity_reason`), separate from `TenderStatus` — a won tender must
-  stay archivable later, so this can't be folded into `changeStatusTo()`'s transition map. Not
-  built yet — no such column exists on `tenders` today.
-- [ ] Admin hard-delete of junk tenders: idea.md M1 requires a distinct, admin-gated hard-delete
-  action (logged reason: who/when/why, captured before the row is removed) for true
-  technical-junk entries. `TenderResource::canDelete()`/`canDeleteAny()` currently return
-  `false` unconditionally (see [[resources]]) — that's the correct default for the regular
-  resource, but the separate admin path doesn't exist yet.
+- [x] Archive/invalid field: `is_archived`/`archived_at`/`archived_by` and
+  `invalidity_reason`/`invalidated_at`/`invalidated_by` columns on `tenders`, a separate axis
+  from `TenderStatus` (a tender can be archived from any status, including a terminal one like
+  `won`) — see [[resources-tenders]] for the full rationale. Deliberately excluded from
+  `Tender`'s `#[Fillable(...)]` list; only writable via `Tender::archive()`/`unarchive()`/
+  `markInvalid()`/`clearInvalidFlag()` (all using `forceFill()`). UI: `TendersTable` row actions
+  (archive/unarchive toggle pair, flag-invalid modal requiring a reason / clear-invalid-flag),
+  each pair visible only in its applicable state; `TenderInfolist` gained an "Archive & validity"
+  section, visible only when relevant. Tests cover the model methods, mass-assignment
+  resistance, and the table actions (visibility toggling, required reason validation).
+- [x] Admin hard-delete of junk tenders: `Tender::hardDelete($actor, $reason)` writes a
+  `TenderHardDeletion` snapshot (tender_id/internal_id/title/deleted_by/reason/deleted_at —
+  `tender_id` has no FK, since the row it describes won't exist once the method returns) inside
+  the same DB transaction before calling `$this->delete()`. UI: a `hardDelete` `TendersTable`
+  row action, gated `->visible(fn () => auth()->user()?->hasRole(RoleName::SUPER_ADMIN) ?? false)`
+  with a required-reason modal — a wholly separate custom Action from Filament's built-in
+  `DeleteAction`, so `TenderResource::canDelete()`/`canDeleteAny()` staying `false` is unaffected
+  (see [[resources]] on `canDelete()` not being auto-wired to actions) and every other user still
+  has no delete path at all. Tests cover: hidden from non-super-admins, visible/functional for a
+  super admin, row actually gone afterward, log captures who/when/why, reason required.
 
-These two are the remaining open M1 acceptance points.
+**M1 acceptance points (idea.md) are now all met** — every checklist item above is checked.
+Don't start M2 (Team & Tasks) scope without the user asking for it explicitly.
 
 Update the checklist above as work lands, and flip the milestone line when M1's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the

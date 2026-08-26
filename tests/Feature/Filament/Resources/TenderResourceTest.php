@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Right;
+use App\Enums\RoleName;
 use App\Enums\TenderStatus;
 use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
@@ -12,6 +13,7 @@ use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Tender;
+use App\Models\TenderHardDeletion;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
@@ -269,5 +271,112 @@ describe('category-scoped views', function () {
 
         $tender = Tender::where('title', 'Cleaning services for the town hall')->firstOrFail();
         expect($tender->service_category_id)->toBe($ownCategory->id);
+    });
+});
+
+describe('archive action', function () {
+    it('archives an active tender', function () {
+        $tender = Tender::factory()->create(['is_archived' => false]);
+
+        Livewire::test(ListTenders::class)
+            ->callAction(TestAction::make('archive')->table($tender))
+            ->assertHasNoFormErrors();
+
+        expect($tender->fresh()->is_archived)->toBeTrue();
+    });
+
+    it('hides the archive action once already archived, and offers unarchive instead', function () {
+        $tender = Tender::factory()->create();
+        $tender->archive(User::factory()->create());
+
+        Livewire::test(ListTenders::class)
+            ->assertActionHidden(TestAction::make('archive')->table($tender))
+            ->callAction(TestAction::make('unarchive')->table($tender))
+            ->assertHasNoFormErrors();
+
+        expect($tender->fresh()->is_archived)->toBeFalse();
+    });
+});
+
+describe('mark invalid action', function () {
+    it('flags a tender invalid with the given reason', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(ListTenders::class)
+            ->callAction(TestAction::make('markInvalid')->table($tender), [
+                'reason' => 'Duplicate of another tender',
+            ])
+            ->assertHasNoFormErrors();
+
+        $tender->refresh();
+        expect($tender->isInvalid())->toBeTrue();
+        expect($tender->invalidity_reason)->toBe('Duplicate of another tender');
+    });
+
+    it('requires a reason', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(ListTenders::class)
+            ->callAction(TestAction::make('markInvalid')->table($tender), ['reason' => ''])
+            ->assertHasFormErrors(['reason' => 'required']);
+    });
+
+    it('hides mark-invalid once flagged, and offers clearing the flag instead', function () {
+        $tender = Tender::factory()->create();
+        $tender->markInvalid(User::factory()->create(), 'Duplicate');
+
+        Livewire::test(ListTenders::class)
+            ->assertActionHidden(TestAction::make('markInvalid')->table($tender))
+            ->callAction(TestAction::make('clearInvalidFlag')->table($tender))
+            ->assertHasNoFormErrors();
+
+        expect($tender->fresh()->isInvalid())->toBeFalse();
+    });
+});
+
+describe('hard delete action', function () {
+    it('hides the hard-delete action from a non-super-admin', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(ListTenders::class)
+            ->assertActionHidden(TestAction::make('hardDelete')->table($tender));
+    });
+
+    it('offers the hard-delete action to a super admin', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $tender = Tender::factory()->create();
+        $this->actingAs(tap(User::factory()->create())->assignRole(RoleName::SUPER_ADMIN));
+
+        Livewire::test(ListTenders::class)
+            ->assertActionVisible(TestAction::make('hardDelete')->table($tender));
+    });
+
+    it('permanently deletes the tender and logs who/when/why as a super admin', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $tender = Tender::factory()->create();
+        $admin = tap(User::factory()->create())->assignRole(RoleName::SUPER_ADMIN);
+        $this->actingAs($admin);
+
+        Livewire::test(ListTenders::class)
+            ->callAction(TestAction::make('hardDelete')->table($tender), [
+                'reason' => 'Confirmed technical junk entry',
+            ])
+            ->assertHasNoFormErrors();
+
+        expect(Tender::withoutGlobalScopes()->find($tender->id))->toBeNull();
+
+        $log = TenderHardDeletion::query()->where('tender_id', $tender->id)->firstOrFail();
+        expect($log->deleted_by)->toBe($admin->id);
+        expect($log->reason)->toBe('Confirmed technical junk entry');
+    });
+
+    it('requires a reason', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $tender = Tender::factory()->create();
+        $this->actingAs(tap(User::factory()->create())->assignRole(RoleName::SUPER_ADMIN));
+
+        Livewire::test(ListTenders::class)
+            ->callAction(TestAction::make('hardDelete')->table($tender), ['reason' => ''])
+            ->assertHasFormErrors(['reason' => 'required']);
     });
 });

@@ -47,6 +47,12 @@ use RuntimeException;
  * @property string|null $portal_link
  * @property string|null $notes
  * @property TenderStatus $status
+ * @property bool $is_archived
+ * @property Carbon|null $archived_at
+ * @property string|null $archived_by
+ * @property string|null $invalidity_reason
+ * @property Carbon|null $invalidated_at
+ * @property string|null $invalidated_by
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -79,6 +85,9 @@ use RuntimeException;
     'portal_link',
     'notes',
     'status',
+    // is_archived/archived_at/archived_by/invalidity_reason/invalidated_at/invalidated_by are
+    // intentionally excluded: they're only ever written via archive()/unarchive()/markInvalid()/
+    // clearInvalidFlag() below (using forceFill), never through form mass assignment.
 ])]
 class Tender extends Model
 {
@@ -148,6 +157,9 @@ class Tender extends Model
             'site_visit_date' => 'datetime',
             'publication_date' => 'date',
             'status' => TenderStatus::class,
+            'is_archived' => 'boolean',
+            'archived_at' => 'datetime',
+            'invalidated_at' => 'datetime',
         ];
     }
 
@@ -208,6 +220,22 @@ class Tender extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function archivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'archived_by');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function invalidatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'invalidated_by');
+    }
+
+    /**
      * Move the tender to a new status, enforcing the allowed-transitions map in
      * TenderStatus and recording an audit entry (who, when, from/to) per idea.md M1.
      */
@@ -230,6 +258,79 @@ class Tender extends Model
                 'reason' => $reason,
                 'changed_at' => $changedAt,
             ]);
+        });
+    }
+
+    public function isInvalid(): bool
+    {
+        return $this->invalidated_at !== null;
+    }
+
+    /**
+     * Archive the tender (idea.md M1: tenders are never hard-deleted, only
+     * archived or flagged invalid). Distinct from TenderStatus: a tender can
+     * be archived from any status, including a terminal one like `won`.
+     */
+    public function archive(User $actor): void
+    {
+        $this->forceFill([
+            'is_archived' => true,
+            'archived_at' => now(),
+            'archived_by' => $actor->id,
+        ])->save();
+    }
+
+    public function unarchive(): void
+    {
+        $this->forceFill([
+            'is_archived' => false,
+            'archived_at' => null,
+            'archived_by' => null,
+        ])->save();
+    }
+
+    /**
+     * Flag the tender invalid (idea.md M1: an alternative to hard-delete for
+     * junk/mistaken entries, preserving the record rather than removing it).
+     */
+    public function markInvalid(User $actor, string $reason): void
+    {
+        $this->forceFill([
+            'invalidity_reason' => $reason,
+            'invalidated_at' => now(),
+            'invalidated_by' => $actor->id,
+        ])->save();
+    }
+
+    public function clearInvalidFlag(): void
+    {
+        $this->forceFill([
+            'invalidity_reason' => null,
+            'invalidated_at' => null,
+            'invalidated_by' => null,
+        ])->save();
+    }
+
+    /**
+     * Permanently remove the tender. Per idea.md M1 this is an admin-only
+     * escape hatch for true junk entries — every call must be logged with
+     * who/when/why before the row disappears, via a TenderHardDeletion
+     * snapshot (which carries no FK back to `tenders`, since the row it
+     * describes won't exist once this method returns).
+     */
+    public function hardDelete(User $actor, string $reason): void
+    {
+        DB::transaction(function () use ($actor, $reason): void {
+            TenderHardDeletion::create([
+                'tender_id' => $this->id,
+                'internal_id' => $this->internal_id,
+                'title' => $this->title,
+                'deleted_by' => $actor->id,
+                'reason' => $reason,
+                'deleted_at' => now(),
+            ]);
+
+            $this->delete();
         });
     }
 }

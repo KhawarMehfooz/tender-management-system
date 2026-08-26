@@ -49,6 +49,22 @@ class TenderInfolist
                     ])
                     ->columns(2),
 
+                Section::make(__('tenders.infolist.lifecycle_heading'))
+                    ->icon(Heroicon::OutlinedArchiveBox)
+                    ->schema([
+                        TextEntry::make('archived_at')
+                            ->label(__('tenders.fields.is_archived'))
+                            ->dateTime()
+                            ->visible(fn (Tender $record): bool => $record->is_archived),
+                        TextEntry::make('invalidity_reason')
+                            ->label(__('tenders.fields.invalidity_reason'))
+                            ->color('danger')
+                            ->columnSpanFull()
+                            ->visible(fn (Tender $record): bool => $record->isInvalid()),
+                    ])
+                    ->visible(fn (Tender $record): bool => $record->is_archived || $record->isInvalid())
+                    ->columns(2),
+
                 Section::make(__('tenders.infolist.status_history_heading'))
                     ->icon(Heroicon::OutlinedClock)
                     ->schema([

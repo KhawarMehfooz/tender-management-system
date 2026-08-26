@@ -7,6 +7,7 @@ use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Tender;
+use App\Models\TenderHardDeletion;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 
@@ -173,5 +174,105 @@ describe('status lifecycle', function () {
         }
 
         expect($tender->statusChanges()->count())->toBe(0);
+    });
+});
+
+describe('archiving', function () {
+    it('archives a tender, recording who and when', function () {
+        $tender = Tender::factory()->create();
+        $user = User::factory()->create();
+
+        $tender->archive($user);
+
+        expect($tender->is_archived)->toBeTrue();
+        expect($tender->archived_at)->not->toBeNull();
+        expect($tender->archived_by)->toBe($user->id);
+    });
+
+    it('unarchives a tender, clearing the archive metadata', function () {
+        $tender = Tender::factory()->create();
+        $tender->archive(User::factory()->create());
+
+        $tender->unarchive();
+
+        expect($tender->is_archived)->toBeFalse();
+        expect($tender->archived_at)->toBeNull();
+        expect($tender->archived_by)->toBeNull();
+    });
+
+    it('is a separate axis from TenderStatus, archivable from a terminal status', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::WON]);
+        $user = User::factory()->create();
+
+        $tender->archive($user);
+
+        expect($tender->fresh()->status)->toBe(TenderStatus::WON);
+        expect($tender->fresh()->is_archived)->toBeTrue();
+    });
+
+    it('is not mass-assignable', function () {
+        $tender = Tender::factory()->create();
+
+        $tender->update(['is_archived' => true]);
+
+        expect($tender->fresh()->is_archived)->toBeFalse();
+    });
+});
+
+describe('invalidity flag', function () {
+    it('flags a tender invalid with a reason, actor, and timestamp', function () {
+        $tender = Tender::factory()->create();
+        $user = User::factory()->create();
+
+        $tender->markInvalid($user, 'Duplicate entry');
+
+        expect($tender->isInvalid())->toBeTrue();
+        expect($tender->invalidity_reason)->toBe('Duplicate entry');
+        expect($tender->invalidated_by)->toBe($user->id);
+        expect($tender->invalidated_at)->not->toBeNull();
+    });
+
+    it('clears the invalidity flag', function () {
+        $tender = Tender::factory()->create();
+        $tender->markInvalid(User::factory()->create(), 'Duplicate entry');
+
+        $tender->clearInvalidFlag();
+
+        expect($tender->isInvalid())->toBeFalse();
+        expect($tender->invalidity_reason)->toBeNull();
+        expect($tender->invalidated_by)->toBeNull();
+    });
+
+    it('is not mass-assignable', function () {
+        $tender = Tender::factory()->create();
+
+        $tender->update(['invalidity_reason' => 'sneaky']);
+
+        expect($tender->fresh()->invalidity_reason)->toBeNull();
+    });
+});
+
+describe('admin hard delete', function () {
+    it('permanently removes the tender', function () {
+        $tender = Tender::factory()->create();
+        $user = User::factory()->create();
+
+        $tender->hardDelete($user, 'Genuine test junk entry');
+
+        expect(Tender::withoutGlobalScopes()->find($tender->id))->toBeNull();
+    });
+
+    it('logs who, when, and why before the row disappears', function () {
+        $tender = Tender::factory()->create();
+        $user = User::factory()->create();
+
+        $tender->hardDelete($user, 'Genuine test junk entry');
+
+        $log = TenderHardDeletion::query()->where('tender_id', $tender->id)->firstOrFail();
+        expect($log->internal_id)->toBe($tender->internal_id);
+        expect($log->title)->toBe($tender->title);
+        expect($log->deleted_by)->toBe($user->id);
+        expect($log->reason)->toBe('Genuine test junk entry');
+        expect($log->deleted_at)->not->toBeNull();
     });
 });

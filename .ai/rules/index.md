@@ -13,6 +13,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Filament/Resources/** | .ai/rules/resources.md |
 | app/Filament/** | .ai/rules/filament.md |
 | app/Filament/**,resources/views/filament/**,resources/css/filament/** | .ai/rules/css-filament.md |
+| app/Models/Tender.php,app/Models/TenderHardDeletion.php,app/Filament/Resources/Tenders/** | .ai/rules/resources-tenders.md |
 | app/Models/Tender.php,app/Models/Scopes/**,app/Models/User.php | .ai/rules/scopes-models.md |
 | resources/**,lang/** | .ai/rules/i18n.md |
 | app/Policies/**,app/Http/Controllers/**,app/Livewire/** | .ai/rules/permissions.md |
