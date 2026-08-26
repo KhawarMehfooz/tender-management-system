@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Tenders\Schemas;
 
 use App\Enums\Right;
 use App\Models\Tender;
+use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ViewEntry;
 use Filament\Schemas\Components\Section;
@@ -46,6 +47,26 @@ class TenderInfolist
                                 ? __('tenders.fields.estimated_contract_volume_unknown')
                                 : __('tenders.infolist.money_eur', ['amount' => number_format((float) $record->estimated_contract_volume, 2)]))
                             ->visible(fn (): bool => auth()->user()?->can(Right::SEE_PRICES->value) ?? false),
+                    ])
+                    ->columns(2),
+
+                Section::make(__('tenders.infolist.team_heading'))
+                    ->icon(Heroicon::OutlinedUserGroup)
+                    ->schema([
+                        TextEntry::make('owner.name')
+                            ->label(__('tenders.fields.owner_id')),
+                        RepeatableEntry::make('teamMembers')
+                            ->label(__('tenders.fields.team_members'))
+                            ->schema([
+                                TextEntry::make('user.name')
+                                    ->label(__('tenders.fields.team_member_user')),
+                                TextEntry::make('functional_role')
+                                    ->label(__('tenders.fields.team_member_role'))
+                                    ->badge(),
+                            ])
+                            ->columns(2)
+                            ->columnSpanFull()
+                            ->visible(fn (Tender $record): bool => $record->teamMembers()->exists()),
                     ])
                     ->columns(2),
 

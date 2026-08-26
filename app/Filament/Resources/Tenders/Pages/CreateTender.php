@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Tenders\Pages;
 
 use App\Enums\Right;
+use App\Filament\Resources\Tenders\Schemas\TenderForm;
 use App\Filament\Resources\Tenders\TenderResource;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -24,6 +25,15 @@ class CreateTender extends CreateRecord
 
         if ($categoryId = auth()->user()?->service_category_id) {
             $data['service_category_id'] = $categoryId;
+        }
+
+        /**
+         * Belt-and-braces per [[resources-tenders]]/[[permissions]]: the owner select is
+         * disabled in the UI for anyone without team-assignment rights, but never trust that
+         * alone — force the owner back to the creating user regardless of what was submitted.
+         */
+        if (! TenderForm::canManageTeam()) {
+            $data['owner_id'] = auth()->id();
         }
 
         return $data;

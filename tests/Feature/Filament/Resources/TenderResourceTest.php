@@ -2,6 +2,7 @@
 
 use App\Enums\Right;
 use App\Enums\RoleName;
+use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
 use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
@@ -14,6 +15,7 @@ use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Tender;
 use App\Models\TenderHardDeletion;
+use App\Models\TenderTeamMember;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
@@ -378,5 +380,138 @@ describe('hard delete action', function () {
         Livewire::test(ListTenders::class)
             ->callAction(TestAction::make('hardDelete')->table($tender), ['reason' => ''])
             ->assertHasFormErrors(['reason' => 'required']);
+    });
+});
+
+describe('team assignment', function () {
+    it('disables the owner and team member fields for a user without team-assignment rights', function () {
+        Livewire::test(CreateTender::class)
+            ->assertFormFieldIsDisabled('owner_id')
+            ->assertFormFieldIsDisabled('teamMembers');
+    });
+
+    it('enables the owner and team member fields for a team lead', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        Livewire::test(CreateTender::class)
+            ->assertFormFieldIsEnabled('owner_id')
+            ->assertFormFieldIsEnabled('teamMembers');
+    });
+
+    it('defaults the owner to the creating user when they lack team-assignment rights', function () {
+        $category = ServiceCategory::factory()->create(['code' => 'SEC']);
+        $sector = Sector::factory()->create();
+        $procedure = ProcurementProcedure::factory()->create();
+        $source = Source::factory()->create();
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(CreateTender::class)
+            ->fillForm([
+                'title' => 'Guarding services for the airport',
+                'contracting_authority' => 'City of Example',
+                'service_category_id' => $category->id,
+                'sector_id' => $sector->id,
+                'procurement_procedure_id' => $procedure->id,
+                'source_id' => $source->id,
+                'submission_deadline' => now()->addWeeks(2),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $tender = Tender::where('title', 'Guarding services for the airport')->firstOrFail();
+        expect($tender->owner_id)->toBe($user->id);
+    });
+
+    it('lets a team lead set the owner and add team members on create', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $category = ServiceCategory::factory()->create(['code' => 'SEC']);
+        $sector = Sector::factory()->create();
+        $procedure = ProcurementProcedure::factory()->create();
+        $source = Source::factory()->create();
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+
+        Livewire::test(CreateTender::class)
+            ->fillForm([
+                'title' => 'Guarding services for the museum',
+                'contracting_authority' => 'City of Example',
+                'service_category_id' => $category->id,
+                'sector_id' => $sector->id,
+                'procurement_procedure_id' => $procedure->id,
+                'source_id' => $source->id,
+                'submission_deadline' => now()->addWeeks(2),
+                'owner_id' => $owner->id,
+                'teamMembers' => [
+                    ['user_id' => $member->id, 'functional_role' => TeamRole::QUALITY_CONTROL->value],
+                ],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $tender = Tender::where('title', 'Guarding services for the museum')->firstOrFail();
+        expect($tender->owner_id)->toBe($owner->id);
+
+        $teamMember = TenderTeamMember::where('tender_id', $tender->id)->firstOrFail();
+        expect($teamMember->user_id)->toBe($member->id);
+        expect($teamMember->functional_role)->toBe(TeamRole::QUALITY_CONTROL);
+    });
+
+    it('strips a smuggled owner value server-side when creating without team-assignment rights', function () {
+        $category = ServiceCategory::factory()->create(['code' => 'SEC']);
+        $sector = Sector::factory()->create();
+        $procedure = ProcurementProcedure::factory()->create();
+        $source = Source::factory()->create();
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $this->actingAs($user);
+
+        Livewire::test(CreateTender::class)
+            ->fillForm([
+                'title' => 'Guarding services for the depot',
+                'contracting_authority' => 'City of Example',
+                'service_category_id' => $category->id,
+                'sector_id' => $sector->id,
+                'procurement_procedure_id' => $procedure->id,
+                'source_id' => $source->id,
+                'submission_deadline' => now()->addWeeks(2),
+                'owner_id' => $otherUser->id,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $tender = Tender::where('title', 'Guarding services for the depot')->firstOrFail();
+        expect($tender->owner_id)->toBe($user->id);
+    });
+
+    it('keeps the existing owner when a user without team-assignment rights tries to change it on edit', function () {
+        $originalOwner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $originalOwner->id]);
+        $otherUser = User::factory()->create();
+
+        Livewire::test(EditTender::class, ['record' => $tender->getRouteKey()])
+            ->fillForm(['owner_id' => $otherUser->id])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        expect($tender->refresh()->owner_id)->toBe($originalOwner->id);
+    });
+
+    it('lets a team lead reassign the owner on edit', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $tender = Tender::factory()->create();
+        $newOwner = User::factory()->create();
+
+        Livewire::test(EditTender::class, ['record' => $tender->getRouteKey()])
+            ->fillForm(['owner_id' => $newOwner->id])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        expect($tender->refresh()->owner_id)->toBe($newOwner->id);
     });
 });

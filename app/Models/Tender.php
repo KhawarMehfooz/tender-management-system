@@ -46,6 +46,7 @@ use RuntimeException;
  * @property string|null $cpv_code_id
  * @property string|null $portal_link
  * @property string|null $notes
+ * @property string $owner_id
  * @property TenderStatus $status
  * @property bool $is_archived
  * @property Carbon|null $archived_at
@@ -84,6 +85,7 @@ use RuntimeException;
     'cpv_code_id',
     'portal_link',
     'notes',
+    'owner_id',
     'status',
     // is_archived/archived_at/archived_by/invalidity_reason/invalidated_at/invalidated_by are
     // intentionally excluded: they're only ever written via archive()/unarchive()/markInvalid()/
@@ -217,6 +219,22 @@ class Tender extends Model
     public function statusChanges(): HasMany
     {
         return $this->hasMany(TenderStatusChange::class)->latest('changed_at');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * @return HasMany<TenderTeamMember, $this>
+     */
+    public function teamMembers(): HasMany
+    {
+        return $this->hasMany(TenderTeamMember::class);
     }
 
     /**

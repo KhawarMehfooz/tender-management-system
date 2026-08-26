@@ -3,11 +3,15 @@
 namespace App\Filament\Resources\Tenders\Schemas;
 
 use App\Enums\Right;
+use App\Enums\RoleName;
+use App\Enums\TeamRole;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
 use App\Models\Source;
+use App\Models\User;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -23,11 +27,54 @@ use Illuminate\Database\Eloquent\Builder;
 
 class TenderForm
 {
+    /**
+     * Only team leads, department heads, and super admins may assign the owner or
+     * team members (idea.md M2) — everyone else sees the Team step read-only.
+     */
+    public static function canManageTeam(): bool
+    {
+        return auth()->user()?->hasAnyRole([
+            RoleName::TEAM_LEAD->value,
+            RoleName::DEPARTMENT_HEAD->value,
+            RoleName::SUPER_ADMIN->value,
+        ]) ?? false;
+    }
+
+    /**
+     * Restrict owner/team-member options to the acting user's own service category plus
+     * management-level users (null category), per [[scopes-models]]. Deliberately keyed off
+     * the *acting user's* category rather than the tender's own service_category_id field:
+     * a category-scoped actor's tender is always pinned to their own category anyway (see
+     * service_category_id's disabled+forced pattern below), so this avoids a fragile
+     * cross-field Get() dependency inside a multi-step wizard while landing on the same
+     * result. Management-level actors (null category) see every user.
+     *
+     * @return array<string, string>
+     */
+    private static function scopedUserOptions(): array
+    {
+        $categoryId = auth()->user()?->service_category_id;
+
+        return User::query()
+            ->when(
+                $categoryId,
+                fn (Builder $query) => $query->where(function (Builder $query) use ($categoryId): void {
+                    $query->whereNull('service_category_id')
+                        ->orWhere('service_category_id', $categoryId);
+                }),
+            )
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Wizard::make([
+                    // Steps are skippable so users can jump around and fill fields out of
+                    // order; required-field validation still runs in full on create/save.
                     Step::make(__('tenders.form.steps.basic_info'))
                         ->icon(Heroicon::OutlinedDocumentText)
                         ->schema([
@@ -193,7 +240,43 @@ class TenderForm
                                     ->columnSpanFull(),
                             ]),
                         ]),
-                ])->columnSpanFull(),
+
+                    Step::make(__('tenders.form.steps.team'))
+                        ->icon(Heroicon::OutlinedUserGroup)
+                        ->schema([
+                            Select::make('owner_id')
+                                ->label(__('tenders.fields.owner_id'))
+                                ->prefixIcon(Heroicon::OutlinedUser)
+                                ->options(fn (): array => static::scopedUserOptions())
+                                ->default(fn (): ?string => static::canManageTeam() ? null : auth()->id())
+                                ->required()
+                                ->searchable()
+                                ->disabled(fn (): bool => ! static::canManageTeam())
+                                ->dehydrated(),
+                            Repeater::make('teamMembers')
+                                ->label(__('tenders.fields.team_members'))
+                                ->relationship()
+                                ->schema([
+                                    Select::make('user_id')
+                                        ->label(__('tenders.fields.team_member_user'))
+                                        ->options(fn (): array => static::scopedUserOptions())
+                                        ->required()
+                                        ->searchable(),
+                                    Select::make('functional_role')
+                                        ->label(__('tenders.fields.team_member_role'))
+                                        ->options(TeamRole::class)
+                                        ->required(),
+                                ])
+                                ->columns(2)
+                                ->columnSpanFull()
+                                ->defaultItems(0)
+                                ->addActionLabel(__('tenders.actions.add_team_member'))
+                                ->disabled(fn (): bool => ! static::canManageTeam())
+                                ->dehydrated(fn (): bool => static::canManageTeam()),
+                        ]),
+                ])
+                    ->skippable()
+                    ->columnSpanFull(),
             ]);
     }
 }

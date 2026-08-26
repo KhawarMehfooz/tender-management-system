@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Tenders\Pages;
 
 use App\Enums\Right;
+use App\Filament\Resources\Tenders\Schemas\TenderForm;
 use App\Filament\Resources\Tenders\TenderResource;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
@@ -36,6 +37,15 @@ class EditTender extends EditRecord
 
         if ($categoryId = auth()->user()?->service_category_id) {
             $data['service_category_id'] = $categoryId;
+        }
+
+        /**
+         * Belt-and-braces per [[resources-tenders]]/[[permissions]]: the owner select is
+         * disabled in the UI for anyone without team-assignment rights, but never trust that
+         * alone — force it back to the record's existing owner regardless of what was submitted.
+         */
+        if (! TenderForm::canManageTeam()) {
+            $data['owner_id'] = $this->getRecord()->owner_id;
         }
 
         return $data;

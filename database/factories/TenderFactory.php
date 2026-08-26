@@ -8,6 +8,7 @@ use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Tender;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -48,6 +49,7 @@ class TenderFactory extends Factory
             'source_id' => Source::factory(),
             'portal_link' => fake()->optional()->url(),
             'notes' => fake()->optional()->paragraph(),
+            'owner_id' => User::factory(),
             'status' => TenderStatus::INTAKE,
         ];
     }

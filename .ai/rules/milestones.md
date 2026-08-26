@@ -7,9 +7,30 @@ Full milestone specs live in [idea.md](../../idea.md) (M1–M13). This file just
 the build currently stands so an assistant knows what's in scope right now vs. not-yet-built
 vs. explicitly deferred.
 
-**M1 — Foundation is complete.** Next up: **M2 — Team & Tasks** (tender team assignment, tasks
-with dependencies, the final-submission dependency gate, notification centre) — not started,
-don't begin it without the user asking explicitly.
+**M1 — Foundation is complete.** **M2 — Team & Tasks** is now in progress, started at the
+user's explicit request. Team assignment (below) is done; tasks with dependencies, the
+final-submission dependency gate, and the notification centre are not started — don't begin
+them without the user asking explicitly.
+
+Progress within M2:
+- [x] Team assignment: one required tender owner (`Tender.owner_id`, NOT NULL FK to `users`,
+  `restrictOnDelete`) plus any number of team members in functional roles
+  (`App\Enums\TeamRole`: calculation/concept/evidence-documents/quality-control/
+  final-approval) via a new `tender_team_members` table (`TenderTeamMember` model, HasMany
+  from `Tender`, unique on tender_id+user_id+functional_role — many users can share a
+  functional role, one user can hold several roles via multiple rows). UI: a 6th
+  `TenderForm` wizard step ("Team") with an owner `Select` and a
+  `Repeater::make('teamMembers')->relationship()`. Gated by `TenderForm::canManageTeam()`
+  (team lead/department head/super admin via `hasAnyRole`) — everyone else sees the step
+  read-only (`->disabled()`, never hidden), with server-side belt-and-braces enforcement in
+  `CreateTender`/`EditTender`'s mutate hooks (owner forced to the creator on create, to the
+  existing owner on edit, for unauthorized actors) and `->dehydrated()` gating on the
+  Repeater so an unauthorized submission never reaches the relationship-save step at all. See
+  [[resources-tenders]] for the full pattern and the Get()-fragility trap it avoids in the
+  owner/team-member option scoping. `TenderInfolist` gained a matching read-only "Team"
+  section. Tests in `TenderResourceTest`'s "team assignment" group cover: field
+  enabled/disabled by role, default-to-creator on create, smuggled-value stripping on create
+  and edit, and a team lead successfully setting owner + adding a team member.
 
 Progress within M1:
 - [x] Roles & rights: `spatie/laravel-permission` (UUID-adapted, see [[models]]/[[seeders]]),
@@ -112,11 +133,12 @@ Progress within M1:
   super admin, row actually gone afterward, log captures who/when/why, reason required.
 
 **M1 acceptance points (idea.md) are now all met** — every checklist item above is checked.
-Don't start M2 (Team & Tasks) scope without the user asking for it explicitly.
+M2 is in progress (team assignment done, tasks/dependencies/notifications not started) — don't
+build ahead into remaining M2 scope, or into M3+, without the user asking for it explicitly.
 
-Update the checklist above as work lands, and flip the milestone line when M1's acceptance
+Update the checklist above as work lands, and flip the milestone line when M2's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the
-user asking for it explicitly — e.g. don't wire up the M5 calculation engine while M1 is still
+user asking for it explicitly — e.g. don't wire up the M5 calculation engine while M2 is still
 in progress, even if it seems convenient.
 
 M13 (import connectors, AI-assisted extraction) is explicitly deferred — don't build it, but

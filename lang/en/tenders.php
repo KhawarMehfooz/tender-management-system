@@ -10,6 +10,7 @@ return [
             'dates_deadlines' => 'Dates & deadlines',
             'contract_terms' => 'Contract terms',
             'source_notes' => 'Source & notes',
+            'team' => 'Team',
         ],
     ],
     'fields' => [
@@ -41,6 +42,10 @@ return [
         'cpv_code_id' => 'CPV code',
         'portal_link' => 'Portal link',
         'notes' => 'Notes',
+        'owner_id' => 'Owner',
+        'team_members' => 'Team members',
+        'team_member_user' => 'User',
+        'team_member_role' => 'Functional role',
         'status' => 'Status',
         'status_change_reason' => 'Reason',
         'is_archived' => 'Archived',
@@ -50,6 +55,7 @@ return [
         'updated_at' => 'Updated at',
     ],
     'actions' => [
+        'add_team_member' => 'Add team member',
         'change_status' => 'Change status',
         'change_status_success' => 'Status updated',
         'archive' => 'Archive',
@@ -65,6 +71,7 @@ return [
     ],
     'infolist' => [
         'overview_heading' => 'Overview',
+        'team_heading' => 'Team',
         'lifecycle_heading' => 'Archive & validity',
         'status_history_heading' => 'Status history',
         'meta_heading' => 'Record history',
