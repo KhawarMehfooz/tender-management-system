@@ -71,7 +71,10 @@ class TenderForm
                                     ->relationship('serviceCategory', 'name', fn (Builder $query) => $query->where('active', true))
                                     ->required()
                                     ->searchable()
-                                    ->preload(),
+                                    ->preload()
+                                    ->default(fn (): ?string => auth()->user()?->service_category_id)
+                                    ->disabled(fn (): bool => (bool) auth()->user()?->service_category_id)
+                                    ->dehydrated(),
                                 Select::make('sector_id')
                                     ->label(__('tenders.fields.sector_id'))
                                     ->prefixIcon(Heroicon::OutlinedBriefcase)

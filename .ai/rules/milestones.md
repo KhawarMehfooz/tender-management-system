@@ -77,10 +77,18 @@ Progress within M1:
   has no action to gate yet (final submission doesn't exist until M5/M8). Tests in
   `TenderResourceTest` cover: field hidden/visible on the form by right, smuggled value stripped
   on both create and edit, and the view-page entry hidden/visible by right.
-- [ ] Category-scoped views: idea.md M1 requires management to span all service categories at
-  once while category-level users stay scoped to their own category/categories. Not built yet
-  — `TendersTable`/`ListTenders` currently show every tender to every authenticated user
-  regardless of role.
+- [x] Category-scoped views: `App\Models\Scopes\ServiceCategoryScope`, a global scope on
+  `Tender` (registered in `Tender::booted()`), restricts every query to
+  `auth()->user()->service_category_id` when it's set; a `null` category (the seeded super
+  admin's state) means management-level and spans all categories — see [[scopes-models]] for
+  the full rationale and why this is keyed off the nullable FK rather than role. Write-side
+  enforced too: `TenderForm`'s category Select defaults to and disables on the user's own
+  category when scoped, and `CreateTender`/`EditTender` force `service_category_id` back to it
+  regardless of submitted value. A scoped user hitting a foreign tender's view/edit route gets
+  a `ModelNotFoundException` (404), not a hidden-but-reachable page. Tests in
+  `TenderResourceTest`'s "category-scoped views" group cover: management sees all, a scoped
+  user sees only their own, foreign view/edit blocked, and create is pinned to the user's own
+  category despite a different submitted value.
 - [ ] Archive/invalid field: idea.md M1 requires archiving/flagging-invalid to be its own field
   (e.g. `is_archived`/`invalidity_reason`), separate from `TenderStatus` — a won tender must
   stay archivable later, so this can't be folded into `changeStatusTo()`'s transition map. Not
@@ -91,7 +99,7 @@ Progress within M1:
   `false` unconditionally (see [[resources]]) — that's the correct default for the regular
   resource, but the separate admin path doesn't exist yet.
 
-These three are the remaining open M1 acceptance points.
+These two are the remaining open M1 acceptance points.
 
 Update the checklist above as work lands, and flip the milestone line when M1's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the

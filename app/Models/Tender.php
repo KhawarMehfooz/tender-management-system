@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\TenderStatus;
 use App\Exceptions\InvalidTenderStatusTransitionException;
+use App\Models\Scopes\ServiceCategoryScope;
 use Database\Factories\TenderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -86,6 +87,8 @@ class Tender extends Model
 
     protected static function booted(): void
     {
+        static::addGlobalScope(new ServiceCategoryScope);
+
         static::creating(function (Tender $tender): void {
             if ($tender->internal_id) {
                 return;

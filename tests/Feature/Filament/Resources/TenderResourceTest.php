@@ -15,6 +15,7 @@ use App\Models\Tender;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -195,5 +196,78 @@ describe('view page', function () {
 
         Livewire::test(ViewTender::class, ['record' => $tender->getRouteKey()])
             ->assertSee('Fits our profile');
+    });
+});
+
+describe('category-scoped views', function () {
+    it('shows a management user (no assigned category) tenders from every category', function () {
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $tenderA = Tender::factory()->create(['service_category_id' => $categoryA->id]);
+        $tenderB = Tender::factory()->create(['service_category_id' => $categoryB->id]);
+
+        Livewire::test(ListTenders::class)
+            ->assertCanSeeTableRecords([$tenderA, $tenderB]);
+    });
+
+    it('scopes a category-assigned user to only their own category', function () {
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $tenderA = Tender::factory()->create(['service_category_id' => $categoryA->id]);
+        $tenderB = Tender::factory()->create(['service_category_id' => $categoryB->id]);
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $categoryA->id]));
+
+        Livewire::test(ListTenders::class)
+            ->assertCanSeeTableRecords([$tenderA])
+            ->assertCanNotSeeTableRecords([$tenderB]);
+    });
+
+    it('blocks a category-scoped user from viewing a tender outside their category', function () {
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $foreignTender = Tender::factory()->create(['service_category_id' => $categoryB->id]);
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $categoryA->id]));
+
+        expect(fn () => Livewire::test(ViewTender::class, ['record' => $foreignTender->getRouteKey()]))
+            ->toThrow(ModelNotFoundException::class);
+    });
+
+    it('blocks a category-scoped user from editing a tender outside their category', function () {
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $foreignTender = Tender::factory()->create(['service_category_id' => $categoryB->id]);
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $categoryA->id]));
+
+        expect(fn () => Livewire::test(EditTender::class, ['record' => $foreignTender->getRouteKey()]))
+            ->toThrow(ModelNotFoundException::class);
+    });
+
+    it('forces a new tender into the scoped user\'s own category regardless of what is submitted', function () {
+        $ownCategory = ServiceCategory::factory()->create(['code' => 'OWN']);
+        $otherCategory = ServiceCategory::factory()->create(['code' => 'OTH']);
+        $sector = Sector::factory()->create();
+        $procedure = ProcurementProcedure::factory()->create();
+        $source = Source::factory()->create();
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $ownCategory->id]));
+
+        Livewire::test(CreateTender::class)
+            ->fillForm([
+                'title' => 'Cleaning services for the town hall',
+                'contracting_authority' => 'City of Example',
+                'service_category_id' => $otherCategory->id,
+                'sector_id' => $sector->id,
+                'procurement_procedure_id' => $procedure->id,
+                'source_id' => $source->id,
+                'submission_deadline' => now()->addWeeks(2),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $tender = Tender::where('title', 'Cleaning services for the town hall')->firstOrFail();
+        expect($tender->service_category_id)->toBe($ownCategory->id);
     });
 });

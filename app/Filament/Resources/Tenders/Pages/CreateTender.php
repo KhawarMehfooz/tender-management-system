@@ -22,6 +22,10 @@ class CreateTender extends CreateRecord
             unset($data['estimated_contract_volume'], $data['estimated_contract_volume_unknown']);
         }
 
+        if ($categoryId = auth()->user()?->service_category_id) {
+            $data['service_category_id'] = $categoryId;
+        }
+
         return $data;
     }
 }
