@@ -42,8 +42,20 @@ return [
         'portal_link' => 'Portal link',
         'notes' => 'Notes',
         'status' => 'Status',
+        'status_change_reason' => 'Reason',
         'created_at' => 'Created at',
         'updated_at' => 'Updated at',
+    ],
+    'actions' => [
+        'change_status' => 'Change status',
+        'change_status_success' => 'Status updated',
+    ],
+    'infolist' => [
+        'overview_heading' => 'Overview',
+        'status_history_heading' => 'Status history',
+        'meta_heading' => 'Record history',
+        'unknown_actor' => 'Unknown user',
+        'status_change_from' => 'From',
     ],
     'status' => [
         'intake' => 'Intake',

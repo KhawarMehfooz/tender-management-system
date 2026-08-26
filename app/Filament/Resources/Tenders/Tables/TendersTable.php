@@ -3,7 +3,15 @@
 namespace App\Filament\Resources\Tenders\Tables;
 
 use App\Enums\TenderStatus;
+use App\Models\Tender;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -57,6 +65,32 @@ class TendersTable
                     ->relationship('source', 'name'),
             ])
             ->recordActions([
+                Action::make('changeStatus')
+                    ->label(__('tenders.actions.change_status'))
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->color('gray')
+                    ->visible(fn (Tender $record): bool => $record->status->allowedTransitions() !== [])
+                    ->modalWidth(Width::Medium)
+                    ->schema(fn (Tender $record) => [
+                        Select::make('status')
+                            ->label(__('tenders.fields.status'))
+                            ->prefixIcon(Heroicon::OutlinedFlag)
+                            ->options(fn () => collect($record->status->allowedTransitions())
+                                ->mapWithKeys(fn (TenderStatus $status) => [$status->value => $status->getLabel()]))
+                            ->required(),
+                        Textarea::make('reason')
+                            ->label(__('tenders.fields.status_change_reason'))
+                            ->rows(2),
+                    ])
+                    ->action(function (Tender $record, array $data): void {
+                        $record->changeStatusTo(TenderStatus::from($data['status']), auth()->user(), $data['reason'] ?? null);
+                    })
+                    ->successNotification(
+                        Notification::make()
+                            ->success()
+                            ->title(__('tenders.actions.change_status_success')),
+                    ),
+                ViewAction::make(),
                 EditAction::make(),
             ]);
     }

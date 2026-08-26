@@ -12,7 +12,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/**,database/migrations/**,database/factories/** | .ai/rules/data-integrity.md |
 | app/Filament/Resources/** | .ai/rules/resources.md |
 | app/Filament/** | .ai/rules/filament.md |
+| app/Filament/**,resources/views/filament/**,resources/css/filament/** | .ai/rules/css-filament.md |
 | config/permission.php,database/seeders/** | .ai/rules/seeders.md |
-| app/Console/Commands/Import*.php,database/seeders/*CodeSeeder.php | .ai/rules/commands-seeders.md |
 | resources/**,lang/** | .ai/rules/i18n.md |
 | app/Policies/**,app/Http/Controllers/**,app/Livewire/** | .ai/rules/permissions.md |
+| app/Models/Tender.php,app/Enums/TenderStatus.php,app/Filament/Resources/Tenders/** | .ai/rules/tenders.md |

@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Enums\TenderStatus;
+use App\Exceptions\InvalidTenderStatusTransitionException;
 use Database\Factories\TenderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -192,5 +194,39 @@ class Tender extends Model
     public function cpvCode(): BelongsTo
     {
         return $this->belongsTo(CpvCode::class);
+    }
+
+    /**
+     * @return HasMany<TenderStatusChange, $this>
+     */
+    public function statusChanges(): HasMany
+    {
+        return $this->hasMany(TenderStatusChange::class)->latest('changed_at');
+    }
+
+    /**
+     * Move the tender to a new status, enforcing the allowed-transitions map in
+     * TenderStatus and recording an audit entry (who, when, from/to) per idea.md M1.
+     */
+    public function changeStatusTo(TenderStatus $newStatus, User $actor, ?string $reason = null): void
+    {
+        if (! $this->status->canTransitionTo($newStatus)) {
+            throw InvalidTenderStatusTransitionException::make($this->status, $newStatus);
+        }
+
+        DB::transaction(function () use ($newStatus, $actor, $reason): void {
+            $fromStatus = $this->status;
+            $changedAt = now();
+
+            $this->update(['status' => $newStatus]);
+
+            $this->statusChanges()->create([
+                'from_status' => $fromStatus,
+                'to_status' => $newStatus,
+                'changed_by' => $actor->id,
+                'reason' => $reason,
+                'changed_at' => $changedAt,
+            ]);
+        });
     }
 }

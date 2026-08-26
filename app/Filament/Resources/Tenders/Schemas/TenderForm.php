@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Tenders\Schemas;
 
-use App\Enums\TenderStatus;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
 use App\Models\Source;
@@ -177,13 +176,6 @@ class TenderForm
                                     ->required()
                                     ->searchable()
                                     ->preload(),
-                                Select::make('status')
-                                    ->label(__('tenders.fields.status'))
-                                    ->prefixIcon(Heroicon::OutlinedFlag)
-                                    ->options(TenderStatus::class)
-                                    ->default(TenderStatus::INTAKE)
-                                    ->searchable()
-                                    ->required(),
                                 TextInput::make('portal_link')
                                     ->label(__('tenders.fields.portal_link'))
                                     ->prefixIcon(Heroicon::OutlinedLink)

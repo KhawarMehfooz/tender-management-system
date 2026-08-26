@@ -1,10 +1,13 @@
 <?php
 
+use App\Enums\TenderStatus;
+use App\Exceptions\InvalidTenderStatusTransitionException;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Tender;
+use App\Models\User;
 use Illuminate\Database\QueryException;
 
 describe('internal ID generation', function () {
@@ -88,4 +91,87 @@ describe('lookup delete protection', function () {
 
         $source->delete();
     })->throws(QueryException::class);
+});
+
+describe('status lifecycle', function () {
+    it('moves through the active phases in order', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::INTAKE]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::REVIEW, $user);
+
+        expect($tender->fresh()->status)->toBe(TenderStatus::REVIEW);
+    });
+
+    it('rejects skipping ahead in the active phases', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::INTAKE]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::DECISION, $user);
+    })->throws(InvalidTenderStatusTransitionException::class);
+
+    it('rejects moving backward to a previous phase', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::DECISION]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::REVIEW, $user);
+    })->throws(InvalidTenderStatusTransitionException::class);
+
+    it('allows cancelling from any active phase, not just the end of the pipeline', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::PROCESSING]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::CANCELLED, $user);
+
+        expect($tender->fresh()->status)->toBe(TenderStatus::CANCELLED);
+    });
+
+    it('rejects won/lost before a bid has reached submission', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::REVIEW]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::WON, $user);
+    })->throws(InvalidTenderStatusTransitionException::class);
+
+    it('allows won/lost from submission or follow-up', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::FOLLOW_UP]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::WON, $user);
+
+        expect($tender->fresh()->status)->toBe(TenderStatus::WON);
+    });
+
+    it('rejects any transition out of a terminal status', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::WON]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::FOLLOW_UP, $user);
+    })->throws(InvalidTenderStatusTransitionException::class);
+
+    it('records an audit entry with the actor, reason, and both statuses', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::INTAKE]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::REVIEW, $user, 'Looks promising');
+
+        $change = $tender->statusChanges()->first();
+        expect($change->from_status)->toBe(TenderStatus::INTAKE);
+        expect($change->to_status)->toBe(TenderStatus::REVIEW);
+        expect($change->changed_by)->toBe($user->id);
+        expect($change->reason)->toBe('Looks promising');
+        expect($change->changed_at)->not->toBeNull();
+    });
+
+    it('does not write an audit entry when the transition is rejected', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::INTAKE]);
+        $user = User::factory()->create();
+
+        try {
+            $tender->changeStatusTo(TenderStatus::DECISION, $user);
+        } catch (InvalidTenderStatusTransitionException) {
+        }
+
+        expect($tender->statusChanges()->count())->toBe(0);
+    });
 });

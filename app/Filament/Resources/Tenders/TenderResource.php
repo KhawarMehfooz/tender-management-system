@@ -5,7 +5,9 @@ namespace App\Filament\Resources\Tenders;
 use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
+use App\Filament\Resources\Tenders\Pages\ViewTender;
 use App\Filament\Resources\Tenders\Schemas\TenderForm;
+use App\Filament\Resources\Tenders\Schemas\TenderInfolist;
 use App\Filament\Resources\Tenders\Tables\TendersTable;
 use App\Models\Tender;
 use BackedEnum;
@@ -58,6 +60,11 @@ class TenderResource extends Resource
         return TenderForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return TenderInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return TendersTable::configure($table);
@@ -75,6 +82,7 @@ class TenderResource extends Resource
         return [
             'index' => ListTenders::route('/'),
             'create' => CreateTender::route('/create'),
+            'view' => ViewTender::route('/{record}'),
             'edit' => EditTender::route('/{record}/edit'),
         ];
     }

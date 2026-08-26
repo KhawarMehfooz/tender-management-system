@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Tenders\Pages;
 
 use App\Filament\Resources\Tenders\TenderResource;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditTender extends EditRecord
@@ -15,6 +16,8 @@ class EditTender extends EditRecord
      */
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            ViewAction::make(),
+        ];
     }
 }

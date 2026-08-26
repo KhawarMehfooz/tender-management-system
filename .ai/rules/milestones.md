@@ -46,12 +46,25 @@ Progress within M1:
   classification; dates & deadlines; contract terms; source & notes) per [[resources]]'s
   size/grouping rule — List/Create/Edit only, no delete path (tenders are never hard-deleted,
   see [[data-integrity]]).
-- [ ] Lifecycle state machine: `status` column + `TenderStatus` enum (12 values: 7 active
-  phases + 5 terminal outcomes realizing the spec's "closure" phase) exist on `Tender`, but
-  transition enforcement and the status-change audit log are not built yet — deliberately
-  deferred to a follow-up task.
-- [ ] Field-level rights enforcement wired into the Tender resource once the state machine (and
-  a Tender detail/view page) exist.
+- [x] Lifecycle state machine: `TenderStatus::allowedTransitions()`/`canTransitionTo()` encode
+  the transition map — the 7 active phases (intake→review→decision→processing→quality→
+  submission→follow-up) only move forward one step at a time (no skipping, no going back);
+  `cancelled`/`not-evaluated`/`excluded` are reachable from any active phase; `won`/`lost` only
+  from `submission`/`follow-up` (a bid must exist first); terminal statuses have no further
+  transitions. `Tender::changeStatusTo()` enforces the map (throws
+  `InvalidTenderStatusTransitionException` otherwise) and, in the same DB transaction, writes
+  an audit row to `tender_status_changes` (`TenderStatusChange` model: from/to status, actor
+  `changed_by`, optional `reason`, `changed_at` — immutable, no `updated_at`). UI: per
+  [[resources]]'s decision, status is no longer editable via the create/edit wizard (removed
+  from `TenderForm`; DB still defaults new tenders to `intake`) — instead a dedicated
+  "Change status" table row action (`TendersTable`) offers only the record's currently-valid
+  next statuses via a modal (status select + optional reason), hidden once a tender reaches a
+  terminal status. A `TenderInfolist`/`ViewTender` page now exists (route `view`, reachable via
+  a `ViewAction` on the table and on `EditTender`'s header) showing an overview section and a
+  "Status history" section (`RepeatableEntry` over the `statusChanges` relation: changed_at,
+  from/to, actor, reason) — this is the audit log's only UI surface right now.
+- [ ] Field-level rights enforcement wired into the Tender resource (the view page now exists to
+  host it).
 
 Update the checklist above as work lands, and flip the milestone line when M1's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the
