@@ -1,0 +1,23 @@
+{
+    "agents": [
+        "opencode",
+        "claude_code"
+    ],
+    "cloud": false,
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch": false,
+    "packages": [
+        "livewire/blaze",
+        "filament/filament"
+    ],
+    "sail": false,
+    "skills": [
+        "infer-conventions",
+        "laravel-best-practices",
+        "testing-best-practices",
+        "livewire-development",
+        "tailwindcss-development",
+        "blaze-optimize"
+    ]
+}
