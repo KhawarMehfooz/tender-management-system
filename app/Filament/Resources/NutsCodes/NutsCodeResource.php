@@ -31,6 +31,16 @@ class NutsCodeResource extends Resource
         return __('nuts_codes.plural_label');
     }
 
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.groups.master_data');
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        return 6;
+    }
+
     /**
      * NUTS codes are deactivated, never deleted, to preserve historical
      * tender filtering/reporting integrity and the region hierarchy.

@@ -13,6 +13,8 @@ return [
     'fields' => [
         'id' => 'ID',
         'name' => 'Name',
+        'code' => 'Code',
+        'code_helper' => 'Short unique prefix (max 4 letters) used to generate internal tender IDs for this category, e.g. SEC-2026-0001.',
         'description' => 'Description',
         'active' => 'Active',
         'active_helper' => 'Inactive categories are hidden from the tender creation form, but stay visible on existing tenders and reports.',

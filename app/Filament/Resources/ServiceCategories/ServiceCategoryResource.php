@@ -33,6 +33,16 @@ class ServiceCategoryResource extends Resource
         return __('service_categories.plural_label');
     }
 
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.groups.master_data');
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        return 1;
+    }
+
     /**
      * Service categories are deactivated, never deleted, to preserve historical
      * tender scoping and reporting integrity.

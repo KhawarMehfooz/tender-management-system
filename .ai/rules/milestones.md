@@ -30,9 +30,28 @@ Progress within M1:
   for EL/BG/etc; `level`/`parent_code` derived from `NUTS_ID` length/prefix, not present in the
   source file). Both CSVs live at `database/data/` — re-running `migrate:fresh --seed` picks
   them up automatically.
-- [ ] Tender model: ~25 master fields, internal ID scheme — not started.
-- [ ] Lifecycle state machine: 8-phase status flow + status-change audit log — not started.
-- [ ] Field-level rights enforcement wired into the Tender resource once it exists.
+- [x] Tender model: `Tender` model/migration/factory with ~27 master fields (see
+  `app/Models/Tender.php`), plus its two remaining lookup dependencies `Sector` and
+  `ProcurementProcedure` (same admin-managed pattern as [[resources]]'s Source, each seeded
+  with an explicit "Unknown" row). `ServiceCategory` gained a `code` column (3-4 uppercase
+  letters, nullable) used as the tender-ID prefix. Internal ID scheme:
+  `{ServiceCategory.code}-{year}-{sequence}` (e.g. `SEC-2026-0001`), sequence resets per
+  category per year, generated via a `creating` model event backed by a DB-locked
+  `tender_number_sequences` counter table (race-safe, survives future hard-deletes).
+  `estimated_contract_volume_unknown` is a boolean companion flag (not a null/sentinel value)
+  per the explicit-unknown rule in [[data-integrity]]. `service_category_id`/`sector_id`/
+  `procurement_procedure_id`/`source_id` use `restrictOnDelete` (required stats-bearing
+  dimensions); `nuts_code_id`/`cpv_code_id` stay nullable+`nullOnDelete` (optional
+  classification). `TenderResource` built as a 5-step Filament Wizard (basic info; location &
+  classification; dates & deadlines; contract terms; source & notes) per [[resources]]'s
+  size/grouping rule — List/Create/Edit only, no delete path (tenders are never hard-deleted,
+  see [[data-integrity]]).
+- [ ] Lifecycle state machine: `status` column + `TenderStatus` enum (12 values: 7 active
+  phases + 5 terminal outcomes realizing the spec's "closure" phase) exist on `Tender`, but
+  transition enforcement and the status-change audit log are not built yet — deliberately
+  deferred to a follow-up task.
+- [ ] Field-level rights enforcement wired into the Tender resource once the state machine (and
+  a Tender detail/view page) exist.
 
 Update the checklist above as work lands, and flip the milestone line when M1's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the

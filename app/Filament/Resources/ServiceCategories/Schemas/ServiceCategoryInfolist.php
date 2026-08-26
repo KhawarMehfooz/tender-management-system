@@ -20,6 +20,9 @@ class ServiceCategoryInfolist
                     ->schema([
                         TextEntry::make('name')
                             ->label(__('service_categories.fields.name')),
+                        TextEntry::make('code')
+                            ->label(__('service_categories.fields.code'))
+                            ->placeholder('-'),
                         IconEntry::make('active')
                             ->label(__('service_categories.fields.active'))
                             ->boolean(),

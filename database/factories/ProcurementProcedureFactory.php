@@ -2,13 +2,13 @@
 
 namespace Database\Factories;
 
-use App\Models\ServiceCategory;
+use App\Models\ProcurementProcedure;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<ServiceCategory>
+ * @extends Factory<ProcurementProcedure>
  */
-class ServiceCategoryFactory extends Factory
+class ProcurementProcedureFactory extends Factory
 {
     /**
      * Define the model's default state.
@@ -19,8 +19,6 @@ class ServiceCategoryFactory extends Factory
     {
         return [
             'name' => fake()->unique()->words(2, true),
-            'code' => strtoupper(fake()->unique()->lexify('???')),
-            'description' => fake()->optional()->sentence(),
             'active' => true,
         ];
     }

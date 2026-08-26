@@ -18,16 +18,19 @@ class ServiceCategorySeeder extends Seeder
         foreach ([
             [
                 'name' => 'Security Services',
+                'code' => 'SEC',
                 'description' => 'Guarding, access control, and site security tenders.',
                 'active' => true,
             ],
             [
                 'name' => 'Cleaning Services',
+                'code' => 'CLN',
                 'description' => 'Facility and industrial cleaning tenders.',
                 'active' => true,
             ],
             [
                 'name' => 'Facility Management',
+                'code' => 'FM',
                 'description' => 'Combined building and grounds maintenance tenders.',
                 'active' => true,
             ],

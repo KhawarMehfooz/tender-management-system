@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Filament\Resources\Sources;
+namespace App\Filament\Resources\Sectors;
 
-use App\Filament\Resources\Sources\Pages\CreateSource;
-use App\Filament\Resources\Sources\Pages\EditSource;
-use App\Filament\Resources\Sources\Pages\ListSources;
-use App\Filament\Resources\Sources\Schemas\SourceForm;
-use App\Filament\Resources\Sources\Tables\SourcesTable;
-use App\Models\Source;
+use App\Filament\Resources\Sectors\Pages\CreateSector;
+use App\Filament\Resources\Sectors\Pages\EditSector;
+use App\Filament\Resources\Sectors\Pages\ListSectors;
+use App\Filament\Resources\Sectors\Schemas\SectorForm;
+use App\Filament\Resources\Sectors\Tables\SectorsTable;
+use App\Models\Sector;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -15,20 +15,20 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
-class SourceResource extends Resource
+class SectorResource extends Resource
 {
-    protected static ?string $model = Source::class;
+    protected static ?string $model = Sector::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRss;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBriefcase;
 
     public static function getModelLabel(): string
     {
-        return __('sources.label');
+        return __('sectors.label');
     }
 
     public static function getPluralModelLabel(): string
     {
-        return __('sources.plural_label');
+        return __('sectors.plural_label');
     }
 
     public static function getNavigationGroup(): ?string
@@ -38,12 +38,12 @@ class SourceResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 4;
+        return 2;
     }
 
     /**
-     * Sources are deactivated, never deleted, to preserve historical
-     * win-rate/volume-per-source reporting integrity.
+     * Sectors are deactivated, never deleted, to preserve historical
+     * market-analysis reporting integrity.
      */
     public static function canDelete(Model $record): bool
     {
@@ -57,12 +57,12 @@ class SourceResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return SourceForm::configure($schema);
+        return SectorForm::configure($schema);
     }
 
     public static function table(Table $table): Table
     {
-        return SourcesTable::configure($table);
+        return SectorsTable::configure($table);
     }
 
     public static function getRelations(): array
@@ -75,9 +75,9 @@ class SourceResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListSources::route('/'),
-            'create' => CreateSource::route('/create'),
-            'edit' => EditSource::route('/{record}/edit'),
+            'index' => ListSectors::route('/'),
+            'create' => CreateSector::route('/create'),
+            'edit' => EditSector::route('/{record}/edit'),
         ];
     }
 }

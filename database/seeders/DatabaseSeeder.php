@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
         $this->call(RolesAndPermissionsSeeder::class);
         $this->call(ServiceCategorySeeder::class);
         $this->call(SourceSeeder::class);
+        $this->call(SectorSeeder::class);
+        $this->call(ProcurementProcedureSeeder::class);
         $this->call(CpvCodeSeeder::class);
         $this->call(NutsCodeSeeder::class);
 

@@ -31,6 +31,16 @@ class CpvCodeResource extends Resource
         return __('cpv_codes.plural_label');
     }
 
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.groups.master_data');
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        return 5;
+    }
+
     /**
      * CPV codes are deactivated, never deleted, to preserve historical
      * tender filtering/reporting integrity.

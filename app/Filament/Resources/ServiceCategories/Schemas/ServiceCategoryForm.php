@@ -24,6 +24,13 @@ class ServiceCategoryForm
                             ->prefixIcon(Heroicon::OutlinedTag)
                             ->required()
                             ->unique(ignoreRecord: true),
+                        TextInput::make('code')
+                            ->label(__('service_categories.fields.code'))
+                            ->helperText(__('service_categories.fields.code_helper'))
+                            ->maxLength(4)
+                            ->unique(ignoreRecord: true)
+                            ->formatStateUsing(fn (?string $state): ?string => $state !== null ? strtoupper($state) : null)
+                            ->dehydrateStateUsing(fn (?string $state): ?string => $state !== null ? strtoupper($state) : null),
                         Textarea::make('description')
                             ->label(__('service_categories.fields.description'))
                             ->rows(3),
