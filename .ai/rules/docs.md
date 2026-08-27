@@ -11,8 +11,8 @@ Customer-facing product documentation (not architecture docs) is being written i
 Planned sequence (write one at a time, not all at once — confirm with the user before starting each):
 - [x] 01 - Overview: what the system is, who it's for, the core tender-lifecycle concept — drafted at `docs/01-overview.md`, audience is both prospects and onboarding users in one doc, product referred to as "Tender Management System (TMS)", German/EU procurement terms (CPV/NUTS, etc.) kept as-is rather than translated
 - [x] 02 - Getting started: login, roles overview, category scoping (why a user may only see some tenders) — drafted at `docs/02-getting-started.md`, full 9-role table with one-line purpose each, mentions accounts are admin-provisioned (no self-signup), uses `<!-- screenshot: ... -->` HTML-comment placeholder markers at the spots needing images
-- [ ] 03 - Managing tenders: creating a tender, lifecycle/status flow, archiving/invalidating, viewing history
-- [ ] 04 - Team assignment: assigning an owner and team members to a tender
+- [x] 03 - Managing tenders: creating a tender, lifecycle/status flow, archiving/invalidating, viewing history — drafted at `docs/03-managing-tenders.md`, walks all 5 wizard steps (Team step deferred to 04), one-line mention that estimated contract volume needs the see-prices right, covers archive/invalidate for regular users with hard-delete mentioned briefly as admin-only (full detail deferred to 08)
+- [x] 04 - Team assignment: assigning an owner and team members to a tender — drafted at `docs/04-team-assignment.md`, covers both who can edit (team lead/department head/super admin) and the read-only view for others, one-line-per-role table for the 5 functional roles
 - [ ] 05 - Tasks: creating tasks, checklists, statuses, dependencies, due dates
 - [ ] 06 - Collaboration: comments and attachments on tasks
 - [ ] 07 - Notifications: the notification centre, email preferences
