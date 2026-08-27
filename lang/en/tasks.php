@@ -31,6 +31,10 @@ return [
         'checklist_item_done' => 'Done',
         'created_at' => 'Created at',
         'updated_at' => 'Updated at',
+        'attachment_file' => 'File',
+        'attachment_size' => 'Size',
+        'attachment_uploaded_by' => 'Uploaded by',
+        'attachment_uploaded_at' => 'Uploaded at',
     ],
     'status' => [
         'open' => 'Open',
@@ -50,6 +54,7 @@ return [
         'change_status' => 'Change status',
         'change_status_success' => 'Status updated',
         'add_checklist_item' => 'Add checklist item',
+        'download_attachment' => 'Download',
     ],
     'infolist' => [
         'overview_heading' => 'Overview',

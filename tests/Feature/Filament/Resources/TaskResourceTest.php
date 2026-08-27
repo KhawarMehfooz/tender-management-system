@@ -7,17 +7,21 @@ use App\Filament\Resources\Tasks\Pages\CreateTask;
 use App\Filament\Resources\Tasks\Pages\EditTask;
 use App\Filament\Resources\Tasks\Pages\ListTasks;
 use App\Filament\Resources\Tasks\Pages\ViewTask;
+use App\Filament\Resources\Tasks\RelationManagers\AttachmentsRelationManager;
 use App\Filament\Resources\Tasks\TaskResource;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
 use App\Filament\Resources\Tenders\RelationManagers\TasksRelationManager;
 use App\Models\ServiceCategory;
 use App\Models\Task;
+use App\Models\TaskAttachment;
 use App\Models\Tender;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -310,6 +314,107 @@ describe('category-scoped views', function () {
 
         expect(fn () => Livewire::test(ViewTask::class, ['record' => $foreignTask->getRouteKey()]))
             ->toThrow(ModelNotFoundException::class);
+    });
+});
+
+describe('attachments', function () {
+    it('lets a linked reviewer upload an attachment', function () {
+        Storage::fake('local');
+        $reviewer = User::factory()->create();
+        $task = Task::factory()->create(['reviewer_id' => $reviewer->id]);
+        $this->actingAs($reviewer);
+
+        Livewire::test(AttachmentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'file' => UploadedFile::fake()->create('evidence.pdf', 100, 'application/pdf'),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $attachment = $task->attachments()->firstOrFail();
+        expect($attachment->uploaded_by)->toBe($reviewer->id);
+        expect($attachment->original_filename)->toBe('evidence.pdf');
+        expect(Storage::disk('local')->exists($attachment->file_path))->toBeTrue();
+    });
+
+    it('lets a task manager upload an attachment even when unrelated to the task', function () {
+        Storage::fake('local');
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $task = Task::factory()->create();
+
+        Livewire::test(AttachmentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionVisible('create');
+    });
+
+    it('hides the upload action from a user with no link to the task', function () {
+        $task = Task::factory()->create();
+
+        Livewire::test(AttachmentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the uploader delete their own attachment', function () {
+        Storage::fake('local');
+        $uploader = User::factory()->create();
+        $task = Task::factory()->create(['reviewer_id' => $uploader->id]);
+        $attachment = TaskAttachment::factory()->for($task)->create(['uploaded_by' => $uploader->id]);
+        $this->actingAs($uploader);
+
+        Livewire::test(AttachmentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionVisible('delete', $attachment)
+            ->callTableAction('delete', record: $attachment)
+            ->assertHasNoTableActionErrors();
+
+        expect(TaskAttachment::find($attachment->id))->toBeNull();
+    });
+
+    it('hides delete from a different linked user who did not upload the attachment', function () {
+        $uploader = User::factory()->create();
+        $otherOwner = User::factory()->create();
+        $task = Task::factory()->create(['reviewer_id' => $uploader->id, 'owner_id' => $otherOwner->id]);
+        $attachment = TaskAttachment::factory()->for($task)->create(['uploaded_by' => $uploader->id]);
+        $this->actingAs($otherOwner);
+
+        Livewire::test(AttachmentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionHidden('delete', $attachment);
+    });
+
+    it('lets a task manager delete any attachment', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $task = Task::factory()->create();
+        $attachment = TaskAttachment::factory()->for($task)->create();
+
+        Livewire::test(AttachmentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionVisible('delete', $attachment);
+    });
+});
+
+describe('attachment download', function () {
+    it('streams the file for a user within the task\'s category', function () {
+        Storage::fake('local');
+        $category = ServiceCategory::factory()->create();
+        $task = Task::factory()->create(['tender_id' => Tender::factory()->create(['service_category_id' => $category->id])]);
+        $attachment = TaskAttachment::factory()->for($task)->create(['file_path' => 'task-attachments/evidence.pdf']);
+        Storage::disk('local')->put($attachment->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $category->id]))
+            ->get(route('task-attachments.download', $attachment))
+            ->assertOk();
+    });
+
+    it('returns 404 for a user outside the task\'s category', function () {
+        Storage::fake('local');
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $task = Task::factory()->create(['tender_id' => Tender::factory()->create(['service_category_id' => $categoryA->id])]);
+        $attachment = TaskAttachment::factory()->for($task)->create(['file_path' => 'task-attachments/evidence.pdf']);
+        Storage::disk('local')->put($attachment->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $categoryB->id]))
+            ->get(route('task-attachments.download', $attachment))
+            ->assertNotFound();
     });
 });
 

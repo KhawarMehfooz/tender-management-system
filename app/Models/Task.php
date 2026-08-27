@@ -118,6 +118,28 @@ class Task extends Model
     }
 
     /**
+     * @return HasMany<TaskAttachment, $this>
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TaskAttachment::class)->latest();
+    }
+
+    /**
+     * Whether the given user is one of the task's assigned people (owner, creator, reviewer,
+     * or participant) — the set allowed to add attachments, distinct from
+     * TaskForm::canManageTask()'s narrower management-only set for owner/reviewer/participant
+     * assignment itself.
+     */
+    public function isLinkedTo(User $user): bool
+    {
+        return $this->owner_id === $user->id
+            || $this->creator_id === $user->id
+            || $this->reviewer_id === $user->id
+            || $this->participants()->whereKey($user->id)->exists();
+    }
+
+    /**
      * A task is overdue if its due date has passed and it hasn't been completed. This is
      * deliberately computed, not stored: storing it would need a background job to keep in
      * sync with wall-clock time (see [[resources-tenders]]'s archived/invalid axis for the

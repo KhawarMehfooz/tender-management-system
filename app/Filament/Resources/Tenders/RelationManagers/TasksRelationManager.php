@@ -43,7 +43,7 @@ class TasksRelationManager extends RelationManager
             ->filters(TasksTable::filters(includeTenderFilter: false))
             ->headerActions([
                 CreateAction::make()
-                    ->mutateFormDataUsing(function (array $data): array {
+                    ->mutateDataUsing(function (array $data): array {
                         $data['creator_id'] = auth()->id();
 
                         if (! TaskForm::canManageTask()) {
@@ -58,7 +58,7 @@ class TasksRelationManager extends RelationManager
                 TasksTable::changeStatusAction(),
                 ViewAction::make(),
                 EditAction::make()
-                    ->mutateFormDataUsing(function (Task $record, array $data): array {
+                    ->mutateDataUsing(function (Task $record, array $data): array {
                         if (! TaskForm::canManageTask()) {
                             $data['owner_id'] = $record->owner_id;
                             $data['reviewer_id'] = $record->reviewer_id;

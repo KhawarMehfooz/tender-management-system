@@ -13,7 +13,36 @@ attachments, comments, cross-task dependencies, the final-submission dependency 
 notification centre are not started — don't begin them without the user asking explicitly.
 
 Progress within M2:
-- [x] Tasks (core slice — attachments/comments/dependencies/final-submission-gate explicitly
+- [x] Task attachments: `TaskAttachment` model/migration (`task_id` required FK
+  `cascadeOnDelete`; `uploaded_by` required FK `restrictOnDelete` to `users`; `file_path`,
+  `original_filename`, `mime_type`, `size` in bytes). Files live on the private `local` disk
+  (`storage/app/private`) under `task-attachments/`, never the `public` disk — attachments can
+  carry price/evidence-bearing documents. UI: an `AttachmentsRelationManager` on
+  `TaskResource` (list/upload/delete only, no dedicated resource) using a single
+  `FileUpload::make('file')` create form with `->preserveFilenames()` (so `file_path`'s
+  basename doubles as `original_filename`, no separate client-supplied filename field to
+  trust) and `->preventFilePathTampering()` (blocks a smuggled arbitrary existing-file path
+  standing in for a fresh upload, since create forms have no record to diff against — see the
+  Filament file-upload docs' "Authorizing existing file paths" section).
+  `mutateFormDataUsing()` derives `mime_type`/`size` server-side via `Storage::mimeType()`/
+  `size()` rather than trusting client-reported values, and stamps `uploaded_by` from
+  `auth()->id()`. Download is a dedicated authenticated route
+  (`task-attachments.download` → `TaskAttachmentDownloadController`) that re-runs
+  `Task::query()->findOrFail()` on the attachment's `task_id` so `TaskTenderCategoryScope`
+  gates access the same "404, not hidden-but-reachable" way as task/tender viewing (see
+  [[scopes-models]]) — streamed via `Storage::download()`, not a public/signed URL. Permission
+  model (a judgment call the user picked explicitly, not derived from idea.md): upload is
+  open to anyone "linked" to the task (owner/creator/reviewer/participant, via new
+  `Task::isLinkedTo(User)`) or `TaskForm::canManageTask()`'s management set — broader than
+  `canManageTask()` alone, since attachments are evidence the assignees themselves produce;
+  delete is uploader-or-manager. Tests in `TaskResourceTest`'s "attachments"/"attachment
+  download" groups cover upload visibility (linked user, manager, unrelated user hidden),
+  delete visibility (own upload, manager, a different linked user hidden), and download
+  category-scoping (200 in-category, 404 out-of-category) — using `EditTask` as the relation
+  manager's `pageClass` for the mutating assertions, since Filament v4's read-only-relation-
+  managers-on-ViewRecord-pages default (the same one noted on `TasksRelationManager` above)
+  would otherwise hide every action regardless of the permission logic being tested.
+- [x] Tasks (core slice — comments/dependencies/final-submission-gate explicitly
   deferred): `Task` model/migration (`tender_id` required FK `cascadeOnDelete`; `owner_id`/
   `creator_id` required, `reviewer_id` nullable, all `restrictOnDelete` to `users`; `priority`
   → `App\Enums\TaskPriority` low/medium/high/urgent; `status` → `App\Enums\TaskStatus`
