@@ -78,6 +78,15 @@ class TaskInfolist
                     ])
                     ->columns(2),
 
+                Section::make(__('tasks.infolist.dependencies_heading'))
+                    ->icon(Heroicon::OutlinedLink)
+                    ->schema([
+                        TextEntry::make('dependencies.title')
+                            ->label(__('tasks.fields.dependencies'))
+                            ->listWithLineBreaks(),
+                    ])
+                    ->visible(fn (Task $record): bool => $record->dependencies()->exists()),
+
                 Section::make(__('tasks.infolist.checklist_heading'))
                     ->icon(Heroicon::OutlinedCheckCircle)
                     ->schema([

@@ -26,7 +26,7 @@ class TasksRelationManager extends RelationManager
 
     public function form(Schema $schema): Schema
     {
-        return TaskForm::configure($schema, includeTenderField: false);
+        return TaskForm::configure($schema, includeTenderField: false, tenderId: (string) $this->getOwnerRecord()->getKey());
     }
 
     /**

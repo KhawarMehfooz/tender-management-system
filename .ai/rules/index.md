@@ -18,4 +18,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Filament/Resources/** | .ai/rules/resources.md |
 | app/Models/Tender.php,app/Models/Scopes/**,app/Models/User.php | .ai/rules/scopes-models.md |
 | config/permission.php,database/seeders/** | .ai/rules/seeders.md |
+| app/Models/Task.php,database/migrations/*task_dependencies*,app/Filament/Resources/Tasks/** | .ai/rules/tasks.md |
 | app/Models/Tender.php,app/Enums/TenderStatus.php,app/Filament/Resources/Tenders/** | .ai/rules/tenders.md |

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Exceptions\InvalidTaskStatusTransitionException;
+use App\Exceptions\TaskDependenciesNotCompleteException;
 use App\Models\Scopes\TaskTenderCategoryScope;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -102,6 +103,26 @@ class Task extends Model
     }
 
     /**
+     * Tasks this task depends on — it cannot be marked done until each of these is done.
+     *
+     * @return BelongsToMany<Task, $this>
+     */
+    public function dependencies(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'task_dependencies', 'task_id', 'depends_on_task_id')->withTimestamps();
+    }
+
+    /**
+     * Tasks that depend on this task.
+     *
+     * @return BelongsToMany<Task, $this>
+     */
+    public function dependents(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'task_dependencies', 'depends_on_task_id', 'task_id')->withTimestamps();
+    }
+
+    /**
      * @return HasMany<TaskChecklistItem, $this>
      */
     public function checklistItems(): HasMany
@@ -161,6 +182,43 @@ class Task extends Model
     }
 
     /**
+     * All tasks that directly or transitively depend on this one, found by walking the
+     * `dependents` relation breadth-first. Used to keep the dependency graph acyclic: none of
+     * these may be added as one of this task's own dependencies, since that would create a
+     * cycle back to this task.
+     *
+     * @return array<int, string>
+     */
+    public function transitiveDependentIds(): array
+    {
+        $visited = [];
+        $queue = [$this->id];
+
+        while ($queue !== []) {
+            $currentId = array_shift($queue);
+            $childIds = static::query()->whereKey($currentId)->first()?->dependents()->pluck('tasks.id')->all() ?? [];
+
+            foreach ($childIds as $childId) {
+                if (! in_array($childId, $visited, true)) {
+                    $visited[] = $childId;
+                    $queue[] = $childId;
+                }
+            }
+        }
+
+        return $visited;
+    }
+
+    /**
+     * Whether every dependency of this task is done — gates the DONE transition in
+     * changeStatusTo().
+     */
+    public function dependenciesComplete(): bool
+    {
+        return ! $this->dependencies()->where('status', '!=', TaskStatus::DONE->value)->exists();
+    }
+
+    /**
      * Move the task to a new status, enforcing the allowed-transitions map in TaskStatus and
      * recording an audit entry (who, when, from/to), mirroring Tender::changeStatusTo(). Also
      * stamps completion_date when the task reaches DONE.
@@ -169,6 +227,10 @@ class Task extends Model
     {
         if (! $this->status->canTransitionTo($newStatus)) {
             throw InvalidTaskStatusTransitionException::make($this->status, $newStatus);
+        }
+
+        if ($newStatus === TaskStatus::DONE && ! $this->dependenciesComplete()) {
+            throw TaskDependenciesNotCompleteException::make($this);
         }
 
         DB::transaction(function () use ($newStatus, $actor, $reason): void {

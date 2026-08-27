@@ -4,12 +4,14 @@ namespace App\Filament\Resources\Tasks\Schemas;
 
 use App\Enums\RoleName;
 use App\Enums\TaskPriority;
+use App\Models\Task;
 use App\Models\User;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
@@ -66,8 +68,11 @@ class TaskForm
      * @param  bool  $includeTenderField  Omit when embedding this form inside a
      *                                    TasksRelationManager on TenderResource — the parent
      *                                    tender is already implied by relation context there.
+     * @param  ?string  $tenderId  The owning tender's id, required to scope the dependencies
+     *                             field when $includeTenderField is false (the relation
+     *                             manager has no tender_id form field to read via Get()).
      */
-    public static function configure(Schema $schema, bool $includeTenderField = true): Schema
+    public static function configure(Schema $schema, bool $includeTenderField = true, ?string $tenderId = null): Schema
     {
         return $schema
             ->components([
@@ -81,6 +86,7 @@ class TaskForm
                             ->required($includeTenderField)
                             ->searchable()
                             ->preload()
+                            ->live()
                             ->visible($includeTenderField)
                             ->dehydrated($includeTenderField),
                         Select::make('priority')
@@ -130,6 +136,35 @@ class TaskForm
                             ->dehydrated(fn (): bool => static::canManageTask()),
                     ])
                     ->columns(2),
+
+                Section::make(__('tasks.form.sections.dependencies'))
+                    ->icon(Heroicon::OutlinedLink)
+                    ->schema([
+                        Select::make('dependencies')
+                            ->label(__('tasks.fields.dependencies'))
+                            ->prefixIcon(Heroicon::OutlinedLink)
+                            ->relationship(
+                                name: 'dependencies',
+                                titleAttribute: 'title',
+                                modifyQueryUsing: function (Builder $query, ?Task $record, Get $get) use ($includeTenderField, $tenderId): Builder {
+                                    $scopeTenderId = $includeTenderField ? $get('tender_id') : $tenderId;
+
+                                    return $query
+                                        ->when(
+                                            $record,
+                                            fn (Builder $query) => $query->whereKeyNot([$record->id, ...$record->transitiveDependentIds()]),
+                                        )
+                                        ->when(
+                                            $scopeTenderId,
+                                            fn (Builder $query) => $query->where('tender_id', $scopeTenderId),
+                                            fn (Builder $query) => $query->whereRaw('1 = 0'),
+                                        );
+                                },
+                            )
+                            ->multiple()
+                            ->searchable()
+                            ->columnSpanFull(),
+                    ]),
 
                 Section::make(__('tasks.form.sections.dates'))
                     ->icon(Heroicon::OutlinedCalendarDays)

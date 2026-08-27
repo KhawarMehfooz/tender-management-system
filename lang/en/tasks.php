@@ -7,6 +7,7 @@ return [
         'sections' => [
             'details' => 'Details',
             'assignment' => 'Assignment',
+            'dependencies' => 'Dependencies',
             'dates' => 'Dates',
             'checklist' => 'Checklist',
         ],
@@ -22,6 +23,7 @@ return [
         'reviewer_id' => 'Reviewer',
         'creator_id' => 'Created by',
         'participants' => 'Participants',
+        'dependencies' => 'Dependencies',
         'start_date' => 'Start date',
         'due_date' => 'Due date',
         'completion_date' => 'Completion date',
@@ -66,6 +68,7 @@ return [
     'infolist' => [
         'overview_heading' => 'Overview',
         'assignment_heading' => 'Assignment',
+        'dependencies_heading' => 'Dependencies',
         'checklist_heading' => 'Checklist',
         'status_history_heading' => 'Status history',
         'comments_heading' => 'Comments',

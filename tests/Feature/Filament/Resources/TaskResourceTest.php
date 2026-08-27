@@ -239,6 +239,78 @@ describe('assignment', function () {
     });
 });
 
+describe('dependencies', function () {
+    it('saves a dependency on another task in the same tender', function () {
+        $tender = Tender::factory()->create();
+        $dependency = Task::factory()->create(['tender_id' => $tender->id]);
+        $task = Task::factory()->create(['tender_id' => $tender->id]);
+
+        Livewire::test(EditTask::class, ['record' => $task->getRouteKey()])
+            ->fillForm(['dependencies' => [$dependency->id]])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        expect($task->dependencies()->pluck('tasks.id')->all())->toBe([$dependency->id]);
+    });
+
+    it('rejects a dependency on a task from a different tender', function () {
+        $task = Task::factory()->create();
+        $otherTenderTask = Task::factory()->create();
+
+        Livewire::test(EditTask::class, ['record' => $task->getRouteKey()])
+            ->fillForm(['dependencies' => [$otherTenderTask->id]])
+            ->call('save')
+            ->assertHasFormErrors(['dependencies.0']);
+    });
+
+    it('rejects a task depending on itself', function () {
+        $task = Task::factory()->create();
+
+        Livewire::test(EditTask::class, ['record' => $task->getRouteKey()])
+            ->fillForm(['dependencies' => [$task->id]])
+            ->call('save')
+            ->assertHasFormErrors(['dependencies.0']);
+    });
+
+    it('rejects a dependency that would create a cycle', function () {
+        $tender = Tender::factory()->create();
+        $a = Task::factory()->create(['tender_id' => $tender->id]);
+        $b = Task::factory()->create(['tender_id' => $tender->id]);
+        $b->dependencies()->attach($a);
+
+        Livewire::test(EditTask::class, ['record' => $a->getRouteKey()])
+            ->fillForm(['dependencies' => [$b->id]])
+            ->call('save')
+            ->assertHasFormErrors(['dependencies.0']);
+    });
+
+    it('blocks completing a task while a dependency is unfinished', function () {
+        $dependency = Task::factory()->create(['status' => TaskStatus::OPEN]);
+        $task = Task::factory()->create(['status' => TaskStatus::IN_REVIEW]);
+        $task->dependencies()->attach($dependency);
+
+        Livewire::test(ListTasks::class)
+            ->callAction(TestAction::make('changeStatus')->table($task), [
+                'status' => TaskStatus::DONE->value,
+            ])
+            ->assertHasFormErrors(['status']);
+    });
+
+    it('allows completing a task once dependencies are done', function () {
+        $dependency = Task::factory()->create(['status' => TaskStatus::DONE]);
+        $task = Task::factory()->create(['status' => TaskStatus::IN_REVIEW]);
+        $task->dependencies()->attach($dependency);
+
+        Livewire::test(ListTasks::class)
+            ->callAction(TestAction::make('changeStatus')->table($task), [
+                'status' => TaskStatus::DONE->value,
+            ])
+            ->assertHasNoFormErrors();
+
+        expect($task->fresh()->status)->toBe(TaskStatus::DONE);
+    });
+});
+
 describe('checklist', function () {
     it('saves checklist items via the repeater relationship', function () {
         $this->seed(RolesAndPermissionsSeeder::class);

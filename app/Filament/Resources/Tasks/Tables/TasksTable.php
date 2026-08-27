@@ -112,6 +112,7 @@ class TasksTable
                     ->label(__('tasks.fields.status'))
                     ->prefixIcon(Heroicon::OutlinedFlag)
                     ->options(fn () => collect($record->status->allowedTransitions())
+                        ->reject(fn (TaskStatus $status) => $status === TaskStatus::DONE && ! $record->dependenciesComplete())
                         ->mapWithKeys(fn (TaskStatus $status) => [$status->value => $status->getLabel()]))
                     ->required(),
                 Textarea::make('reason')

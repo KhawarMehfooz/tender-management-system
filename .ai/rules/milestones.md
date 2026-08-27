@@ -8,12 +8,29 @@ the build currently stands so an assistant knows what's in scope right now vs. n
 vs. explicitly deferred.
 
 **M1 — Foundation is complete.** **M2 — Team & Tasks** is now in progress, started at the
-user's explicit request. Team assignment and the core Task feature (below) are done; task
-attachments and comments are done; cross-task dependencies, the final-submission dependency
-gate, and the notification centre are not started — don't begin them without the user asking
-explicitly.
+user's explicit request. Team assignment, the core Task feature, attachments, comments, and
+cross-task dependencies (below) are done; the final-submission dependency gate and the
+notification centre are not started — don't begin them without the user asking explicitly.
 
 Progress within M2:
+- [x] Cross-task dependencies: self-referencing `task_dependencies` pivot (composite PK on
+  `task_id`+`depends_on_task_id`, both `cascadeOnDelete` — no own uuid `id` column, sidestepping
+  the `task_participants` pivot-uuid bug in [[migrations]] entirely) backing
+  `Task::dependencies()`/`dependents()`. A task cannot be marked `done` while any dependency
+  isn't `done` yet: `Task::changeStatusTo()` throws `TaskDependenciesNotCompleteException`, and
+  `TasksTable::changeStatusAction()` also filters `done` out of the offered next-statuses when
+  `!$record->dependenciesComplete()`, mirroring the existing "hide the invalid choice, then
+  enforce it again server-side" pattern. Dependencies are scoped to same-tender tasks only, and
+  cycles/self-dependency are prevented not via a validation rule but by excluding
+  `Task::transitiveDependentIds()` (BFS over `dependents()`) plus the record's own id from the
+  `dependencies` Select field's `relationship(modifyQueryUsing: ...)` query on `TaskForm` — see
+  [[tasks]] for the full pattern, the `TaskForm::configure()` `$tenderId` param needed for the
+  tender-scoped relation-manager context, and the `dependencies.0`-not-`dependencies` form-error
+  key trap when testing rejected selections. Tests in `TaskTest.php`'s "dependencies" group
+  (model-level: blocking, `dependenciesComplete()`, `transitiveDependentIds()`) and
+  `TaskResourceTest.php`'s "dependencies" group (same-tender scoping, self/cycle rejection,
+  status-change gating) cover it. Not yet built: nothing surfaces a task's dependents (what it
+  blocks) in the UI, only its dependencies — deferred as out of scope until asked for.
 - [x] Task attachments: `TaskAttachment` model/migration (`task_id` required FK
   `cascadeOnDelete`; `uploaded_by` required FK `restrictOnDelete` to `users`; `file_path`,
   `original_filename`, `mime_type`, `size` in bytes). Files live on the private `local` disk
@@ -214,9 +231,9 @@ Progress within M1:
   super admin, row actually gone afterward, log captures who/when/why, reason required.
 
 **M1 acceptance points (idea.md) are now all met** — every checklist item above is checked.
-M2 is in progress (team assignment and tasks done, comments done; dependencies/notifications
-not started) — don't build ahead into remaining M2 scope, or into M3+, without the user
-asking for it explicitly.
+M2 is in progress (team assignment, tasks, comments, and cross-task dependencies done; the
+final-submission dependency gate and notification centre not started) — don't build ahead into
+remaining M2 scope, or into M3+, without the user asking for it explicitly.
 
 Update the checklist above as work lands, and flip the milestone line when M2's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the

@@ -2,6 +2,7 @@
 
 use App\Enums\TaskStatus;
 use App\Exceptions\InvalidTaskStatusTransitionException;
+use App\Exceptions\TaskDependenciesNotCompleteException;
 use App\Models\Task;
 use App\Models\Tender;
 use App\Models\User;
@@ -121,6 +122,83 @@ describe('cascade delete', function () {
         $tender->hardDelete(User::factory()->create(), 'Genuine test junk entry');
 
         expect(Task::find($task->id))->toBeNull();
+    });
+});
+
+describe('dependencies', function () {
+    it('blocks marking a task done while a dependency is not done', function () {
+        $dependency = Task::factory()->create(['status' => TaskStatus::IN_PROGRESS]);
+        $task = Task::factory()->create(['status' => TaskStatus::IN_REVIEW]);
+        $task->dependencies()->attach($dependency);
+        $user = User::factory()->create();
+
+        $task->changeStatusTo(TaskStatus::DONE, $user);
+    })->throws(TaskDependenciesNotCompleteException::class);
+
+    it('does not write an audit entry when blocked by an incomplete dependency', function () {
+        $dependency = Task::factory()->create(['status' => TaskStatus::OPEN]);
+        $task = Task::factory()->create(['status' => TaskStatus::IN_REVIEW]);
+        $task->dependencies()->attach($dependency);
+        $user = User::factory()->create();
+
+        try {
+            $task->changeStatusTo(TaskStatus::DONE, $user);
+        } catch (TaskDependenciesNotCompleteException) {
+        }
+
+        expect($task->statusChanges()->count())->toBe(0);
+    });
+
+    it('allows marking a task done once all dependencies are done', function () {
+        $dependency = Task::factory()->create(['status' => TaskStatus::DONE]);
+        $task = Task::factory()->create(['status' => TaskStatus::IN_REVIEW]);
+        $task->dependencies()->attach($dependency);
+        $user = User::factory()->create();
+
+        $task->changeStatusTo(TaskStatus::DONE, $user);
+
+        expect($task->fresh()->status)->toBe(TaskStatus::DONE);
+    });
+
+    it('allows marking a task done with no dependencies', function () {
+        $task = Task::factory()->create(['status' => TaskStatus::IN_REVIEW]);
+        $user = User::factory()->create();
+
+        $task->changeStatusTo(TaskStatus::DONE, $user);
+
+        expect($task->fresh()->status)->toBe(TaskStatus::DONE);
+    });
+
+    it('reports dependenciesComplete false while any dependency is unfinished', function () {
+        $dependency = Task::factory()->create(['status' => TaskStatus::OPEN]);
+        $task = Task::factory()->create();
+        $task->dependencies()->attach($dependency);
+
+        expect($task->dependenciesComplete())->toBeFalse();
+    });
+
+    it('finds direct dependents via transitiveDependentIds', function () {
+        $a = Task::factory()->create();
+        $b = Task::factory()->create();
+        $b->dependencies()->attach($a);
+
+        expect($a->transitiveDependentIds())->toBe([$b->id]);
+    });
+
+    it('finds transitive dependents several hops away', function () {
+        $a = Task::factory()->create();
+        $b = Task::factory()->create();
+        $c = Task::factory()->create();
+        $b->dependencies()->attach($a);
+        $c->dependencies()->attach($b);
+
+        expect($a->transitiveDependentIds())->toEqualCanonicalizing([$b->id, $c->id]);
+    });
+
+    it('has no dependents when nothing depends on it', function () {
+        $task = Task::factory()->create();
+
+        expect($task->transitiveDependentIds())->toBe([]);
     });
 });
 
