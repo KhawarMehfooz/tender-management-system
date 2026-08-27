@@ -70,7 +70,22 @@ Progress within M2:
   (not just hidden from nav), no delete action exists, create sets role+category+direct rights
   and hashes the password, edit syncs role/category/rights (including revoking a removed one)
   and preserves the existing password when the field is left blank, and a submitted new
-  password does change it.
+  password does change it. Rights and role also use `Toggle` switches (with
+  `onIcon(Heroicon::Check)`/`offIcon(Heroicon::XMark)`, matching `RolesAndPermissions`' table
+  toggles) rather than a `CheckboxList`/`ToggleButtons` array field — one `Toggle` per
+  `Right::value` in a nested "Rights" section, so `UserForm::selectedRights()` reads them back
+  by key instead of a single array field. Both form sections stack fields in one column
+  (`Section` without `->columns()`), not the 2-column layout used elsewhere. Guards against
+  locking the system out of user administration entirely: `EditUser::beforeSave()` blocks (via
+  `Filament\Support\Exceptions\Halt` + a danger `Notification`) a save that would change the
+  `role` away from super admin on a record that currently holds it when
+  `User::role(RoleName::SUPER_ADMIN->value)->count() <= 1` — i.e. the last super admin in the
+  system, whether they're demoting themselves or another super admin is doing it. `UserForm`'s
+  role `Select` also shows a `helperText` warning on the only remaining super admin's record as
+  a UI hint (`UserForm::isOnlyRemainingSuperAdmin()`) — the actual enforcement is the
+  server-side `beforeSave()` check, never the hint alone. Tests in `UserResourceTest`'s "last
+  super admin safeguard" group cover: the only super admin can't demote themselves (role
+  unchanged, notified), and a super admin *can* be demoted when another one still exists.
 - [x] In-app notification centre (foundation): Filament's built-in database-notifications panel
   feature (`->databaseNotifications()` on `AdminPanelProvider`) backs the bell/slide-over UI —
   `User` already had `Notifiable`+`HasUuids` wired, so this was mostly config plus fixing the

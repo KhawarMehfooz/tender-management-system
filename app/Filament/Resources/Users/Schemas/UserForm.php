@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Users\Schemas;
 
 use App\Enums\Right;
 use App\Enums\RoleName;
+use App\Models\User;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -28,6 +29,18 @@ class UserForm
             ->map(fn (Right $right): string => $right->value)
             ->values()
             ->all();
+    }
+
+    /**
+     * Whether $record is a super admin and the only one left — used to warn before someone
+     * changes their role away and locks everyone out of this super-admin-only panel. The
+     * actual block is server-side in EditUser::beforeSave(); this is a UI hint only.
+     */
+    private static function isOnlyRemainingSuperAdmin(?User $record): bool
+    {
+        return $record !== null
+            && $record->hasRole(RoleName::SUPER_ADMIN)
+            && User::role(RoleName::SUPER_ADMIN->value)->count() <= 1;
     }
 
     public static function configure(Schema $schema): Schema
@@ -65,6 +78,9 @@ class UserForm
                         Select::make('role')
                             ->label(__('users.fields.role'))
                             ->prefixIcon(Heroicon::OutlinedIdentification)
+                            ->helperText(fn (?User $record): ?string => self::isOnlyRemainingSuperAdmin($record)
+                                ? __('users.fields.role_last_super_admin_helper')
+                                : null)
                             ->options(collect(RoleName::cases())->mapWithKeys(
                                 fn (RoleName $role): array => [$role->value => $role->getLabel()],
                             ))

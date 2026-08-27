@@ -6,7 +6,10 @@ use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Filament\Resources\Users\Schemas\UserForm;
 use App\Filament\Resources\Users\UserResource;
+use App\Models\User;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Support\Exceptions\Halt;
 
 class EditUser extends EditRecord
 {
@@ -19,6 +22,36 @@ class EditUser extends EditRecord
     protected function getHeaderActions(): array
     {
         return [];
+    }
+
+    /**
+     * Block a save that would leave the system with zero super admins — e.g. the only super
+     * admin accidentally changing their own role. Without this, that user (and everyone else)
+     * would be locked out of the User administration panel with no way back in, since it's
+     * super-admin-only (see UserResource::canManage()) and nothing else can re-grant the role.
+     */
+    protected function beforeSave(): void
+    {
+        $data = $this->form->getState();
+
+        if (! $this->getRecord()->hasRole(RoleName::SUPER_ADMIN)) {
+            return;
+        }
+
+        if ($data['role'] === RoleName::SUPER_ADMIN->value) {
+            return;
+        }
+
+        if (User::role(RoleName::SUPER_ADMIN->value)->count() > 1) {
+            return;
+        }
+
+        Notification::make()
+            ->danger()
+            ->title(__('users.validation.last_super_admin'))
+            ->send();
+
+        throw new Halt;
     }
 
     protected function mutateFormDataBeforeFill(array $data): array

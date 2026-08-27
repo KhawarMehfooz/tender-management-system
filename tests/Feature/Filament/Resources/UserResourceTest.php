@@ -147,3 +147,33 @@ describe('editing', function () {
         expect($user->refresh()->password)->not->toBe($originalPassword);
     });
 });
+
+describe('last super admin safeguard', function () {
+    it('blocks the only super admin from changing their own role away from super admin', function () {
+        $admin = tap(User::factory()->create())->assignRole(RoleName::SUPER_ADMIN);
+
+        $this->actingAs($admin);
+
+        Livewire::test(EditUser::class, ['record' => $admin->getRouteKey()])
+            ->fillForm(['role' => RoleName::STAFF->value])
+            ->call('save')
+            ->assertNotified();
+
+        expect($admin->refresh()->hasRole(RoleName::SUPER_ADMIN))->toBeTrue();
+    });
+
+    it('allows demoting a super admin when another super admin remains', function () {
+        $admin = tap(User::factory()->create())->assignRole(RoleName::SUPER_ADMIN);
+        $otherAdmin = tap(User::factory()->create())->assignRole(RoleName::SUPER_ADMIN);
+
+        $this->actingAs($admin);
+
+        Livewire::test(EditUser::class, ['record' => $otherAdmin->getRouteKey()])
+            ->fillForm(['role' => RoleName::STAFF->value])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        expect($otherAdmin->refresh()->hasRole(RoleName::SUPER_ADMIN))->toBeFalse();
+        expect($otherAdmin->hasRole(RoleName::STAFF))->toBeTrue();
+    });
+});
