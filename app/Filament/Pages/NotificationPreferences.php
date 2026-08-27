@@ -26,6 +26,11 @@ class NotificationPreferences extends Page implements HasTable
         return __('notifications.navigation_label');
     }
 
+    public static function getNavigationGroup(): ?string
+    {
+        return __('navigation.groups.system_settings');
+    }
+
     public function getTitle(): string
     {
         return __('notifications.title');

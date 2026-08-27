@@ -4,6 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| app/Filament/** | .ai/rules/app-filament.md |
 | app/Console/Commands/Import*.php,database/seeders/*CodeSeeder.php | .ai/rules/commands-seeders.md |
 | app/Filament/**,resources/views/filament/**,resources/css/filament/** | .ai/rules/css-filament.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
