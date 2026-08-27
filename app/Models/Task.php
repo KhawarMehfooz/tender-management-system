@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Exceptions\InvalidTaskStatusTransitionException;
 use App\Exceptions\TaskDependenciesNotCompleteException;
 use App\Models\Scopes\TaskTenderCategoryScope;
+use App\Notifications\TaskStatusChangedNotification;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -16,7 +17,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * @property string $id
@@ -155,17 +158,28 @@ class Task extends Model
     }
 
     /**
-     * Whether the given user is one of the task's assigned people (owner, creator, reviewer,
-     * or participant) — the set allowed to add attachments, distinct from
-     * TaskForm::canManageTask()'s narrower management-only set for owner/reviewer/participant
-     * assignment itself.
+     * The task's assigned people (owner, creator, reviewer, and participants, deduplicated) —
+     * the set allowed to add attachments/comments, and who get notified about task activity.
+     * Distinct from TaskForm::canManageTask()'s narrower management-only set for
+     * owner/reviewer/participant assignment itself.
+     *
+     * @return Collection<int, User>
+     */
+    public function linkedUsers(): Collection
+    {
+        return collect([$this->owner, $this->creator, $this->reviewer])
+            ->filter()
+            ->merge($this->participants)
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * Whether the given user is one of the task's linkedUsers().
      */
     public function isLinkedTo(User $user): bool
     {
-        return $this->owner_id === $user->id
-            || $this->creator_id === $user->id
-            || $this->reviewer_id === $user->id
-            || $this->participants()->whereKey($user->id)->exists();
+        return $this->linkedUsers()->contains('id', $user->id);
     }
 
     /**
@@ -233,8 +247,9 @@ class Task extends Model
             throw TaskDependenciesNotCompleteException::make($this);
         }
 
-        DB::transaction(function () use ($newStatus, $actor, $reason): void {
-            $fromStatus = $this->status;
+        $fromStatus = $this->status;
+
+        DB::transaction(function () use ($newStatus, $actor, $reason, $fromStatus): void {
             $changedAt = now();
 
             $this->update([
@@ -250,5 +265,10 @@ class Task extends Model
                 'changed_at' => $changedAt,
             ]);
         });
+
+        Notification::send(
+            $this->linkedUsers()->reject(fn (User $user): bool => $user->is($actor)),
+            new TaskStatusChangedNotification($this, $fromStatus, $newStatus, $actor),
+        );
     }
 }

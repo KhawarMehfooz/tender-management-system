@@ -19,10 +19,13 @@ use App\Models\TaskAttachment;
 use App\Models\TaskComment;
 use App\Models\Tender;
 use App\Models\User;
+use App\Notifications\TaskAttachmentAddedNotification;
+use App\Notifications\TaskCommentAddedNotification;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -609,6 +612,41 @@ describe('comments', function () {
 
         Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
             ->assertTableActionVisible('delete', $comment);
+    });
+});
+
+describe('notifications', function () {
+    it('notifies other linked users but not the author when a comment is added', function () {
+        Notification::fake();
+        $owner = User::factory()->create();
+        $reviewer = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $owner->id, 'reviewer_id' => $reviewer->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->callTableAction('create', data: ['body' => 'Looks good to me.'])
+            ->assertHasNoTableActionErrors();
+
+        Notification::assertSentTo($reviewer, TaskCommentAddedNotification::class);
+        Notification::assertNotSentTo($owner, TaskCommentAddedNotification::class);
+    });
+
+    it('notifies other linked users but not the uploader when an attachment is added', function () {
+        Storage::fake('local');
+        Notification::fake();
+        $owner = User::factory()->create();
+        $reviewer = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $owner->id, 'reviewer_id' => $reviewer->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(AttachmentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->callTableAction('create', data: [
+                'file' => UploadedFile::fake()->create('evidence.pdf', 100, 'application/pdf'),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        Notification::assertSentTo($reviewer, TaskAttachmentAddedNotification::class);
+        Notification::assertNotSentTo($owner, TaskAttachmentAddedNotification::class);
     });
 });
 

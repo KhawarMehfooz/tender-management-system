@@ -7,6 +7,7 @@ use App\Enums\RoleName;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -50,6 +51,13 @@ class RolesAndPermissionsSeeder extends Seeder
         foreach (Right::cases() as $right) {
             Permission::findOrCreate($right->value);
         }
+
+        // DatabaseSeeder runs under WithoutModelEvents, which mutes the model-saved events
+        // Spatie's permission cache normally relies on to invalidate itself. Without this, the
+        // findOrCreate() loop above caches an empty permission list on its first lookup and
+        // never refreshes it, so syncPermissions() below would throw PermissionDoesNotExist
+        // even though the rows now exist. See [[database-seeders]].
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         foreach (RoleName::cases() as $roleName) {
             $role = Role::findOrCreate($roleName->value);

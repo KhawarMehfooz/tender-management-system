@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Tasks\RelationManagers;
 use App\Filament\Resources\Tasks\Schemas\TaskForm;
 use App\Models\Task;
 use App\Models\TaskComment;
+use App\Notifications\TaskCommentAddedNotification;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\Textarea;
@@ -12,6 +13,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Notification;
 
 class CommentsRelationManager extends RelationManager
 {
@@ -69,6 +71,15 @@ class CommentsRelationManager extends RelationManager
                         $data['user_id'] = auth()->id();
 
                         return $data;
+                    })
+                    ->after(function (TaskComment $record): void {
+                        /** @var Task $task */
+                        $task = $this->getOwnerRecord();
+
+                        Notification::send(
+                            $task->linkedUsers()->reject(fn ($user) => $user->is($record->author)),
+                            new TaskCommentAddedNotification($record),
+                        );
                     }),
             ])
             ->recordActions([

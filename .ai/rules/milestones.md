@@ -8,11 +8,49 @@ the build currently stands so an assistant knows what's in scope right now vs. n
 vs. explicitly deferred.
 
 **M1 — Foundation is complete.** **M2 — Team & Tasks** is now in progress, started at the
-user's explicit request. Team assignment, the core Task feature, attachments, comments, and
-cross-task dependencies (below) are done; the final-submission dependency gate and the
-notification centre are not started — don't begin them without the user asking explicitly.
+user's explicit request. Team assignment, the core Task feature, attachments, comments,
+cross-task dependencies, and the notification centre foundation (below) are done; the
+final-submission dependency gate is not started — don't begin it without the user asking
+explicitly (it also needs an action that doesn't exist yet — final submission isn't built until
+M5/M8).
 
 Progress within M2:
+- [x] In-app notification centre (foundation): Filament's built-in database-notifications panel
+  feature (`->databaseNotifications()` on `AdminPanelProvider`) backs the bell/slide-over UI —
+  `User` already had `Notifiable`+`HasUuids` wired, so this was mostly config plus fixing the
+  published `notifications` migration's default `morphs('notifiable')` to `uuidMorphs()` to match
+  this app's all-UUID domain PKs (same trap as spatie/laravel-permission's bigint-default
+  migration, see [[models]]). A new `App\Enums\NotificationType` (task-status-changed,
+  task-comment-added, task-attachment-added) plus `notification_preferences` table/model
+  (`user_id`+`notification_type` unique, `email_enabled` default `true`) implement "email
+  optional per user/notification type" — in-app is always on; email is opt-out, not opt-in
+  (`User::wantsEmailFor()` defaults `true` when no preference row exists yet). Three Laravel
+  `Notification` classes (`app/Notifications/`, all `ShouldQueue` — the `tms-queue` container
+  already runs `queue:work` against `QUEUE_CONNECTION=database`) feed both channels: `toDatabase()`
+  builds the message via `Filament\Notifications\Notification::make()->getDatabaseMessage()` (the
+  documented pattern for a traditional Notification class populating Filament's database-
+  notifications UI), `toMail()` a plain `MailMessage`, `via()` gating `mail` on
+  `wantsEmailFor()`. `Task::isLinkedTo()` was refactored into a reusable `linkedUsers(): Collection`
+  (owner+creator+reviewer+participants, deduplicated) — the same "who's assigned to this task" set
+  proven correct by the attachment/comment visibility tests — now doubling as the recipient list
+  for all three notifications, always excluding the acting user (via `->reject()`). Wired at the
+  three trigger points that already had a single clean hook: `Task::changeStatusTo()` (dispatches
+  after its existing DB transaction commits), and `CreateAction::after()` on both
+  `CommentsRelationManager` and `AttachmentsRelationManager`. Task **assignment** notifications are
+  explicitly deferred — owner/reviewer/participants are set across scattered Filament mutate hooks
+  (`TaskForm`/`CreateTask`/`EditTask`), not one place, and this codebase has no Observer pattern
+  anywhere to introduce as a clean hook; wiring it is a follow-up once one exists, not part of this
+  foundation. A new `App\Filament\Pages\NotificationPreferences` page (mirrors
+  `RolesAndPermissions`' `HasTable`/`InteractsWithTable`+`ToggleColumn` pattern, not a bespoke
+  form) lets every authenticated user manage their own email toggles per type — no role gate,
+  unlike `RolesAndPermissions`' super-admin-only page — `firstOrCreate`-ing a default
+  `email_enabled = true` row per `NotificationType` case on `mount()` so the table always shows
+  every type even before the user has touched anything. Tests: `TaskTest.php`'s "notifications"
+  group (recipients exclude the actor, mail suppressed by an opted-out preference),
+  `TaskResourceTest.php`'s "notifications" group (comment/attachment creation notifies other
+  linked users but not the author/uploader), and `NotificationPreferencesTest.php` (default rows
+  created, a toggle persists, one user's preferences don't leak into another's) — all using
+  `Notification::fake()`/`assertSentTo`/`assertNotSentTo`.
 - [x] Cross-task dependencies: self-referencing `task_dependencies` pivot (composite PK on
   `task_id`+`depends_on_task_id`, both `cascadeOnDelete` — no own uuid `id` column, sidestepping
   the `task_participants` pivot-uuid bug in [[migrations]] entirely) backing
@@ -231,9 +269,9 @@ Progress within M1:
   super admin, row actually gone afterward, log captures who/when/why, reason required.
 
 **M1 acceptance points (idea.md) are now all met** — every checklist item above is checked.
-M2 is in progress (team assignment, tasks, comments, and cross-task dependencies done; the
-final-submission dependency gate and notification centre not started) — don't build ahead into
-remaining M2 scope, or into M3+, without the user asking for it explicitly.
+M2 is in progress (team assignment, tasks, comments, cross-task dependencies, and the
+notification centre foundation done; the final-submission dependency gate not started) — don't
+build ahead into remaining M2 scope, or into M3+, without the user asking for it explicitly.
 
 Update the checklist above as work lands, and flip the milestone line when M2's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the

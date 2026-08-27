@@ -6,11 +6,13 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Console/Commands/Import*.php,database/seeders/*CodeSeeder.php | .ai/rules/commands-seeders.md |
 | app/Filament/**,resources/views/filament/**,resources/css/filament/** | .ai/rules/css-filament.md |
+| database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/** | .ai/rules/database-seeders.md |
 | app/Enums/** | .ai/rules/enums.md |
 | **/* | .ai/rules/general.md |
 | app/Models/Task.php,database/migrations/*task_participants* | .ai/rules/migrations.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
+| app/Notifications/** | .ai/rules/notifications.md |
 | app/Filament/Pages/** | .ai/rules/pages.md |
 | app/Filament/Resources/Tasks/RelationManagers/* | .ai/rules/relation-managers.md |
 | app/Filament/Resources/**/Tables/*.php,app/Filament/Resources/**/RelationManagers/*.php | .ai/rules/resources-relation-managers.md |

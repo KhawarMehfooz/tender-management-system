@@ -1,12 +1,16 @@
 <?php
 
+use App\Enums\NotificationType;
 use App\Enums\TaskStatus;
 use App\Exceptions\InvalidTaskStatusTransitionException;
 use App\Exceptions\TaskDependenciesNotCompleteException;
+use App\Models\NotificationPreference;
 use App\Models\Task;
 use App\Models\Tender;
 use App\Models\User;
+use App\Notifications\TaskStatusChangedNotification;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Notification;
 
 describe('status lifecycle', function () {
     it('moves through the chain in order', function () {
@@ -85,6 +89,39 @@ describe('status lifecycle', function () {
         }
 
         expect($task->statusChanges()->count())->toBe(0);
+    });
+});
+
+describe('notifications', function () {
+    it('notifies every linked user except the actor on status change', function () {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $reviewer = User::factory()->create();
+        $task = Task::factory()->create(['status' => TaskStatus::OPEN, 'owner_id' => $owner->id, 'reviewer_id' => $reviewer->id]);
+        $actor = $task->creator;
+
+        $task->changeStatusTo(TaskStatus::IN_PROGRESS, $actor);
+
+        Notification::assertSentTo([$owner, $reviewer], TaskStatusChangedNotification::class);
+        Notification::assertNotSentTo($actor, TaskStatusChangedNotification::class);
+    });
+
+    it('skips the mail channel when the recipient opted out for this notification type', function () {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        NotificationPreference::factory()->for($owner)->create([
+            'notification_type' => NotificationType::TASK_STATUS_CHANGED,
+            'email_enabled' => false,
+        ]);
+        $task = Task::factory()->create(['status' => TaskStatus::OPEN, 'owner_id' => $owner->id]);
+
+        $task->changeStatusTo(TaskStatus::IN_PROGRESS, $task->creator);
+
+        Notification::assertSentTo($owner, TaskStatusChangedNotification::class, function ($notification, $channels) {
+            return ! in_array('mail', $channels, true) && in_array('database', $channels, true);
+        });
     });
 });
 

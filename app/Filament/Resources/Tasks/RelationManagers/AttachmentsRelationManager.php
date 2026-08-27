@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Tasks\RelationManagers;
 use App\Filament\Resources\Tasks\Schemas\TaskForm;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Notifications\TaskAttachmentAddedNotification;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -14,6 +15,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 
@@ -84,6 +86,15 @@ class AttachmentsRelationManager extends RelationManager
                             'size' => Storage::disk('local')->size($path),
                             'uploaded_by' => auth()->id(),
                         ];
+                    })
+                    ->after(function (TaskAttachment $record): void {
+                        /** @var Task $task */
+                        $task = $this->getOwnerRecord();
+
+                        Notification::send(
+                            $task->linkedUsers()->reject(fn ($user) => $user->is($record->uploadedBy)),
+                            new TaskAttachmentAddedNotification($record),
+                        );
                     }),
             ])
             ->recordActions([
