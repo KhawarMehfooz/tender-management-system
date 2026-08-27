@@ -22,15 +22,35 @@ M3+ without the user asking for it explicitly.
 
 **Planned next steps beyond M2 (recorded so a future session doesn't need to re-derive this
 from chat history):**
-- A realistic-data seeder, to be built once the User admin panel exists (it seeds users
-  through that same path rather than around it). Scope discussed with the user: tenders
-  spread across all 8 lifecycle statuses (including won/lost/cancelled/not-evaluated/
-  excluded); realistic team/task graphs (multiple team members per tender, tasks with
-  owners/priorities/checklists, some dependency chains, comments, attachments); multiple
-  users per role (not just one super admin) so category-scoping and permission differences
-  are visible; deliberate edge cases (archived tenders, invalidated tenders, overdue tasks)
-  for documentation screenshots; and one demo user per role with documented/known
-  credentials.
+- [x] Realistic-data seeder: `Database\Seeders\DemoDataSeeder`, called from `DatabaseSeeder`
+  only under `app()->environment(['local', 'testing'])` (never production — every demo
+  account uses the well-known password "password", confirmed explicitly with the user).
+  9 roles × 3 users each (27 total): one user per non-super-admin role has a known-credential
+  demo account (`{role-value}@example.com` / `password`, e.g. `team-lead@example.com`) plus
+  two realistic `UserFactory` users; super admin reuses the existing `admin@example.com`.
+  Management roles (super-admin/department-head/team-lead — mirrors
+  `TenderForm::canManageTeam()`'s role set) get `service_category_id = null`; the other 6
+  roles are round-robin assigned across the 3 seeded categories. Department-head/team-lead
+  demo users get all 5 `Right`s, the calculation demo user gets `see-prices`, for rights-gating
+  demos. All 12 `TenderStatus::cases()` get exactly 3 tenders each (36 total), reached by
+  walking `Tender::changeStatusTo()` through `ACTIVE_PHASES` in order (never setting `status`
+  directly) so the status-change audit trail is real, with the walked distance varied by
+  variant index for realistic-looking history; each gets a 3-5 person team, 3-5 tasks
+  (checklist items, comments, 1-2 file-backed attachments each, task-status walked the same
+  way, a first-two-tasks dependency chain), some archived/invalidated tenders and some
+  overdue tasks for screenshot variety. Hit and worked around three pre-existing traps along
+  the way (all recorded as rules, not fixed as app-code changes since out of scope for a
+  seeder task): `DatabaseSeeder`'s `WithoutModelEvents` muting `Tender`'s `internal_id`-
+  generating `creating` hook (fixed *for this seeder* via `Model::setEventDispatcher()` at the
+  top of `DemoDataSeeder::run()` — see [[database-seeders]]); `Task.status`'s DB-level default
+  not reflecting on a freshly-`create()`d in-memory model, needed explicit
+  `'status' => TaskStatus::OPEN` before calling `changeStatusTo()` (see
+  [[factories-seeders]]); and the known `task_participants.id` uuid-pivot bug from
+  [[migrations]], routed around with a direct `DB::table('task_participants')->insert()`
+  instead of `attach()`/`sync()`. Verified via an actual `migrate:fresh --seed` run (36
+  tenders across all 12 statuses, 139 tasks, 109 team members, 295 comments, 216 attachments,
+  410 checklist items, 5 archived, 2 invalidated, 18 overdue) plus the full test suite (176
+  passed).
 - Product documentation for potential customers: English, user-story style ("as a team
   lead, I..."), no architecture content — the user will add screenshots themselves once the
   seeded data exists to screenshot.

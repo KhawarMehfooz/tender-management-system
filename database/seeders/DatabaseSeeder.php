@@ -2,11 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Enums\RoleName;
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -25,17 +22,11 @@ class DatabaseSeeder extends Seeder
         $this->call(CpvCodeSeeder::class);
         $this->call(NutsCodeSeeder::class);
 
+        // Demo users (admin@example.com and one known-credential account per role) plus a full
+        // set of realistic tenders/tasks/teams — local/testing only, never production, since
+        // every demo account uses the well-known password "password".
         if (app()->environment(['local', 'testing'])) {
-            $admin = User::query()->updateOrCreate(
-                ['email' => 'admin@example.com'],
-                [
-                    'name' => 'Admin',
-                    'password' => Hash::make('password'),
-                    'email_verified_at' => now(),
-                ],
-            );
-
-            $admin->assignRole(RoleName::SUPER_ADMIN);
+            $this->call(DemoDataSeeder::class);
         }
     }
 }

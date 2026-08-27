@@ -9,6 +9,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/** | .ai/rules/database-seeders.md |
 | app/Enums/** | .ai/rules/enums.md |
+| app/Models/Task.php,database/factories/TaskFactory.php,database/seeders/** | .ai/rules/factories-seeders.md |
 | **/* | .ai/rules/general.md |
 | app/Models/Task.php,database/migrations/*task_participants* | .ai/rules/migrations.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
