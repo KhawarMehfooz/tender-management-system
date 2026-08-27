@@ -23,6 +23,10 @@ intelligence that accumulates from them over time.
 
 Early: foundation stage. Not yet usable end to end.
 
+## Documentation
+
+User-facing documentation, with screenshots, starts at [docs/01-overview.md](docs/01-overview.md).
+
 ## Tech stack
 
 - Laravel 13 (PHP 8.4)
