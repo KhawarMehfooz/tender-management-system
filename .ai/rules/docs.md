@@ -13,7 +13,7 @@ Planned sequence (write one at a time, not all at once — confirm with the user
 - [x] 02 - Getting started: login, roles overview, category scoping (why a user may only see some tenders) — drafted at `docs/02-getting-started.md`, full 9-role table with one-line purpose each, mentions accounts are admin-provisioned (no self-signup), uses `<!-- screenshot: ... -->` HTML-comment placeholder markers at the spots needing images
 - [x] 03 - Managing tenders: creating a tender, lifecycle/status flow, archiving/invalidating, viewing history — drafted at `docs/03-managing-tenders.md`, walks all 5 wizard steps (Team step deferred to 04), one-line mention that estimated contract volume needs the see-prices right, covers archive/invalidate for regular users with hard-delete mentioned briefly as admin-only (full detail deferred to 08)
 - [x] 04 - Team assignment: assigning an owner and team members to a tender — drafted at `docs/04-team-assignment.md`, covers both who can edit (team lead/department head/super admin) and the read-only view for others, one-line-per-role table for the 5 functional roles
-- [ ] 05 - Tasks: creating tasks, checklists, statuses, dependencies, due dates
+- [x] 05 - Tasks: creating tasks, checklists, statuses, dependencies, due dates — drafted at `docs/05-tasks.md`, covers all 4 involvement roles (creator/owner/reviewer/participants), full status chain including the waiting-on-another-task branch and correction-required review loop, and dependencies
 - [ ] 06 - Collaboration: comments and attachments on tasks
 - [ ] 07 - Notifications: the notification centre, email preferences
 - [ ] 08 - Administration: user management, roles & rights, lookup tables (service categories, sources, CPV/NUTS codes)

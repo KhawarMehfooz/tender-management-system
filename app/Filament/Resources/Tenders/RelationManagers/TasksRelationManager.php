@@ -11,6 +11,7 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Table;
 
 /**
@@ -44,6 +45,7 @@ class TasksRelationManager extends RelationManager
             ->filters(TasksTable::filters(includeTenderFilter: false))
             ->headerActions([
                 CreateAction::make()
+                    ->modalWidth(Width::SixExtraLarge)
                     ->mutateDataUsing(function (array $data): array {
                         $data['creator_id'] = auth()->id();
 
@@ -62,6 +64,7 @@ class TasksRelationManager extends RelationManager
                     TasksTable::addAttachmentAction(),
                     ViewAction::make(),
                     EditAction::make()
+                        ->modalWidth(Width::SixExtraLarge)
                         ->mutateDataUsing(function (Task $record, array $data): array {
                             if (! TaskForm::canManageTask()) {
                                 $data['owner_id'] = $record->owner_id;
