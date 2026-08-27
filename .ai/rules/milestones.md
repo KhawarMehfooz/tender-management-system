@@ -9,12 +9,68 @@ vs. explicitly deferred.
 
 **M1 — Foundation is complete.** **M2 — Team & Tasks** is now in progress, started at the
 user's explicit request. Team assignment, the core Task feature, attachments, comments,
-cross-task dependencies, and the notification centre foundation (below) are done; the
-final-submission dependency gate is not started — don't begin it without the user asking
-explicitly (it also needs an action that doesn't exist yet — final submission isn't built until
-M5/M8).
+cross-task dependencies, the notification centre foundation, and the User administration
+panel (below) are done. One thing remains in scope before M2 is complete:
+- The final-submission dependency gate — not started. Also needs an action that doesn't exist
+  yet (final submission isn't built until M5/M8). Whether it gates the Tender status
+  transition into `submission`, a specific Task, or something else is an open design question
+  to work through with the user before coding — don't begin it without the user asking
+  explicitly.
+
+Once that lands, M2's acceptance points (idea.md) will be met. Don't build ahead into
+M3+ without the user asking for it explicitly.
+
+**Planned next steps beyond M2 (recorded so a future session doesn't need to re-derive this
+from chat history):**
+- A realistic-data seeder, to be built once the User admin panel exists (it seeds users
+  through that same path rather than around it). Scope discussed with the user: tenders
+  spread across all 8 lifecycle statuses (including won/lost/cancelled/not-evaluated/
+  excluded); realistic team/task graphs (multiple team members per tender, tasks with
+  owners/priorities/checklists, some dependency chains, comments, attachments); multiple
+  users per role (not just one super admin) so category-scoping and permission differences
+  are visible; deliberate edge cases (archived tenders, invalidated tenders, overdue tasks)
+  for documentation screenshots; and one demo user per role with documented/known
+  credentials.
+- Product documentation for potential customers: English, user-story style ("as a team
+  lead, I..."), no architecture content — the user will add screenshots themselves once the
+  seeded data exists to screenshot.
 
 Progress within M2:
+- [x] User administration panel: `UserResource` (list/create/edit only — no delete path, since
+  every FK referencing users, e.g. task owner/creator/reviewer/attachment-uploader/
+  comment-author, is `restrictOnDelete`, so a real delete would just fail once a user has any
+  history; mirrors the `canDelete()`/`canDeleteAny() => false` pattern from [[resources]]).
+  Access is restricted to super admins only — the user's explicit pick over the two broader
+  options (department-head/team-lead inclusion) idea.md's M2 "User administration" subsection
+  had left as an open "TBD". No `App\Policies` class exists anywhere in this codebase yet, so
+  gating is done the same way as `RolesAndPermissions`' page-level `canAccess()`: static
+  `UserResource::canViewAny()`/`canCreate()`/`canEdit()` overrides checking
+  `hasRole(RoleName::SUPER_ADMIN)` directly (Filament's `HasAuthorization` trait falls back to
+  allow-all when no policy exists and strict mode is off, so every other resource in this app
+  is currently open by default — `UserResource` is the first to need resource-level role
+  restriction). `CanAuthorizeResourceAccess` (mounted on every resource page) means this alone
+  blocks List/Create/Edit server-side, not just navigation. Form: `name`/`email`/`password`
+  (create-required, blank-on-edit-preserves-current via `dehydrated(fn (?string $state) =>
+  filled($state))`, hashed automatically by `User`'s existing `'password' => 'hashed'` cast) in
+  an "Account" section; `role` (single-value `Select` over `RoleName::cases()`),
+  `service_category_id` (nullable `serviceCategory` relationship `Select`, null = management/
+  all-categories per [[scopes-models]]), and `rights` (`CheckboxList` over `Right::cases()`) in
+  an "Access" section. `role`/`rights` aren't `users` columns — they're Spatie role/permission
+  pivots, so both are stripped from `$data` in `mutateFormDataBeforeCreate`/`BeforeSave` and
+  instead applied in `afterCreate()`/`afterSave()` via `assignRole()`/`givePermissionTo()`
+  (create) or `syncRoles()`/`syncPermissions()` (edit, so a removed role/right is actually
+  revoked, not just left alongside a newly added one); `EditUser::mutateFormDataBeforeFill()`
+  hydrates the transient `role`/`rights` fields from `$record->roles->first()?->name` /
+  `getDirectPermissions()->pluck('name')` since they have no real form-state backing.
+  `rights` here means the user's own *direct* Spatie permissions specifically — additive to
+  whatever their role already grants via `RolesAndPermissions`, matching idea.md M1's "a user
+  without the matching role can still hold a right if explicitly granted" rule in
+  [[permissions]]. Tests in `UserResourceTest`'s "access"/"creation"/"editing" groups cover:
+  super admin can reach the list, a non-super-admin is rejected server-side on all three pages
+  (not just hidden from nav), no delete action exists, create sets role+category+direct rights
+  and hashes the password, edit syncs role/category/rights (including revoking a removed one)
+  and preserves the existing password when the field is left blank, and a submitted new
+  password does change it.
 - [x] In-app notification centre (foundation): Filament's built-in database-notifications panel
   feature (`->databaseNotifications()` on `AdminPanelProvider`) backs the bell/slide-over UI —
   `User` already had `Notifiable`+`HasUuids` wired, so this was mostly config plus fixing the
@@ -269,9 +325,10 @@ Progress within M1:
   super admin, row actually gone afterward, log captures who/when/why, reason required.
 
 **M1 acceptance points (idea.md) are now all met** — every checklist item above is checked.
-M2 is in progress (team assignment, tasks, comments, cross-task dependencies, and the
-notification centre foundation done; the final-submission dependency gate not started) — don't
-build ahead into remaining M2 scope, or into M3+, without the user asking for it explicitly.
+M2 is in progress (team assignment, tasks, comments, cross-task dependencies, the notification
+centre foundation, and the User administration panel done; the final-submission dependency gate
+not started) — don't build ahead into remaining M2 scope, or into M3+, without the user asking
+for it explicitly.
 
 Update the checklist above as work lands, and flip the milestone line when M2's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the
