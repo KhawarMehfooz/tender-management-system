@@ -21,3 +21,8 @@ UI lives in a 6th TenderForm wizard Step ("Team"): owner Select + a `Repeater::m
 `TenderForm::canManageTeam()` gates both fields to team-lead/department-head/super-admin (`hasAnyRole`) — everyone else gets them `->disabled()` but still visible (read-only), never hidden. Belt-and-braces per [[permissions]]: CreateTender/EditTender's mutate hooks force owner_id back (to the creator on create, to the existing record's owner on edit) when the actor lacks the role, since disabled fields can still be tampered with client-side. The Repeater additionally uses `->dehydrated(fn () => canManageTeam())` so an unauthorized submission never reaches the HasMany relationship-save step at all (mutateFormDataBeforeCreate/Save can't stop relationship saves — those bypass the returned $data array entirely).
 
 Owner/team-member Select options are scoped by the *acting user's* own service_category_id (null → all users), not by the tender's own service_category_id field read via Get() — a Get()-based cross-field filter inside options()/relationship() modifyQueryUsing is fragile in a multi-step wizard (evaluated at both mount and submit-time validation, can go stale/mismatched) and Filament tests bypass ->disabled() when calling fillForm(), surfacing the mismatch as spurious "selection is invalid" errors. Since a scoped user's tender is always forced into their own category anyway, filtering by the actor's category lands on the same result without the fragility.
+
+## Docs
+Archive/invalid/hard-delete are documented in `docs/03-managing-tenders.md` and
+`docs/08-administration.md`; team assignment is documented in `docs/04-team-assignment.md`.
+If any of this behavior changes, update those pages too — see [[docs]].

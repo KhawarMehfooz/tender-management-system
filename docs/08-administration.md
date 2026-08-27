@@ -1,5 +1,7 @@
 # Administration
 
+_Last updated: 28/08/2026_
+
 This page covers the parts of TMS reserved for administrators: managing user accounts, adjusting roles and rights, maintaining the reference data the rest of the system runs on, and removing genuine junk entries.
 
 ## User administration

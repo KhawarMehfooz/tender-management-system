@@ -1,5 +1,7 @@
 # Tasks
 
+_Last updated: 28/08/2026_
+
 ## Breaking a tender down into work
 
 A tender's work is tracked as a set of tasks. Each task has a title, a description, a priority, a due date, a checklist, and its own status. Tasks can be created and managed from a tender's Tasks tab, or from the main task list.

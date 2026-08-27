@@ -1,5 +1,7 @@
 # Notifications
 
+_Last updated: 28/08/2026_
+
 ## The notification centre
 
 TMS keeps you informed about activity on the tasks you're involved in through a notification bell in the panel. Opening it shows a running list of what's happened, most recent first.

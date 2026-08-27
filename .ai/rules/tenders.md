@@ -11,3 +11,7 @@ Status changes never happen via the create/edit form field — that Select was r
 Transition rules (TenderStatus::allowedTransitions()): the 7 active phases (intake→review→decision→processing→quality→submission→follow-up) move forward one step at a time only, no skipping and no going back. cancelled/not-evaluated/excluded are reachable from any active phase (a tender can drop out early). won/lost are only reachable from submission/follow-up, since a bid must actually be submitted first. Terminal statuses (won/lost/cancelled/not-evaluated/excluded) have no further transitions.
 
 UI lives as a "Change status" row action in TendersTable (Filament Action, not EditAction) — its modal only offers the record's currently-valid next statuses and an optional reason, and the action hides itself once the tender is terminal. Don't re-add a free status Select to the form.
+
+## Docs
+The tender lifecycle is documented for end users in `docs/03-managing-tenders.md`. If the
+transition map or status-change UI changes, update that page too — see [[docs]].

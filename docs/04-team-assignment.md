@@ -1,5 +1,7 @@
 # Team Assignment
 
+_Last updated: 28/08/2026_
+
 ## Who can assign a team
 
 Every tender needs an owner, and can have any number of team members covering specific functions. Assigning them is done on the **Team** step of the tender form.

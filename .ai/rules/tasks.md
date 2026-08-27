@@ -13,3 +13,7 @@ idea.md M2: tasks can depend on other tasks; a task cannot be marked DONE until 
 Cycle/self-dependency prevention is NOT a custom validation rule — it's baked into the `dependencies` Select field's `relationship(modifyQueryUsing: ...)` on TaskForm, which excludes $record's own id plus Task::transitiveDependentIds() (BFS over `dependents()`) from the query. Per Filament docs, `relationship()`'s modifyQueryUsing IS a real security boundary (submitted values are validated against it), unlike a table's presentational modifyQueryUsing/tableArguments. Dependencies are also scoped to the same tender only, via `$get('tender_id')` (standalone TaskResource form, which needs `->live()` on the tender_id Select) or an explicit `$tenderId` param threaded through `TaskForm::configure()` (TasksRelationManager, which has no tender_id field and passes `$this->getOwnerRecord()->getKey()`).
 
 Test-writing trap: Filament's `in` validation rule for a `multiple()` Select is applied per-array-item at `{field}.*`, not at `{field}` — a rejected dependency shows up as a form error at `dependencies.0`, not `dependencies`. `assertHasFormErrors(['dependencies'])` will wrongly report no error; use `assertHasFormErrors(['dependencies.0'])`.
+
+## Docs
+Tasks (roles, status chain, checklists, dependencies) are documented in `docs/05-tasks.md`. If
+this file's user-visible behavior changes, update that page too — see [[docs]].

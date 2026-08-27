@@ -28,3 +28,9 @@ Regardless of wizard vs. single form, design every form/infolist evenly rather t
 
 ## Filament file uploads: preserveFilenames + preventFilePathTampering + server-derived metadata
 For any FileUpload field backing a persisted attachment/document row: use ->preserveFilenames() so the stored path's basename is the display filename (no separate client-supplied filename field to trust), and ->preventFilePathTampering() so a create form can't accept a smuggled arbitrary existing-disk path standing in for a fresh upload. Derive mime_type/size server-side via Storage::mimeType()/size() in the mutate hook rather than trusting client-reported values. Default to a private disk (e.g. 'local' → storage/app/private) for anything that may carry price/evidence-bearing documents — never the 'public' disk. Serve downloads through a dedicated authenticated controller/route that re-applies the parent model's scope (e.g. Task::query()->findOrFail()) before streaming via Storage::download(), so category/permission scoping produces a 404 rather than a hidden-but-reachable public URL. See TaskAttachment / AttachmentsRelationManager / TaskAttachmentDownloadController for the reference implementation.
+
+## Docs
+`UserResource` and the lookup-table resources (ServiceCategory, Source, Sector,
+ProcurementProcedure, CpvCode, NutsCode) are documented for end users in
+`docs/08-administration.md`. If a resource covered there changes user-visible behavior, update
+that page too — see [[docs]].

@@ -14,3 +14,7 @@ A scoped user hitting a foreign tender's view/edit route gets a hard ModelNotFou
 
 ## Child models with no service_category_id of their own still need their own scope
 Task has no service_category_id column — it inherits category scoping from its parent Tender. That's automatic for relation-manager access (`$tender->tasks()`, since the parent Tender was already fetched through Tender's own ServiceCategoryScope) but NOT automatic for a standalone resource that queries the child model directly (TaskResource's ListTasks queries Task::query()). Task::booted() registers its own App\Models\Scopes\TaskTenderCategoryScope, which re-derives the same restriction via `whereRelation('tender', 'service_category_id', $user->service_category_id)`. Any future child-of-Tender model with its own top-level Filament resource (not just a relation manager) needs the same pattern — don't assume the parent's scope is enough.
+
+## Docs
+Category scoping is documented for end users in `docs/02-getting-started.md`. If the scoping
+mechanism or its user-visible effect changes, update that page too — see [[docs]].

@@ -1,5 +1,7 @@
 # Collaboration
 
+_Last updated: 28/08/2026_
+
 ## Who can comment and attach files
 
 Comments and file attachments are both available on individual tasks, and both use the same rule for who can add them: anyone "linked" to the task, plus anyone who can manage tasks generally.

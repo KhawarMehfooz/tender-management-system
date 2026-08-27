@@ -1,5 +1,7 @@
 # Managing Tenders
 
+_Last updated: 28/08/2026_
+
 ## Creating a tender
 
 A tender is created through a guided, multi-step form. You can move between steps freely while filling it in, but every required field is checked when you save. The steps are:
