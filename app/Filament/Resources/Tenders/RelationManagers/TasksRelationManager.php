@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Tenders\RelationManagers;
 use App\Filament\Resources\Tasks\Schemas\TaskForm;
 use App\Filament\Resources\Tasks\Tables\TasksTable;
 use App\Models\Task;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -55,19 +56,21 @@ class TasksRelationManager extends RelationManager
                     }),
             ])
             ->recordActions([
-                TasksTable::changeStatusAction(),
-                TasksTable::addCommentAction(),
-                TasksTable::addAttachmentAction(),
-                ViewAction::make(),
-                EditAction::make()
-                    ->mutateDataUsing(function (Task $record, array $data): array {
-                        if (! TaskForm::canManageTask()) {
-                            $data['owner_id'] = $record->owner_id;
-                            $data['reviewer_id'] = $record->reviewer_id;
-                        }
+                ActionGroup::make([
+                    TasksTable::changeStatusAction(),
+                    TasksTable::addCommentAction(),
+                    TasksTable::addAttachmentAction(),
+                    ViewAction::make(),
+                    EditAction::make()
+                        ->mutateDataUsing(function (Task $record, array $data): array {
+                            if (! TaskForm::canManageTask()) {
+                                $data['owner_id'] = $record->owner_id;
+                                $data['reviewer_id'] = $record->reviewer_id;
+                            }
 
-                        return $data;
-                    }),
+                            return $data;
+                        }),
+                ]),
             ]);
     }
 }

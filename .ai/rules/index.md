@@ -13,6 +13,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
 | app/Filament/Pages/** | .ai/rules/pages.md |
 | app/Filament/Resources/Tasks/RelationManagers/* | .ai/rules/relation-managers.md |
+| app/Filament/Resources/**/Tables/*.php,app/Filament/Resources/**/RelationManagers/*.php | .ai/rules/resources-relation-managers.md |
 | app/Models/Tender.php,app/Models/TenderHardDeletion.php,app/Filament/Resources/Tenders/**, app/Models/Tender.php,app/Models/TenderTeamMember.php,app/Filament/Resources/Tenders/** | .ai/rules/resources-tenders.md |
 | app/Filament/Resources/** | .ai/rules/resources.md |
 | app/Models/Tender.php,app/Models/Scopes/**,app/Models/User.php | .ai/rules/scopes-models.md |

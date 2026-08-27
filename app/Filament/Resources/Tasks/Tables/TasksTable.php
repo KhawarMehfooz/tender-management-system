@@ -7,6 +7,7 @@ use App\Enums\TaskStatus;
 use App\Filament\Resources\Tasks\Schemas\TaskForm;
 use App\Models\Task;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\FileUpload;
@@ -204,11 +205,13 @@ class TasksTable
             ->columns(static::columns())
             ->filters(static::filters())
             ->recordActions([
-                static::changeStatusAction(),
-                static::addCommentAction(),
-                static::addAttachmentAction(),
-                ViewAction::make(),
-                EditAction::make(),
+                ActionGroup::make([
+                    static::changeStatusAction(),
+                    static::addCommentAction(),
+                    static::addAttachmentAction(),
+                    ViewAction::make(),
+                    EditAction::make(),
+                ]),
             ]);
     }
 }
