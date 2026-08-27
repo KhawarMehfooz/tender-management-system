@@ -14,7 +14,7 @@ Planned sequence (write one at a time, not all at once — confirm with the user
 - [x] 03 - Managing tenders: creating a tender, lifecycle/status flow, archiving/invalidating, viewing history — drafted at `docs/03-managing-tenders.md`, walks all 5 wizard steps (Team step deferred to 04), one-line mention that estimated contract volume needs the see-prices right, covers archive/invalidate for regular users with hard-delete mentioned briefly as admin-only (full detail deferred to 08)
 - [x] 04 - Team assignment: assigning an owner and team members to a tender — drafted at `docs/04-team-assignment.md`, covers both who can edit (team lead/department head/super admin) and the read-only view for others, one-line-per-role table for the 5 functional roles
 - [x] 05 - Tasks: creating tasks, checklists, statuses, dependencies, due dates — drafted at `docs/05-tasks.md`, covers all 4 involvement roles (creator/owner/reviewer/participants), full status chain including the waiting-on-another-task branch and correction-required review loop, and dependencies
-- [ ] 06 - Collaboration: comments and attachments on tasks
+- [x] 06 - Collaboration: comments and attachments on tasks — drafted at `docs/06-collaboration.md`, defines "linked to a task" once and references it for both sections, notes comments are delete-only (no edit) and attachments download via a dedicated access-checked link rather than inline viewing
 - [ ] 07 - Notifications: the notification centre, email preferences
 - [ ] 08 - Administration: user management, roles & rights, lookup tables (service categories, sources, CPV/NUTS codes)
 

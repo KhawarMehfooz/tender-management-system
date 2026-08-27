@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Tenders\RelationManagers;
 
 use App\Filament\Resources\Tasks\Schemas\TaskForm;
+use App\Filament\Resources\Tasks\Schemas\TaskInfolist;
 use App\Filament\Resources\Tasks\Tables\TasksTable;
 use App\Models\Task;
 use Filament\Actions\ActionGroup;
@@ -62,7 +63,9 @@ class TasksRelationManager extends RelationManager
                     TasksTable::changeStatusAction(),
                     TasksTable::addCommentAction(),
                     TasksTable::addAttachmentAction(),
-                    ViewAction::make(),
+                    ViewAction::make()
+                        ->modalWidth(Width::SixExtraLarge)
+                        ->schema(fn (): array => TaskInfolist::components()),
                     EditAction::make()
                         ->modalWidth(Width::SixExtraLarge)
                         ->mutateDataUsing(function (Task $record, array $data): array {

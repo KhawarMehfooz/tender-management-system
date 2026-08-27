@@ -25,9 +25,7 @@
                     </span>
                 </div>
 
-                <p class="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                    {{ $comment->body }}
-                </p>
+                <p class="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ $comment->body }}</p>
             </div>
         </li>
     @endforeach

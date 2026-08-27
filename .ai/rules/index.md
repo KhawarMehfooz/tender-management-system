@@ -6,6 +6,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Filament/** | .ai/rules/app-filament.md |
 | app/Console/Commands/Import*.php,database/seeders/*CodeSeeder.php | .ai/rules/commands-seeders.md |
+| app/Models/TaskAttachment.php,app/Http/Controllers/TaskAttachmentDownloadController.php,routes/web.php | .ai/rules/controllers.md |
 | app/Filament/**,resources/views/filament/**,resources/css/filament/** | .ai/rules/css-filament.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/** | .ai/rules/database-seeders.md |
@@ -21,7 +22,10 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Filament/Resources/**/Tables/*.php,app/Filament/Resources/**/RelationManagers/*.php | .ai/rules/resources-relation-managers.md |
 | app/Models/Tender.php,app/Models/TenderHardDeletion.php,app/Filament/Resources/Tenders/**, app/Models/Tender.php,app/Models/TenderTeamMember.php,app/Filament/Resources/Tenders/** | .ai/rules/resources-tenders.md |
 | app/Filament/Resources/** | .ai/rules/resources.md |
+| app/Filament/Resources/Tasks/Schemas/TaskInfolist.php | .ai/rules/schemas.md |
 | app/Models/Tender.php,app/Models/Scopes/**,app/Models/User.php | .ai/rules/scopes-models.md |
 | config/permission.php,database/seeders/** | .ai/rules/seeders.md |
 | app/Models/Task.php,database/migrations/*task_dependencies*,app/Filament/Resources/Tasks/** | .ai/rules/tasks.md |
+| app/Filament/Resources/Tasks/RelationManagers/*,app/Filament/Resources/Tenders/RelationManagers/TasksRelationManager.php | .ai/rules/tenders-relation-managers.md |
 | app/Models/Tender.php,app/Enums/TenderStatus.php,app/Filament/Resources/Tenders/** | .ai/rules/tenders.md |
+| resources/views/** | .ai/rules/views.md |

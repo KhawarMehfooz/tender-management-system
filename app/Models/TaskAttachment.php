@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
 
 /**
  * @property string $id
@@ -41,5 +42,20 @@ class TaskAttachment extends Model
     public function uploadedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    /**
+     * A short-lived signed URL rather than a plain route() URL — the download route still
+     * requires auth+category-scope on top, but signing means a leaked/cached/shared link
+     * (browser history, referrer headers, a screenshot of a URL bar) stops working within
+     * minutes rather than staying valid for as long as the viewer's session does.
+     */
+    public function downloadUrl(): string
+    {
+        return URL::temporarySignedRoute(
+            'task-attachments.download',
+            now()->addMinutes(5),
+            ['taskAttachment' => $this],
+        );
     }
 }

@@ -477,7 +477,7 @@ describe('attachment download', function () {
         Storage::disk('local')->put($attachment->file_path, 'contents');
 
         $this->actingAs(User::factory()->create(['service_category_id' => $category->id]))
-            ->get(route('task-attachments.download', $attachment))
+            ->get($attachment->downloadUrl())
             ->assertOk();
     });
 
@@ -490,8 +490,31 @@ describe('attachment download', function () {
         Storage::disk('local')->put($attachment->file_path, 'contents');
 
         $this->actingAs(User::factory()->create(['service_category_id' => $categoryB->id]))
-            ->get(route('task-attachments.download', $attachment))
+            ->get($attachment->downloadUrl())
             ->assertNotFound();
+    });
+
+    it('rejects an unsigned download link', function () {
+        Storage::fake('local');
+        $attachment = TaskAttachment::factory()->create(['file_path' => 'task-attachments/evidence.pdf']);
+        Storage::disk('local')->put($attachment->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('task-attachments.download', $attachment))
+            ->assertForbidden();
+    });
+
+    it('rejects an expired download link', function () {
+        Storage::fake('local');
+        $attachment = TaskAttachment::factory()->create(['file_path' => 'task-attachments/evidence.pdf']);
+        Storage::disk('local')->put($attachment->file_path, 'contents');
+        $expiredUrl = $attachment->downloadUrl();
+
+        $this->travel(6)->minutes();
+
+        $this->actingAs(User::factory()->create())
+            ->get($expiredUrl)
+            ->assertForbidden();
     });
 });
 
@@ -542,6 +565,30 @@ describe('tasks relation manager on a tender', function () {
 
         Livewire::test(TasksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
             ->assertTableActionHidden('create');
+    });
+
+    it('shows a task\'s comments in the view action modal', function () {
+        $tender = Tender::factory()->create();
+        $owner = User::factory()->create();
+        $task = Task::factory()->create(['tender_id' => $tender->id, 'owner_id' => $owner->id]);
+        $task->comments()->create(['user_id' => $owner->id, 'body' => 'Ready for review']);
+        $this->actingAs($owner);
+
+        Livewire::test(TasksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->mountTableAction('view', record: $task)
+            ->assertMountedActionModalSee('Ready for review');
+    });
+
+    it('shows a task\'s attachments in the view action modal', function () {
+        $tender = Tender::factory()->create();
+        $owner = User::factory()->create();
+        $task = Task::factory()->create(['tender_id' => $tender->id, 'owner_id' => $owner->id]);
+        TaskAttachment::factory()->for($task)->create(['file_path' => 'task-attachments/evidence.pdf', 'original_filename' => 'evidence.pdf']);
+        $this->actingAs($owner);
+
+        Livewire::test(TasksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->mountTableAction('view', record: $task)
+            ->assertMountedActionModalSee('evidence.pdf');
     });
 });
 

@@ -101,7 +101,7 @@ class AttachmentsRelationManager extends RelationManager
                 Action::make('download')
                     ->label(__('tasks.actions.download_attachment'))
                     ->icon(Heroicon::OutlinedArrowDownTray)
-                    ->url(fn (TaskAttachment $record): string => route('task-attachments.download', $record))
+                    ->url(fn (TaskAttachment $record): string => $record->downloadUrl())
                     ->openUrlInNewTab(),
                 DeleteAction::make()
                     ->visible(fn (TaskAttachment $record): bool => $record->uploaded_by === auth()->id() || TaskForm::canManageTask())

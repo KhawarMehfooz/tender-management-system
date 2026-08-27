@@ -71,6 +71,7 @@ return [
         'dependencies_heading' => 'Dependencies',
         'checklist_heading' => 'Checklist',
         'status_history_heading' => 'Status history',
+        'attachments_heading' => 'Attachments',
         'comments_heading' => 'Comments',
         'meta_heading' => 'Record history',
         'status_change_from' => 'from',
