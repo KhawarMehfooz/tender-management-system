@@ -4,10 +4,12 @@ namespace App\Filament\Resources\Tasks\Tables;
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Filament\Resources\Tasks\Schemas\TaskForm;
 use App\Models\Task;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -17,9 +19,21 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class TasksTable
 {
+    private static function canCommentOrAttach(Task $record): bool
+    {
+        $user = auth()->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return TaskForm::canManageTask() || $record->isLinkedTo($user);
+    }
+
     /**
      * @return array<int, TextColumn|IconColumn>
      */
@@ -113,6 +127,77 @@ class TasksTable
             );
     }
 
+    public static function addCommentAction(): Action
+    {
+        return Action::make('addComment')
+            ->label(__('tasks.actions.add_comment'))
+            ->icon(Heroicon::OutlinedChatBubbleLeft)
+            ->color('gray')
+            ->visible(fn (Task $record): bool => static::canCommentOrAttach($record))
+            ->modalWidth(Width::Medium)
+            ->schema([
+                Textarea::make('body')
+                    ->label(__('tasks.fields.comment_body'))
+                    ->required()
+                    ->rows(3)
+                    ->columnSpanFull(),
+            ])
+            ->action(function (Task $record, array $data): void {
+                if (! static::canCommentOrAttach($record)) {
+                    return;
+                }
+
+                $record->comments()->create([
+                    'user_id' => auth()->id(),
+                    'body' => $data['body'],
+                ]);
+            })
+            ->successNotification(
+                Notification::make()
+                    ->success()
+                    ->title(__('tasks.actions.add_comment_success')),
+            );
+    }
+
+    public static function addAttachmentAction(): Action
+    {
+        return Action::make('addAttachment')
+            ->label(__('tasks.actions.add_attachment'))
+            ->icon(Heroicon::OutlinedPaperClip)
+            ->color('gray')
+            ->visible(fn (Task $record): bool => static::canCommentOrAttach($record))
+            ->modalWidth(Width::Medium)
+            ->schema([
+                FileUpload::make('file')
+                    ->label(__('tasks.fields.attachment_file'))
+                    ->required()
+                    ->disk('local')
+                    ->directory('task-attachments')
+                    ->preserveFilenames()
+                    ->preventFilePathTampering(),
+            ])
+            ->action(function (Task $record, array $data): void {
+                if (! static::canCommentOrAttach($record)) {
+                    return;
+                }
+
+                $path = $data['file'];
+
+                $record->attachments()->create([
+                    'file_path' => $path,
+                    'original_filename' => basename((string) $path),
+                    'mime_type' => Storage::disk('local')->mimeType($path),
+                    'size' => Storage::disk('local')->size($path),
+                    'uploaded_by' => auth()->id(),
+                ]);
+            })
+            ->successNotification(
+                Notification::make()
+                    ->success()
+                    ->title(__('tasks.actions.add_attachment_success')),
+            );
+    }
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -120,6 +205,8 @@ class TasksTable
             ->filters(static::filters())
             ->recordActions([
                 static::changeStatusAction(),
+                static::addCommentAction(),
+                static::addAttachmentAction(),
                 ViewAction::make(),
                 EditAction::make(),
             ]);

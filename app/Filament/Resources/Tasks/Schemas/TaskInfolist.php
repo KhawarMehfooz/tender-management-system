@@ -13,6 +13,17 @@ use Filament\Support\Icons\Heroicon;
 
 class TaskInfolist
 {
+    private static function canSeeComments(Task $record): bool
+    {
+        $user = auth()->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return TaskForm::canManageTask() || $record->isLinkedTo($user);
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -92,6 +103,15 @@ class TaskInfolist
                             ->view('filament.infolists.task-status-timeline'),
                     ])
                     ->visible(fn (Task $record): bool => $record->statusChanges()->exists()),
+
+                Section::make(__('tasks.infolist.comments_heading'))
+                    ->icon(Heroicon::OutlinedChatBubbleLeft)
+                    ->schema([
+                        ViewEntry::make('comments')
+                            ->hiddenLabel()
+                            ->view('filament.infolists.task-comments-timeline'),
+                    ])
+                    ->visible(fn (Task $record): bool => $record->comments()->exists() && static::canSeeComments($record)),
 
                 Section::make(__('tasks.infolist.meta_heading'))
                     ->icon(Heroicon::OutlinedClock)

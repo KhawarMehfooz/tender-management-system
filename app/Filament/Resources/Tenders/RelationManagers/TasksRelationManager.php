@@ -56,6 +56,8 @@ class TasksRelationManager extends RelationManager
             ])
             ->recordActions([
                 TasksTable::changeStatusAction(),
+                TasksTable::addCommentAction(),
+                TasksTable::addAttachmentAction(),
                 ViewAction::make(),
                 EditAction::make()
                     ->mutateDataUsing(function (Task $record, array $data): array {

@@ -9,8 +9,9 @@ vs. explicitly deferred.
 
 **M1 — Foundation is complete.** **M2 — Team & Tasks** is now in progress, started at the
 user's explicit request. Team assignment and the core Task feature (below) are done; task
-attachments, comments, cross-task dependencies, the final-submission dependency gate, and the
-notification centre are not started — don't begin them without the user asking explicitly.
+attachments and comments are done; cross-task dependencies, the final-submission dependency
+gate, and the notification centre are not started — don't begin them without the user asking
+explicitly.
 
 Progress within M2:
 - [x] Task attachments: `TaskAttachment` model/migration (`task_id` required FK
@@ -42,8 +43,28 @@ Progress within M2:
   manager's `pageClass` for the mutating assertions, since Filament v4's read-only-relation-
   managers-on-ViewRecord-pages default (the same one noted on `TasksRelationManager` above)
   would otherwise hide every action regardless of the permission logic being tested.
-- [x] Tasks (core slice — comments/dependencies/final-submission-gate explicitly
-  deferred): `Task` model/migration (`tender_id` required FK `cascadeOnDelete`; `owner_id`/
+- [x] Task comments: `TaskComment` model/migration (`task_id` required FK `cascadeOnDelete`;
+  `user_id` required FK `restrictOnDelete` to `users`; `body` text). Immutable — no edit path,
+  delete only. UI: a `CommentsRelationManager` on `TaskResource` (list/create/delete) using a
+  `Textarea::make('body')` modal create form with `user_id` stamped from `auth()->id()` in
+  `mutateDataUsing()`. Table shows author name, body (truncated), and created_at, sorted
+  newest-first. Delete visible only to comment author or task managers. Permission model
+  mirrors attachments: create is open to anyone "linked" to the task or a task manager; delete
+  is author-or-manager. ViewTask page shows a read-only comments timeline (Blade partial
+  `filament.infolists.task-comments-timeline`) gated by the same `isLinkedTo()`/`canManageTask()`
+  check. `TasksTable` gained `addCommentAction()` and `addAttachmentAction()` — modal row
+  actions on every task table (standalone `TaskResource` list + `TasksRelationManager` on
+  tenders) so users can add comments and attachments directly from the task list without
+  navigating to the edit page. Both actions use the same `isLinkedTo()`/`canManageTask()`
+  gating and server-side enforcement. Tests in `TaskResourceTest`'s "comments"/"table add
+  comment action"/"table add attachment action"/"tasks relation manager table actions" groups
+  cover: create visibility (linked user, manager, unrelated user hidden), create by linked
+  owner, create by manager, delete visibility (own comment, different linked user hidden,
+  manager visible), table-level add comment (linked owner creates, unrelated hidden, user_id
+  stripped), table-level add attachment (linked owner creates, unrelated hidden), and relation
+  manager action visibility — using `EditTask` as the page class for relation-manager
+  assertions.
+- [x] Tasks (core slice — dependencies/final-submission-gate explicitly deferred): `Task` model/migration (`tender_id` required FK `cascadeOnDelete`; `owner_id`/
   `creator_id` required, `reviewer_id` nullable, all `restrictOnDelete` to `users`; `priority`
   → `App\Enums\TaskPriority` low/medium/high/urgent; `status` → `App\Enums\TaskStatus`
   open/in-progress/waiting-on-another-task/in-review/correction-required/done, forward-with-
@@ -193,8 +214,9 @@ Progress within M1:
   super admin, row actually gone afterward, log captures who/when/why, reason required.
 
 **M1 acceptance points (idea.md) are now all met** — every checklist item above is checked.
-M2 is in progress (team assignment done, tasks/dependencies/notifications not started) — don't
-build ahead into remaining M2 scope, or into M3+, without the user asking for it explicitly.
+M2 is in progress (team assignment and tasks done, comments done; dependencies/notifications
+not started) — don't build ahead into remaining M2 scope, or into M3+, without the user
+asking for it explicitly.
 
 Update the checklist above as work lands, and flip the milestone line when M2's acceptance
 points (idea.md) are all met. Don't build ahead into a later milestone's scope without the

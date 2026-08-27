@@ -35,6 +35,9 @@ return [
         'attachment_size' => 'Size',
         'attachment_uploaded_by' => 'Uploaded by',
         'attachment_uploaded_at' => 'Uploaded at',
+        'comment_body' => 'Comment',
+        'comment_author' => 'Author',
+        'comment_created_at' => 'Posted at',
     ],
     'status' => [
         'open' => 'Open',
@@ -54,6 +57,10 @@ return [
         'change_status' => 'Change status',
         'change_status_success' => 'Status updated',
         'add_checklist_item' => 'Add checklist item',
+        'add_comment' => 'Add comment',
+        'add_comment_success' => 'Comment added',
+        'add_attachment' => 'Add attachment',
+        'add_attachment_success' => 'Attachment uploaded',
         'download_attachment' => 'Download',
     ],
     'infolist' => [
@@ -61,6 +68,7 @@ return [
         'assignment_heading' => 'Assignment',
         'checklist_heading' => 'Checklist',
         'status_history_heading' => 'Status history',
+        'comments_heading' => 'Comments',
         'meta_heading' => 'Record history',
         'status_change_from' => 'from',
         'unknown_actor' => 'Unknown',

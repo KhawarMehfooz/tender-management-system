@@ -126,6 +126,14 @@ class Task extends Model
     }
 
     /**
+     * @return HasMany<TaskComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class)->latest();
+    }
+
+    /**
      * Whether the given user is one of the task's assigned people (owner, creator, reviewer,
      * or participant) — the set allowed to add attachments, distinct from
      * TaskForm::canManageTask()'s narrower management-only set for owner/reviewer/participant

@@ -8,6 +8,7 @@ use App\Filament\Resources\Tasks\Pages\EditTask;
 use App\Filament\Resources\Tasks\Pages\ListTasks;
 use App\Filament\Resources\Tasks\Pages\ViewTask;
 use App\Filament\Resources\Tasks\RelationManagers\AttachmentsRelationManager;
+use App\Filament\Resources\Tasks\RelationManagers\CommentsRelationManager;
 use App\Filament\Resources\Tasks\TaskResource;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
@@ -15,6 +16,7 @@ use App\Filament\Resources\Tenders\RelationManagers\TasksRelationManager;
 use App\Models\ServiceCategory;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Models\TaskComment;
 use App\Models\Tender;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -465,5 +467,172 @@ describe('tasks relation manager on a tender', function () {
 
         Livewire::test(TasksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
             ->assertTableActionHidden('create');
+    });
+});
+
+describe('comments', function () {
+    it('lets a linked owner create a comment', function () {
+        $owner = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'body' => 'Please review the cost estimates before Friday.',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $comment = $task->comments()->firstOrFail();
+        expect($comment->body)->toBe('Please review the cost estimates before Friday.');
+        expect($comment->user_id)->toBe($owner->id);
+    });
+
+    it('lets a task manager create a comment even when unrelated', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $task = Task::factory()->create();
+
+        Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionVisible('create');
+    });
+
+    it('hides the create action from a user with no link to the task', function () {
+        $task = Task::factory()->create();
+
+        Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the comment author delete their own comment', function () {
+        $author = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $author->id]);
+        $comment = TaskComment::factory()->for($task)->create(['user_id' => $author->id]);
+        $this->actingAs($author);
+
+        Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionVisible('delete', $comment)
+            ->callTableAction('delete', record: $comment)
+            ->assertHasNoTableActionErrors();
+
+        expect(TaskComment::find($comment->id))->toBeNull();
+    });
+
+    it('hides delete from a different linked user who did not write the comment', function () {
+        $author = User::factory()->create();
+        $otherOwner = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $otherOwner->id]);
+        $comment = TaskComment::factory()->for($task)->create(['user_id' => $author->id]);
+        $this->actingAs($otherOwner);
+
+        Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionHidden('delete', $comment);
+    });
+
+    it('lets a task manager delete any comment', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $task = Task::factory()->create();
+        $comment = TaskComment::factory()->for($task)->create();
+
+        Livewire::test(CommentsRelationManager::class, ['ownerRecord' => $task, 'pageClass' => EditTask::class])
+            ->assertTableActionVisible('delete', $comment);
+    });
+});
+
+describe('table add comment action', function () {
+    it('lets a linked owner add a comment via the table row action', function () {
+        $owner = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(ListTasks::class)
+            ->callAction(TestAction::make('addComment')->table($task), [
+                'body' => 'Check the deadline on this one.',
+            ])
+            ->assertHasNoFormErrors();
+
+        $comment = $task->comments()->firstOrFail();
+        expect($comment->body)->toBe('Check the deadline on this one.');
+        expect($comment->user_id)->toBe($owner->id);
+    });
+
+    it('hides the add comment action from a user with no link to the task', function () {
+        $task = Task::factory()->create();
+
+        Livewire::test(ListTasks::class)
+            ->assertActionHidden(TestAction::make('addComment')->table($task));
+    });
+
+    it('strips a smuggled user_id and uses the acting user', function () {
+        $owner = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $owner->id]);
+        $otherUser = User::factory()->create();
+        $this->actingAs($owner);
+
+        Livewire::test(ListTasks::class)
+            ->callAction(TestAction::make('addComment')->table($task), [
+                'body' => 'Test comment.',
+            ]);
+
+        $comment = $task->comments()->firstOrFail();
+        expect($comment->user_id)->toBe($owner->id);
+    });
+});
+
+describe('table add attachment action', function () {
+    it('lets a linked owner add an attachment via the table row action', function () {
+        Storage::fake('local');
+        $owner = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(ListTasks::class)
+            ->callAction(TestAction::make('addAttachment')->table($task), [
+                'file' => UploadedFile::fake()->create('report.pdf', 100, 'application/pdf'),
+            ])
+            ->assertHasNoFormErrors();
+
+        $attachment = $task->attachments()->firstOrFail();
+        expect($attachment->uploaded_by)->toBe($owner->id);
+        expect($attachment->original_filename)->toBe('report.pdf');
+        expect(Storage::disk('local')->exists($attachment->file_path))->toBeTrue();
+    });
+
+    it('hides the add attachment action from a user with no link to the task', function () {
+        $task = Task::factory()->create();
+
+        Livewire::test(ListTasks::class)
+            ->assertActionHidden(TestAction::make('addAttachment')->table($task));
+    });
+});
+
+describe('tasks relation manager table actions', function () {
+    it('offers add comment action on the tender task list', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create();
+        $task = Task::factory()->create(['tender_id' => $tender->id, 'owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(TasksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('addComment', $task);
+    });
+
+    it('offers add attachment action on the tender task list', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create();
+        $task = Task::factory()->create(['tender_id' => $tender->id, 'owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(TasksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('addAttachment', $task);
+    });
+
+    it('hides add comment from an unrelated user on the tender task list', function () {
+        $tender = Tender::factory()->create();
+        $task = Task::factory()->create(['tender_id' => $tender->id]);
+
+        Livewire::test(TasksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('addComment', $task);
     });
 });
