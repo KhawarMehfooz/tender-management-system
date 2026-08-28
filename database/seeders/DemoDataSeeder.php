@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\DeadlineType;
 use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Enums\TaskStatus;
@@ -152,8 +153,11 @@ class DemoDataSeeder extends Seeder
             'service_category_id' => $category->id,
             'owner_id' => $owner->id,
             'title' => fake()->catchPhrase().' — '.$category->name,
-            'submission_deadline' => fake()->dateTimeBetween('+1 week', '+4 months'),
         ]);
+
+        // Overrides the factory's own default SUBMISSION deadline with a wider realistic
+        // range for screenshot variety.
+        $tender->upsertDeadline(DeadlineType::SUBMISSION, fake()->dateTimeBetween('+1 week', '+4 months'));
 
         // Tasks must exist and (for statuses reached via SUBMISSION) be done *before* the
         // tender's status is walked forward, so Tender::tasksComplete()'s gate on the

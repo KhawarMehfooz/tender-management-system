@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tenders\Pages;
 
+use App\Enums\DeadlineType;
 use App\Enums\Right;
 use App\Filament\Resources\Tenders\Schemas\TenderForm;
 use App\Filament\Resources\Tenders\TenderResource;
@@ -13,6 +14,16 @@ class EditTender extends EditRecord
     protected static string $resource = TenderResource::class;
 
     /**
+     * Captured in mutateFormDataBeforeSave() before those keys are stripped from $data, and
+     * used in afterSave() below — calling $this->form->getState() a second time there would
+     * interfere with the teamMembers Repeater's relationship save, which Filament ties to the
+     * single getState() call already made earlier in EditRecord::save().
+     *
+     * @var array{submission_deadline: mixed, bidder_question_deadline: mixed, site_visit_date: mixed}
+     */
+    private array $deadlineData;
+
+    /**
      * No DeleteAction: tenders are never hard-deleted.
      * See TenderResource::canDelete()/canDeleteAny().
      */
@@ -21,6 +32,22 @@ class EditTender extends EditRecord
         return [
             ViewAction::make(),
         ];
+    }
+
+    /**
+     * submission_deadline/bidder_question_deadline/site_visit_date aren't Tender columns any
+     * more — hydrate the transient form fields from the record's tender_deadlines rows,
+     * mirroring UserResource's role/rights mutateFormDataBeforeFill() pattern.
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $record = $this->getRecord();
+
+        $data['submission_deadline'] = $record->latestDeadlineOfType(DeadlineType::SUBMISSION)?->due_at;
+        $data['bidder_question_deadline'] = $record->latestDeadlineOfType(DeadlineType::BIDDER_QUESTIONS)?->due_at;
+        $data['site_visit_date'] = $record->latestDeadlineOfType(DeadlineType::SITE_VISIT)?->due_at;
+
+        return $data;
     }
 
     /**
@@ -48,6 +75,28 @@ class EditTender extends EditRecord
             $data['owner_id'] = $this->getRecord()->owner_id;
         }
 
+        /**
+         * submission_deadline/bidder_question_deadline/site_visit_date aren't Tender columns
+         * any more — they're transient form state written into tender_deadlines in
+         * afterSave() below, mirroring UserResource's role/rights transient-field pattern.
+         */
+        $this->deadlineData = [
+            'submission_deadline' => $data['submission_deadline'] ?? null,
+            'bidder_question_deadline' => $data['bidder_question_deadline'] ?? null,
+            'site_visit_date' => $data['site_visit_date'] ?? null,
+        ];
+        unset($data['submission_deadline'], $data['bidder_question_deadline'], $data['site_visit_date']);
+
         return $data;
+    }
+
+    protected function afterSave(): void
+    {
+        $tender = $this->getRecord();
+
+        $tender->upsertDeadline(DeadlineType::SUBMISSION, $this->deadlineData['submission_deadline']);
+        $tender->upsertDeadline(DeadlineType::BIDDER_QUESTIONS, $this->deadlineData['bidder_question_deadline']);
+        $tender->upsertDeadline(DeadlineType::SITE_VISIT, $this->deadlineData['site_visit_date']);
+        $tender->syncBidValidityDeadline();
     }
 }

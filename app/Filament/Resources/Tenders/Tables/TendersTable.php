@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\Tenders\Tables;
 
+use App\Enums\DeadlineType;
 use App\Enums\RoleName;
 use App\Enums\TenderStatus;
 use App\Models\Tender;
+use App\Models\TenderDeadline;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
@@ -55,8 +57,17 @@ class TendersTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('submission_deadline')
                     ->label(__('tenders.fields.submission_deadline'))
+                    ->state(fn (Tender $record) => $record->submissionDeadline()?->due_at)
                     ->dateTime()
-                    ->sortable(),
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                        TenderDeadline::query()
+                            ->select('due_at')
+                            ->whereColumn('tender_deadlines.tender_id', 'tenders.id')
+                            ->where('type', DeadlineType::SUBMISSION->value)
+                            ->latest('due_at')
+                            ->limit(1),
+                        $direction,
+                    )),
                 TextColumn::make('created_at')
                     ->label(__('tenders.fields.created_at'))
                     ->dateTime()

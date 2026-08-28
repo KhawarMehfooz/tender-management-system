@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\DeadlineType;
 use App\Enums\TaskStatus;
 use App\Enums\TenderStatus;
 use App\Exceptions\InvalidTenderStatusTransitionException;
@@ -10,6 +11,7 @@ use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Task;
 use App\Models\Tender;
+use App\Models\TenderDeadline;
 use App\Models\TenderHardDeletion;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -327,5 +329,92 @@ describe('admin hard delete', function () {
         expect($log->deleted_by)->toBe($user->id);
         expect($log->reason)->toBe('Genuine test junk entry');
         expect($log->deleted_at)->not->toBeNull();
+    });
+});
+
+describe('deadlines', function () {
+    it('picks the latest SUBMISSION deadline as the canonical submission deadline', function () {
+        $tender = Tender::factory()->create();
+        $tender->deadlines()->delete();
+        $earlier = TenderDeadline::factory()->for($tender)->create([
+            'type' => DeadlineType::SUBMISSION,
+            'due_at' => now()->addWeek(),
+        ]);
+        $later = TenderDeadline::factory()->for($tender)->create([
+            'type' => DeadlineType::SUBMISSION,
+            'due_at' => now()->addMonth(),
+        ]);
+
+        expect($tender->submissionDeadline()->id)->toBe($later->id)
+            ->and($tender->submissionDeadline()->id)->not->toBe($earlier->id);
+    });
+
+    it('returns null when no SUBMISSION deadline exists yet', function () {
+        $tender = Tender::factory()->create();
+        $tender->deadlines()->delete();
+
+        expect($tender->submissionDeadline())->toBeNull();
+    });
+
+    it('creates a derived BID_VALIDITY deadline once both inputs are known', function () {
+        $tender = Tender::factory()->create(['bid_validity_days' => 30]);
+        $tender->deadlines()->delete();
+        TenderDeadline::factory()->for($tender)->create([
+            'type' => DeadlineType::SUBMISSION,
+            'due_at' => now()->addWeek(),
+        ]);
+
+        $tender->syncBidValidityDeadline();
+
+        $bidValidity = $tender->deadlines()->where('type', DeadlineType::BID_VALIDITY)->sole();
+        expect($bidValidity->due_at->equalTo($tender->submissionDeadline()->due_at->copy()->addDays(30)))->toBeTrue();
+    });
+
+    it('keeps a single BID_VALIDITY row in sync when resynced', function () {
+        $tender = Tender::factory()->create(['bid_validity_days' => 30]);
+        $tender->deadlines()->delete();
+        TenderDeadline::factory()->for($tender)->create([
+            'type' => DeadlineType::SUBMISSION,
+            'due_at' => now()->addWeek(),
+        ]);
+
+        $tender->syncBidValidityDeadline();
+        $tender->update(['bid_validity_days' => 60]);
+        $tender->syncBidValidityDeadline();
+
+        expect($tender->deadlines()->where('type', DeadlineType::BID_VALIDITY)->count())->toBe(1);
+        $bidValidity = $tender->deadlines()->where('type', DeadlineType::BID_VALIDITY)->sole();
+        expect($bidValidity->due_at->equalTo($tender->submissionDeadline()->due_at->copy()->addDays(60)))->toBeTrue();
+    });
+
+    it('removes the BID_VALIDITY row once bid_validity_days becomes unknown', function () {
+        $tender = Tender::factory()->create(['bid_validity_days' => 30]);
+        $tender->deadlines()->delete();
+        TenderDeadline::factory()->for($tender)->create([
+            'type' => DeadlineType::SUBMISSION,
+            'due_at' => now()->addWeek(),
+        ]);
+        $tender->syncBidValidityDeadline();
+
+        $tender->update(['bid_validity_days' => null]);
+        $tender->syncBidValidityDeadline();
+
+        expect($tender->deadlines()->where('type', DeadlineType::BID_VALIDITY)->exists())->toBeFalse();
+    });
+
+    it('scopes a standalone TenderDeadline query to the acting user\'s service category', function () {
+        $category = ServiceCategory::factory()->create();
+        $otherCategory = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $category->id]);
+        $otherTender = Tender::factory()->create(['service_category_id' => $otherCategory->id]);
+        $tender->deadlines()->delete();
+        $otherTender->deadlines()->delete();
+        $deadline = TenderDeadline::factory()->for($tender)->create();
+        TenderDeadline::factory()->for($otherTender)->create();
+
+        $scopedUser = User::factory()->create(['service_category_id' => $category->id]);
+        $this->actingAs($scopedUser);
+
+        expect(TenderDeadline::query()->pluck('id')->all())->toBe([$deadline->id]);
     });
 });

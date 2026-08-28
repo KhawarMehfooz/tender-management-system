@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DeadlineType;
 use App\Enums\TaskStatus;
 use App\Enums\TenderStatus;
 use App\Exceptions\InvalidTenderStatusTransitionException;
@@ -39,9 +40,6 @@ use RuntimeException;
  * @property Carbon|null $contract_start_date
  * @property Carbon|null $contract_end_date
  * @property string|null $extension_options
- * @property Carbon $submission_deadline
- * @property Carbon|null $bidder_question_deadline
- * @property Carbon|null $site_visit_date
  * @property int|null $bid_validity_days
  * @property Carbon|null $publication_date
  * @property string $source_id
@@ -78,9 +76,6 @@ use RuntimeException;
     'contract_start_date',
     'contract_end_date',
     'extension_options',
-    'submission_deadline',
-    'bidder_question_deadline',
-    'site_visit_date',
     'bid_validity_days',
     'publication_date',
     'source_id',
@@ -156,9 +151,6 @@ class Tender extends Model
             'estimated_contract_volume_unknown' => 'boolean',
             'contract_start_date' => 'date',
             'contract_end_date' => 'date',
-            'submission_deadline' => 'datetime',
-            'bidder_question_deadline' => 'datetime',
-            'site_visit_date' => 'datetime',
             'publication_date' => 'date',
             'status' => TenderStatus::class,
             'is_archived' => 'boolean',
@@ -245,6 +237,65 @@ class Tender extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * @return HasMany<TenderDeadline, $this>
+     */
+    public function deadlines(): HasMany
+    {
+        return $this->hasMany(TenderDeadline::class);
+    }
+
+    /**
+     * The tender's canonical deadline of a given type, if one has been recorded — the latest
+     * by due date when more than one row of that type exists (e.g. a rescheduled deadline).
+     */
+    public function latestDeadlineOfType(DeadlineType $type): ?TenderDeadline
+    {
+        return $this->deadlines()->where('type', $type)->latest('due_at')->first();
+    }
+
+    /**
+     * The tender's canonical submission deadline, matching idea.md M3's "submission deadline
+     * always visible" requirement.
+     */
+    public function submissionDeadline(): ?TenderDeadline
+    {
+        return $this->latestDeadlineOfType(DeadlineType::SUBMISSION);
+    }
+
+    /**
+     * Create/update/remove the single deadline row of a given type, keyed by type — used by
+     * the tender wizard's dedicated deadline fields (submission/bidder-questions/site-visit),
+     * each of which represents one canonical value rather than an open list. Null removes the
+     * row entirely (the field was cleared).
+     */
+    public function upsertDeadline(DeadlineType $type, \DateTimeInterface|string|null $dueAt): void
+    {
+        if ($dueAt === null) {
+            $this->deadlines()->where('type', $type)->delete();
+
+            return;
+        }
+
+        $this->deadlines()->updateOrCreate(['type' => $type], ['due_at' => $dueAt]);
+    }
+
+    /**
+     * Keep the derived BID_VALIDITY deadline row (submission due date + bid_validity_days) in
+     * sync with its two inputs, via upsertDeadline() — removed entirely once either input
+     * becomes unknown.
+     */
+    public function syncBidValidityDeadline(): void
+    {
+        $submissionDeadline = $this->submissionDeadline();
+
+        $dueAt = ($submissionDeadline && $this->bid_validity_days !== null)
+            ? $submissionDeadline->due_at->copy()->addDays($this->bid_validity_days)
+            : null;
+
+        $this->upsertDeadline(DeadlineType::BID_VALIDITY, $dueAt);
     }
 
     /**

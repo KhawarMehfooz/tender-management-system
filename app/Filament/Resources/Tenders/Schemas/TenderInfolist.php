@@ -40,7 +40,11 @@ class TenderInfolist
                             ->label(__('tenders.fields.source_id')),
                         TextEntry::make('submission_deadline')
                             ->label(__('tenders.fields.submission_deadline'))
-                            ->dateTime(),
+                            ->state(function (Tender $record): ?string {
+                                $dueAt = $record->submissionDeadline()?->due_at;
+
+                                return $dueAt ? $dueAt->translatedFormat('d.m.Y H:i').' ('.$dueAt->diffForHumans().')' : null;
+                            }),
                         TextEntry::make('estimated_contract_volume')
                             ->label(__('tenders.fields.estimated_contract_volume'))
                             ->formatStateUsing(fn (Tender $record): string => $record->estimated_contract_volume_unknown

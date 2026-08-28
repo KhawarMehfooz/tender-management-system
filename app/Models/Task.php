@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EscalationLevel;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Exceptions\InvalidTaskStatusTransitionException;
@@ -34,12 +35,17 @@ use Illuminate\Support\Facades\Notification;
  * @property Carbon|null $start_date
  * @property Carbon|null $due_date
  * @property Carbon|null $completion_date
+ * @property EscalationLevel|null $escalation_level
+ * @property Carbon|null $last_escalated_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
     'tender_id', 'title', 'description', 'owner_id', 'creator_id', 'reviewer_id', 'priority',
     'status', 'start_date', 'due_date', 'completion_date',
+    // escalation_level/last_escalated_at are intentionally excluded: they're only ever written
+    // by the M3 escalation scheduler (not yet built), never through form mass assignment —
+    // same pattern as Tender's archive/invalid fields.
 ])]
 class Task extends Model
 {
@@ -62,6 +68,8 @@ class Task extends Model
             'start_date' => 'date',
             'due_date' => 'date',
             'completion_date' => 'datetime',
+            'escalation_level' => EscalationLevel::class,
+            'last_escalated_at' => 'datetime',
         ];
     }
 

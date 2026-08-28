@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\DeadlineType;
 use App\Enums\TenderStatus;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
@@ -41,9 +42,6 @@ class TenderFactory extends Factory
             'contract_start_date' => fake()->optional()->dateTimeBetween('now', '+1 year'),
             'contract_end_date' => fake()->optional()->dateTimeBetween('+1 year', '+3 years'),
             'extension_options' => fake()->optional()->sentence(),
-            'submission_deadline' => fake()->dateTimeBetween('+2 weeks', '+3 months'),
-            'bidder_question_deadline' => fake()->optional()->dateTimeBetween('now', '+2 weeks'),
-            'site_visit_date' => fake()->optional()->dateTimeBetween('now', '+1 month'),
             'bid_validity_days' => fake()->optional()->numberBetween(30, 180),
             'publication_date' => fake()->optional()->dateTimeBetween('-1 month', 'now'),
             'source_id' => Source::factory(),
@@ -52,5 +50,21 @@ class TenderFactory extends Factory
             'owner_id' => User::factory(),
             'status' => TenderStatus::INTAKE,
         ];
+    }
+
+    /**
+     * Every tender gets a SUBMISSION deadline by default, matching idea.md M3's "submission
+     * deadline always visible" requirement — submission_deadline was a required Tender column
+     * before it moved into tender_deadlines, and this preserves that guarantee for factory-made
+     * tenders.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Tender $tender): void {
+            $tender->deadlines()->create([
+                'type' => DeadlineType::SUBMISSION,
+                'due_at' => fake()->dateTimeBetween('+2 weeks', '+3 months'),
+            ]);
+        });
     }
 }

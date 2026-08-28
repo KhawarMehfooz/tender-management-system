@@ -398,23 +398,65 @@ Planned tasks for M3:
   SCREAMING_SNAKE_CASE-case/kebab-case-value convention and `TeamRole`'s flat-lang-file
   pattern exactly. `EscalationLevel::level(): int` returns 1-4 for ordering comparisons the
   scheduler will need later. Full suite re-verified (188 passed) after the composer install.
-- [ ] `tender_deadlines` schema + model: new `TenderDeadline` (one row per tender+type, multiple
-  rows per type allowed), `TenderDeadlineCategoryScope` (mirrors `TaskTenderCategoryScope`);
-  drop `Tender.submission_deadline`/`bidder_question_deadline`/`site_visit_date` (fully migrated
-  into `tender_deadlines` rows of type `SUBMISSION`/`BIDDER_QUESTIONS`/`SITE_VISIT`) —
-  `bid_validity_days` stays on `Tender` as a duration, with a derived `BID_VALIDITY` row
-  (`submission due_at + bid_validity_days`) when both are known; `publication_date` untouched.
-  `escalation_level`/`last_escalated_at` columns added to both `tender_deadlines` (levels 3-4,
-  `SUBMISSION` row) and `tasks` (levels 1-2, task-overdue) — no separate audit table.
-- [ ] Wire the wizard + existing tender UI: since `submission_deadline` was required at
-  tender-creation time and `TenderDeadline` rows only exist after the parent is saved, the
-  Create/Edit Tender wizard's "Dates & deadlines" step keeps those 3 fields as transient form
-  state (not bound to `Tender` columns), written into `tender_deadlines` via
-  `afterCreate()`/`afterSave()` — mirrors `UserResource`'s existing `role`/rights transient-field
-  pattern exactly. `TenderInfolist` keeps only the submission-deadline countdown (matches the
-  existing Team/Tasks infolist-summary-vs-relation-manager-detail split); `TendersTable` gets a
-  computed sortable column. Update `TenderFactory`/`DemoDataSeeder`, re-verify via
-  `migrate:fresh --seed`.
+- [x] `tender_deadlines` schema + model: new `TenderDeadline` (`tender_id` FK `cascadeOnDelete`,
+  `type` → `App\Enums\DeadlineType`, `due_at` datetime, `escalation_level`/`last_escalated_at`
+  — the table has no unique constraint on tender+type, so multiple rows per type are allowed,
+  e.g. a rescheduled submission deadline or several document requests), indexed on `type` and
+  `due_at` for the scheduler/calendar's future access patterns. `App\Models\Scopes\
+  TenderDeadlineCategoryScope` mirrors `TaskTenderCategoryScope` byte-for-byte (`TenderDeadline`
+  has no `service_category_id` of its own, inherits scoping from its parent `Tender` via
+  `whereRelation`) — needed for the future standalone tender-calendar page's direct queries, the
+  same reasoning as [[scopes-models]]'s "child models with no service_category_id of their own"
+  rule. `Tender` gained `deadlines(): HasMany`, `submissionDeadline(): ?TenderDeadline` (latest
+  by `due_at` when more than one `SUBMISSION` row exists, e.g. after a reschedule — matches
+  idea.md's "submission deadline always visible" requirement with a single deterministic pick),
+  and `syncBidValidityDeadline()` (upserts a single derived `BID_VALIDITY` row at `submission
+  due_at + bid_validity_days` via `updateOrCreate(['type' => BID_VALIDITY], ...)`, deleting it
+  once either input is unknown) — not yet called from anywhere, since nothing writes a
+  `SUBMISSION` row until the next task wires the UI. `escalation_level`/`last_escalated_at`
+  columns (both nullable, `EscalationLevel`-cast) added to `tender_deadlines` (levels 3-4,
+  `SUBMISSION` row) and `tasks` (levels 1-2, task-overdue) via a separate migration — no
+  separate audit table, and deliberately excluded from `Task`'s `#[Fillable(...)]` list since
+  only the not-yet-built M3 scheduler will ever write them (forceFill-only, mirroring
+  `Tender`'s archive-field pattern in [[resources-tenders]]).
+  **Scope adjustment confirmed with the user:** the milestone note originally bundled "drop
+  `Tender.submission_deadline`/`bidder_question_deadline`/`site_visit_date`" into this same
+  task, but those 3 columns are still read directly by `TenderForm`/`TenderInfolist`/
+  `TendersTable`/`TenderFactory`/`DemoDataSeeder` and asserted on by `TenderResourceTest` —
+  dropping them here would have broken the app until the next task's UI rewiring lands. Deferred
+  the actual `dropColumn` migration + all of that UI/factory/seeder/test rework to the next task
+  ("Wire the wizard + existing tender UI"), which already covers exactly that ground. Tests:
+  `TenderTest.php`'s new "deadlines" group (canonical-submission-deadline picking including the
+  no-rows-yet case, BID_VALIDITY sync create/resync/removal, category scope on a direct
+  `TenderDeadline::query()`). Full suite re-verified (194 passed, up from 188).
+- [x] Wire the wizard + existing tender UI: dropped `Tender.submission_deadline`/
+  `bidder_question_deadline`/`site_visit_date` (the deferred half of the previous task) via a
+  new migration; `Tender`'s docblock/casts/`#[Fillable(...)]` list cleaned up to match.
+  `TenderForm`'s "Dates & deadlines" step keeps the same 3 field names as transient form state
+  (not bound to `Tender` columns) — `CreateTender`/`EditTender` strip them in
+  `mutateFormDataBeforeCreate`/`BeforeSave` and write them into `tender_deadlines` via
+  `Tender::upsertDeadline()` (new: create/update/delete-by-type, added alongside
+  `latestDeadlineOfType()` which `submissionDeadline()` now delegates to) in
+  `afterCreate()`/`afterSave()`, then call `syncBidValidityDeadline()` — mirrors `UserResource`'s
+  `role`/rights transient-field pattern, including `EditTender::mutateFormDataBeforeFill()`
+  hydrating the 3 fields back from the record's `tender_deadlines` rows for editing.
+  **Non-obvious trap hit and fixed, recorded as [[resources-pages]]:** naively re-calling
+  `$this->form->getState()` inside `afterCreate()`/`afterSave()` to read the transient deadline
+  values (rather than capturing them earlier) silently wiped the `teamMembers` Repeater's
+  already-saved rows on the same form — no exception, just missing `TenderTeamMember` rows.
+  Fixed by capturing the 3 values on a private property inside
+  `mutateFormDataBeforeCreate`/`BeforeSave` (before stripping them from `$data`) and reading
+  that property in `afterCreate`/`afterSave` instead of calling `getState()` again. `TenderForm`
+  itself needed no changes — same field names, still fully transient. `TenderInfolist`'s
+  submission-deadline entry is now a computed countdown (`state()` closure reading
+  `submissionDeadline()`, formatted `d.m.Y H:i (relative)`); `TendersTable`'s column is a
+  computed `state()` column with a correlated-subquery `sortable(query: ...)` against
+  `tender_deadlines` (ordering by the latest `SUBMISSION` row's `due_at`). `TenderFactory` drops
+  the 3 fields and instead `afterCreating()`-hooks a default `SUBMISSION` deadline (preserving
+  the old "every tender has a submission deadline" guarantee that existing tests/forms rely on);
+  `DemoDataSeeder` overrides that default via `upsertDeadline()` for its wider realistic date
+  range. Re-verified via `migrate:fresh --seed` (36 tenders, 36 tender_deadlines rows, all
+  `SUBMISSION` type) and the full suite (194 passed, Pint clean).
 - [ ] `DeadlinesRelationManager` on `TenderResource` (form + table), mirrors
   `TasksRelationManager`'s structure — full 14-type list lives here.
 - [ ] Escalation notifications: 4 new `NotificationType` cases + 4 new Notification classes
