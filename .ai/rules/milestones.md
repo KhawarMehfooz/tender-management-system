@@ -500,8 +500,35 @@ Planned tasks for M3:
   suppressed by an opted-out `NotificationPreference`) — the same pattern
   `TaskTest.php`'s "notifications" group uses, adapted since there's no trigger action to call
   yet. Full suite re-verified (205 passed, up from 199), Pint clean.
-- [ ] Escalation scheduler: `CheckDeadlineEscalations` Artisan command (hourly, first scheduled
-  task in this app) implementing idea.md's 4 escalation levels.
+- [x] Escalation scheduler: `App\Console\Commands\CheckDeadlineEscalations`
+  (`tenders:check-deadline-escalations`, PHP-attribute `#[Signature]`/`#[Description]` per the
+  `ImportCpvCodes`/`ImportNutsCodes` convention), scheduled hourly via `Schedule::command(...)`
+  in `routes/console.php` — this app's first scheduled task; `tms-scheduler`'s existing
+  `php artisan schedule:work` container picks it up with no further config. Escalation state
+  is one-directional (highest level reached so far, never reset — no reset path exists yet):
+  `Task.escalation_level` only ever holds `ASSIGNEE`/`TEAM_LEAD` (levels 1-2), and the
+  *tender's canonical* `submissionDeadline()` row's `escalation_level` only ever holds
+  `ADMINISTRATOR`/`MANAGEMENT` (levels 3-4) — each level fires its notification at most once
+  per task/tender. `escalateOverdueTasks()`: queries open (`status != DONE`) tasks past
+  `due_date`, notifies the owner (level 1, unconditional) then — once `due_date->diffInHours(now()) >= 24`
+  — the tender's `owner_id` (level 2); both can fire in the same run if a task is already
+  ≥24h overdue on first check (e.g. after downtime), which is treated as legitimate catch-up
+  behavior, not a bug. `escalateSubmissionDeadlines()`: for every tender with a `SUBMISSION`
+  deadline, skips if that canonical deadline is null/already past, then requires at least one
+  open `TaskPriority::URGENT` task ("critical") — notifies every `RoleName::SUPER_ADMIN` user
+  (level 3) once ≤48h remain, referencing the first critical task found, then (level 4) once
+  ≤24h remain, via `TenderEscalatedToManagementNotification` with the open-critical-task count.
+  Guards `User::role(RoleName::SUPER_ADMIN->value)` with a `Spatie\Permission\Models\Role::where('name', ...)->exists()`
+  check first — `User::role()` throws `RoleDoesNotExist` outright when the role hasn't been
+  seeded yet (hit in tests that don't seed `RolesAndPermissionsSeeder`, not just a theoretical
+  fresh-install case). Both escalation paths write state via `forceFill()->save()`, matching
+  `Task`/`TenderDeadline`'s `#[Fillable(...)]` exclusion of these columns. Tests in new
+  `tests/Feature/Console/CheckDeadlineEscalationsTest.php` (10 cases, 2 describe blocks) cover:
+  level-1-only vs level-1+2 (via a same-day vs yesterday `due_date`, working around `Task.due_date`
+  being date-cast so date-only precision is all that's controllable), not-yet-overdue and
+  done-task no-ops, second-run idempotency for both level 1 and level 3, level 3 vs level 4
+  thresholds, no-critical-task no-op, and beyond-48h no-op. Full suite re-verified (215 passed,
+  up from 205), Pint clean.
 - [ ] Tender calendar: standalone `Filament\Pages\Page` (`TenderCalendar`) using `guava/calendar`,
   filtered by employee/tender/contracting authority/deadline type — the "department" filter from
   idea.md is explicitly skipped, since this app has no department concept distinct from
