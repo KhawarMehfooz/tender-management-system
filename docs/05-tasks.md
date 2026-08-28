@@ -45,7 +45,7 @@ A task that's past its due date and not yet done is shown as **overdue**. This i
 
 ## Checklists
 
-Each task can have its own checklist of smaller items to track within it, useful for breaking a task down further without creating separate tasks for every small step.
+Each task can have its own checklist of smaller items to track within it, useful for breaking a task down further without creating separate tasks for every small step. Each item can be ticked off as done directly on the task's edit form.
 
 ![The task edit form, Checklist section, with a few items added](screenshots/tender-task-checklist.jpg)
 *A task's checklist.*

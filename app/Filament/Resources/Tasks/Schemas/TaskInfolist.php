@@ -112,11 +112,11 @@ class TaskInfolist
                     RepeatableEntry::make('checklistItems')
                         ->hiddenLabel()
                         ->schema([
+                            TextEntry::make('description')
+                                ->label(__('tasks.fields.checklist_item_description')),
                             IconEntry::make('is_done')
                                 ->label(__('tasks.fields.checklist_item_done'))
                                 ->boolean(),
-                            TextEntry::make('description')
-                                ->label(__('tasks.fields.checklist_item_description')),
                         ])
                         ->columns(2)
                         ->columnSpanFull(),

@@ -346,6 +346,21 @@ describe('checklist', function () {
 
         expect($item->fresh()->is_done)->toBeTrue();
     });
+
+    it('marks a checklist item done through the edit form repeater', function () {
+        $task = Task::factory()->create();
+        $item = $task->checklistItems()->create(['description' => 'Attach cover letter', 'is_done' => false]);
+
+        $component = Livewire::test(EditTask::class, ['record' => $task->getRouteKey()]);
+        $repeaterKey = collect($component->get('data.checklistItems'))
+            ->search(fn (array $row): bool => $row['description'] === $item->description);
+
+        $component->set("data.checklistItems.{$repeaterKey}.is_done", true)
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        expect($item->fresh()->is_done)->toBeTrue();
+    });
 });
 
 describe('view page', function () {

@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Enums\TaskPriority;
 use App\Models\Task;
 use App\Models\User;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -187,8 +188,12 @@ class TaskForm
                             ->schema([
                                 TextInput::make('description')
                                     ->label(__('tasks.fields.checklist_item_description'))
-                                    ->required(),
+                                    ->required()
+                                    ->columnSpan(2),
+                                Checkbox::make('is_done')
+                                    ->label(__('tasks.fields.checklist_item_done')),
                             ])
+                            ->columns(3)
                             ->columnSpanFull()
                             ->defaultItems(0)
                             ->addActionLabel(__('tasks.actions.add_checklist_item'))
