@@ -15,5 +15,6 @@ return [
         'new_document' => 'New document',
         'new_version' => 'New version',
         'new_version_success' => 'New version uploaded',
+        'download' => 'Download',
     ],
 ];

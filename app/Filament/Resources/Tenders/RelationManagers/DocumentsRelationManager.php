@@ -169,6 +169,12 @@ class DocumentsRelationManager extends RelationManager
             ])
             ->recordActions([
                 ActionGroup::make([
+                    Action::make('download')
+                        ->label(__('tender_documents.actions.download'))
+                        ->icon(Heroicon::OutlinedArrowDownTray)
+                        ->visible(fn (TenderDocument $record): bool => $record->currentVersion !== null)
+                        ->url(fn (TenderDocument $record): string => $record->currentVersion->downloadUrl())
+                        ->openUrlInNewTab(),
                     Action::make('addVersion')
                         ->label(__('tender_documents.actions.new_version'))
                         ->icon(Heroicon::OutlinedArrowUpTray)

@@ -821,4 +821,151 @@ describe('documents relation manager', function () {
         Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
             ->assertTableActionHidden('delete', $document);
     });
+
+    it('hides the download action when the document has no version yet', function () {
+        $tender = Tender::factory()->create();
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertTableActionHidden('download', $document);
+    });
+
+    it('shows the download action once a version exists', function () {
+        $tender = Tender::factory()->create();
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+        $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/original.pdf',
+            'original_filename' => 'original.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $document->created_by,
+        ]);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertTableActionVisible('download', $document);
+    });
+});
+
+describe('document download', function () {
+    it('streams the file for a user within the document\'s tender category', function () {
+        Storage::fake('local');
+        $category = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $category->id]);
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/spec.pdf',
+            'original_filename' => 'spec.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $document->created_by,
+        ]);
+        Storage::disk('local')->put($version->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $category->id]))
+            ->get($version->downloadUrl())
+            ->assertOk();
+    });
+
+    it('returns 404 for a user outside the document\'s tender category', function () {
+        Storage::fake('local');
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $categoryA->id]);
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/spec.pdf',
+            'original_filename' => 'spec.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $document->created_by,
+        ]);
+        Storage::disk('local')->put($version->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $categoryB->id]))
+            ->get($version->downloadUrl())
+            ->assertNotFound();
+    });
+
+    it('returns 403 for a calculation document downloaded by a user without the see-prices right', function () {
+        Storage::fake('local');
+        $tender = Tender::factory()->create();
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::CALCULATION]);
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/pricing.pdf',
+            'original_filename' => 'pricing.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $document->created_by,
+        ]);
+        Storage::disk('local')->put($version->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create())
+            ->get($version->downloadUrl())
+            ->assertForbidden();
+    });
+
+    it('allows a calculation document download for a user with the see-prices right', function () {
+        Storage::fake('local');
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $user = User::factory()->create();
+        $user->givePermissionTo(Right::SEE_PRICES->value);
+        $tender = Tender::factory()->create();
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::CALCULATION]);
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/pricing.pdf',
+            'original_filename' => 'pricing.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $document->created_by,
+        ]);
+        Storage::disk('local')->put($version->file_path, 'contents');
+
+        $this->actingAs($user)
+            ->get($version->downloadUrl())
+            ->assertOk();
+    });
+
+    it('rejects an unsigned download link', function () {
+        Storage::fake('local');
+        $document = TenderDocument::factory()->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/spec.pdf',
+            'original_filename' => 'spec.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $document->created_by,
+        ]);
+        Storage::disk('local')->put($version->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('tender-documents.download', $version))
+            ->assertForbidden();
+    });
+
+    it('rejects an expired download link', function () {
+        Storage::fake('local');
+        $document = TenderDocument::factory()->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+        $version = $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/spec.pdf',
+            'original_filename' => 'spec.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $document->created_by,
+        ]);
+        Storage::disk('local')->put($version->file_path, 'contents');
+        $expiredUrl = $version->downloadUrl();
+
+        $this->travel(6)->minutes();
+
+        $this->actingAs(User::factory()->create())
+            ->get($expiredUrl)
+            ->assertForbidden();
+    });
 });

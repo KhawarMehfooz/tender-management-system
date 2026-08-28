@@ -90,14 +90,20 @@ Planned tasks for M4:
   DocumentCategory::TENDER_DOCUMENTS]` explicitly — otherwise the factory randomly rolls
   `CALCULATION` often enough to flake the test into "record no longer exists" (the document
   silently falls outside the acting user's own `modifyQueryUsing()` scope).
-- [ ] Download controller + signed URLs: `tender-documents.download` route +
+- [x] Download controller + signed URLs: `tender-documents.download` route +
   `TenderDocumentDownloadController`, re-running `Tender::query()->findOrFail()` on the
   version's tender so `ServiceCategoryScope` turns an out-of-category request into a 404, not
   a hidden-but-reachable link. `TenderDocumentVersion::downloadUrl()` uses
   `URL::temporarySignedRoute(..., now()->addMinutes(5), ...)`, matching [[controllers]]'s
-  `TaskAttachment` pattern — a plain `route()` URL must not work. Tests mirroring
-  `TaskResourceTest`'s "attachment download" group (200 in-category, 404 out-of-category,
-  signed link works, unsigned/expired rejected).
+  `TaskAttachment` pattern — a plain `route()` URL must not work. The controller additionally
+  `abort_unless`s on `Right::SEE_PRICES` when the parent document's category is `CALCULATION`
+  — the table-query gating in `DocumentsRelationManager` doesn't protect a leaked/guessed
+  signed URL, so it's re-checked here too ([[controllers]]). `DocumentsRelationManager` gained
+  a `download` record action (`->url()`/`->openUrlInNewTab()`, hidden when `currentVersion` is
+  null). Tests mirroring `TaskResourceTest`'s "attachment download" group, in a new "document
+  download" describe block in `TenderResourceTest`: 200 in-category, 404 out-of-category, 403
+  CALCULATION without see-prices, 200 CALCULATION with see-prices, unsigned/expired rejected —
+  plus two download-action-visibility tests in the "documents relation manager" group.
 - [ ] Docs + wrap-up: a `[[documents]]` rule file consolidating the model/locking/gating
   decisions above (linked from `.ai/rules/index.md` for the relevant `app/**` paths), a new or
   extended `docs/*.md` page, this milestone entry's boxes checked off.

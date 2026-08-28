@@ -1,6 +1,7 @@
 ---
 paths:
   - 'app/Models/TaskAttachment.php,app/Http/Controllers/TaskAttachmentDownloadController.php,routes/web.php'
+  - 'app/Models/TenderDocumentVersion.php,app/Http/Controllers/TenderDocumentDownloadController.php,routes/web.php'
 ---
 
 # Controllers
@@ -15,3 +16,12 @@ Both call sites (`AttachmentsRelationManager`'s download action, `TaskInfolist`'
 ## Docs
 Attachment downloads are documented for end users in `docs/06-collaboration.md`. If the
 download mechanism or its expiry changes, update that page too — see [[docs]].
+
+## Tender document downloads use short-lived signed URLs, plus a see-prices check
+`tender-documents.download` (routes/web.php) carries `auth`+`signed` middleware. Every link must go through `TenderDocumentVersion::downloadUrl()` (`URL::temporarySignedRoute(..., now()->addMinutes(5), ...)`), never a plain `route()` call — mirrors [[controllers]]'s TaskAttachment pattern.
+
+The controller re-runs `Tender::query()->findOrFail($document->tender_id)` so `ServiceCategoryScope` turns an out-of-category request into a 404. It additionally `abort_unless`s on `Right::SEE_PRICES` when the parent `TenderDocument`'s category is `CALCULATION` — the only place besides `DocumentsRelationManager`'s `modifyQueryUsing()` that this gate is enforced, since a signed download URL bypasses the table query entirely if leaked/guessed.
+
+`DocumentsRelationManager`'s recordActions download `Action` uses `->url(fn ($record) => $record->currentVersion->downloadUrl())->openUrlInNewTab()` and is hidden when `currentVersion` is null (no version uploaded yet).
+
+Tests: `TenderResourceTest.php`'s "document download" describe group covers in-category 200, out-of-category 404, CALCULATION without see-prices 403, CALCULATION with see-prices 200, unsigned link 403, expired (>5min via `$this->travel()`) link 403.

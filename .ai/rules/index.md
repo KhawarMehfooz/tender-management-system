@@ -6,7 +6,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Filament/** | .ai/rules/app-filament.md |
 | app/Console/Commands/Import*.php,database/seeders/*CodeSeeder.php | .ai/rules/commands-seeders.md |
-| app/Models/TaskAttachment.php,app/Http/Controllers/TaskAttachmentDownloadController.php,routes/web.php | .ai/rules/controllers.md |
+| app/Models/TaskAttachment.php,app/Http/Controllers/TaskAttachmentDownloadController.php,routes/web.php, app/Models/TenderDocumentVersion.php,app/Http/Controllers/TenderDocumentDownloadController.php,routes/web.php | .ai/rules/controllers.md |
 | app/Filament/**,resources/views/filament/**,resources/css/filament/** | .ai/rules/css-filament.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/**, database/seeders/DemoDataSeeder.php | .ai/rules/database-seeders.md |
@@ -15,7 +15,6 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Enums/** | .ai/rules/enums.md |
 | app/Models/Task.php,database/factories/TaskFactory.php,database/seeders/** | .ai/rules/factories-seeders.md |
 | **/* | .ai/rules/general.md |
-| **/* | .ai/rules/milestones.md |
 | app/Models/Task.php,database/migrations/*task_participants* | .ai/rules/migrations.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
