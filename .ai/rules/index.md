@@ -9,12 +9,13 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/TaskAttachment.php,app/Http/Controllers/TaskAttachmentDownloadController.php,routes/web.php | .ai/rules/controllers.md |
 | app/Filament/**,resources/views/filament/**,resources/css/filament/** | .ai/rules/css-filament.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
-| app/Models/TenderDeadline.php,app/Models/Tender.php,app/Enums/DeadlineType.php,app/Enums/EscalationLevel.php,app/Console/Commands/CheckDeadlineEscalations.php,app/Filament/Resources/Tenders/RelationManagers/DeadlinesRelationManager.php,app/Filament/Pages/TenderCalendar.php,app/Filament/Widgets/TenderDeadlineCalendarWidget.php | .ai/rules/deadlines.md |
 | database/seeders/**, database/seeders/DemoDataSeeder.php | .ai/rules/database-seeders.md |
+| app/Models/TenderDeadline.php,app/Models/Tender.php,app/Enums/DeadlineType.php,app/Enums/EscalationLevel.php,app/Console/Commands/CheckDeadlineEscalations.php,app/Filament/Resources/Tenders/RelationManagers/DeadlinesRelationManager.php,app/Filament/Pages/TenderCalendar.php,app/Filament/Widgets/TenderDeadlineCalendarWidget.php | .ai/rules/deadlines.md |
 | docs/** | .ai/rules/docs.md |
 | app/Enums/** | .ai/rules/enums.md |
 | app/Models/Task.php,database/factories/TaskFactory.php,database/seeders/** | .ai/rules/factories-seeders.md |
 | **/* | .ai/rules/general.md |
+| **/* | .ai/rules/milestones.md |
 | app/Models/Task.php,database/migrations/*task_participants* | .ai/rules/migrations.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
