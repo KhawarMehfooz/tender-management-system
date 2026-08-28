@@ -381,7 +381,55 @@ checked. Don't build ahead into M3+ scope without the user asking for it explici
 don't wire up the M3 escalation levels or the M5 calculation engine just because it seems
 convenient.
 
-Update the checklist above as work lands on whichever milestone comes next.
+**M3 — Deadlines & Escalation is now in progress**, started 2026-08-28 at the user's explicit
+request, building incrementally task-by-task rather than in one pass.
+
+Planned tasks for M3:
+- [x] Dependency + enums: `guava/calendar` (v3.2.2) installed via composer, confirmed
+  Filament v5-compatible (its `composer require` publishes assets and vendor config cleanly
+  against `filament/filament` v5.7.6 already in this app). New `App\Enums\DeadlineType` (14
+  cases — bidder-questions/site-visit/internal-calculation/concept/document-check/approval/
+  quality-check/upload/submission/document-requests/presentation/negotiation/bid-validity/
+  expected-decision, per idea.md's M3 list) and `App\Enums\EscalationLevel` (4 cases —
+  assignee/team-lead/administrator/management, matching idea.md's 4 escalation levels in that
+  order) both implement `HasLabel` only for now (no `color()`/transition logic yet — those are
+  UI/scheduler concerns for later M3 tasks), backed by new `lang/en/deadline_types.php` /
+  `lang/en/escalation_levels.php` flat kebab-case-key files, mirroring [[enums]]'s
+  SCREAMING_SNAKE_CASE-case/kebab-case-value convention and `TeamRole`'s flat-lang-file
+  pattern exactly. `EscalationLevel::level(): int` returns 1-4 for ordering comparisons the
+  scheduler will need later. Full suite re-verified (188 passed) after the composer install.
+- [ ] `tender_deadlines` schema + model: new `TenderDeadline` (one row per tender+type, multiple
+  rows per type allowed), `TenderDeadlineCategoryScope` (mirrors `TaskTenderCategoryScope`);
+  drop `Tender.submission_deadline`/`bidder_question_deadline`/`site_visit_date` (fully migrated
+  into `tender_deadlines` rows of type `SUBMISSION`/`BIDDER_QUESTIONS`/`SITE_VISIT`) —
+  `bid_validity_days` stays on `Tender` as a duration, with a derived `BID_VALIDITY` row
+  (`submission due_at + bid_validity_days`) when both are known; `publication_date` untouched.
+  `escalation_level`/`last_escalated_at` columns added to both `tender_deadlines` (levels 3-4,
+  `SUBMISSION` row) and `tasks` (levels 1-2, task-overdue) — no separate audit table.
+- [ ] Wire the wizard + existing tender UI: since `submission_deadline` was required at
+  tender-creation time and `TenderDeadline` rows only exist after the parent is saved, the
+  Create/Edit Tender wizard's "Dates & deadlines" step keeps those 3 fields as transient form
+  state (not bound to `Tender` columns), written into `tender_deadlines` via
+  `afterCreate()`/`afterSave()` — mirrors `UserResource`'s existing `role`/rights transient-field
+  pattern exactly. `TenderInfolist` keeps only the submission-deadline countdown (matches the
+  existing Team/Tasks infolist-summary-vs-relation-manager-detail split); `TendersTable` gets a
+  computed sortable column. Update `TenderFactory`/`DemoDataSeeder`, re-verify via
+  `migrate:fresh --seed`.
+- [ ] `DeadlinesRelationManager` on `TenderResource` (form + table), mirrors
+  `TasksRelationManager`'s structure — full 14-type list lives here.
+- [ ] Escalation notifications: 4 new `NotificationType` cases + 4 new Notification classes
+  (mirroring `TaskStatusChangedNotification`'s dual-channel pattern) + lang keys. Recipients:
+  level 1 assignee = task owner; level 2 team lead = `Tender.owner_id`; level 3
+  administrator/level 4 management = every `RoleName::SUPER_ADMIN` user (no distinct
+  administrator/management role exists). "Critical" task = `TaskPriority::URGENT`.
+- [ ] Escalation scheduler: `CheckDeadlineEscalations` Artisan command (hourly, first scheduled
+  task in this app) implementing idea.md's 4 escalation levels.
+- [ ] Tender calendar: standalone `Filament\Pages\Page` (`TenderCalendar`) using `guava/calendar`,
+  filtered by employee/tender/contracting authority/deadline type — the "department" filter from
+  idea.md is explicitly skipped, since this app has no department concept distinct from
+  `ServiceCategory` and the user chose not to assume that mapping.
+- [ ] Wrap-up: full suite + Pint, new `.ai/rules/deadlines.md` rule file, docs page (ask the user
+  before drafting, per [[docs]]'s "confirm before starting each" rule).
 
 M13 (import connectors, AI-assisted extraction) is explicitly deferred — don't build it, but
 per idea.md's architectural note, don't make first-class structured data choices in earlier
