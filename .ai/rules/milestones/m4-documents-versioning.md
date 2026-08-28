@@ -59,17 +59,37 @@ Planned tasks for M4:
   actor recorded, a document created after submission stays unlocked, and an
   already-locked document's original `locked_by`/`locked_at` survive a later submission
   transition untouched.
-- [ ] `DocumentsRelationManager` on `TenderResource`: table grouped/filterable by category;
-  "new document" action (title + category Select + first-version `FileUpload`) and a
-  per-document "new version" row action (single `FileUpload`, next `version_number`), both
-  using [[resources]]'s file-upload rule (`->preserveFilenames()`,
-  `->preventFilePathTampering()`, server-derived `mime_type`/`size`, private `local` disk
-  under `tender-documents/`). `CALCULATION` rows/options hidden from users without
-  `see-prices`. Upload/new-version visible when `linkedToDocuments()` or
-  `canManageTeam()`; delete visible when uploader-or-manager, additionally hidden once the
-  parent document `isLocked()` — both enforced again server-side in the action's
-  before()/mutate hook, never UI-hiding alone ([[permissions]]). Feature tests mirroring
-  `TaskResourceTest`'s "attachments" group shape.
+- [x] `DocumentsRelationManager` on `TenderResource`: table grouped by category
+  (`Filament\Tables\Grouping\Group::make('category')`, title resolved automatically from
+  `DocumentCategory`'s `HasLabel`) and filterable via a `SelectFilter`; a "new document"
+  header action (title + category Select + first-version `FileUpload`) and a per-document
+  "new version" row action (single `FileUpload`, next `version_number` computed as
+  `$record->versions()->max('version_number') + 1`), both using [[resources]]'s file-upload
+  rule (`->preserveFilenames()`, `->preventFilePathTampering()`, server-derived
+  `mime_type`/`size` via `Storage::disk('local')`, private `local` disk under
+  `tender-documents/`). The version row isn't a column on `TenderDocument` itself, so both
+  actions create it via `->mutateDataUsing()` (stamps `created_by`) + `->after()` (create
+  action) or a plain `->action()` closure (row action) rather than `->mutateFormDataBeforeCreate()`,
+  which only exists on Create/Edit *pages*, not inline RelationManager actions.
+  `CALCULATION` rows are excluded from the table query entirely via `->modifyQueryUsing()`
+  for users without `see-prices` (not just hidden client-side), and the category Select's
+  options list drops `CALCULATION` the same way — submitting it anyway server-side rejects
+  as an invalid Select value. Upload/new-version visible when `Tender::linkedToDocuments()`
+  or `TenderForm::canManageTeam()`; delete visible when the document's `created_by` matches
+  the actor or `canManageTeam()`, additionally hidden once `isLocked()` — every one of these
+  is re-checked in the action's `before()` via `abort_unless(...)`, never UI-`->visible()`
+  alone ([[permissions]]). The relation manager's own `canDelete(TenderDocument $record)`
+  helper is named `canDeleteDocument()` — the base `RelationManager` class already declares a
+  protected `canDelete(Model $record)` for its own (unused here) authorization wiring, and a
+  same-name override with an incompatible parameter type is a fatal error, not just a shadow.
+  Feature tests mirroring `TaskResourceTest`'s "attachments" group shape
+  (`TenderResourceTest`'s new "documents relation manager" group) — including calculation
+  gating and locked-state hiding. Trap hit while writing them: `TenderDocumentFactory`'s
+  `category` is `fake()->randomElement(DocumentCategory::cases())` by default, so any test
+  not exercising the `see-prices` gate itself must pin `'category' =>
+  DocumentCategory::TENDER_DOCUMENTS]` explicitly — otherwise the factory randomly rolls
+  `CALCULATION` often enough to flake the test into "record no longer exists" (the document
+  silently falls outside the acting user's own `modifyQueryUsing()` scope).
 - [ ] Download controller + signed URLs: `tender-documents.download` route +
   `TenderDocumentDownloadController`, re-running `Tender::query()->findOrFail()` on the
   version's tender so `ServiceCategoryScope` turns an out-of-category request into a 404, not

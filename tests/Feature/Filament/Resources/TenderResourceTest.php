@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\DeadlineType;
+use App\Enums\DocumentCategory;
 use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Enums\TaskStatus;
@@ -11,6 +12,7 @@ use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Tenders\TenderResource;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
@@ -19,12 +21,15 @@ use App\Models\Source;
 use App\Models\Task;
 use App\Models\Tender;
 use App\Models\TenderDeadline;
+use App\Models\TenderDocument;
 use App\Models\TenderHardDeletion;
 use App\Models\TenderTeamMember;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -611,5 +616,209 @@ describe('deadlines relation manager', function () {
             ->assertHasNoTableActionErrors();
 
         expect(TenderDeadline::find($deadline->id))->toBeNull();
+    });
+});
+
+describe('documents relation manager', function () {
+    it('lists only the tender\'s own documents', function () {
+        $tender = Tender::factory()->create();
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+        $foreignDocument = TenderDocument::factory()->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$document])
+            ->assertCanNotSeeTableRecords([$foreignDocument]);
+    });
+
+    it('hides the new document action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner upload a new document with its first version', function () {
+        Storage::fake('local');
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'title' => 'Tender specification',
+                'category' => DocumentCategory::TENDER_DOCUMENTS->value,
+                'file' => UploadedFile::fake()->create('spec.pdf', 100, 'application/pdf'),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $document = $tender->documents()->firstOrFail();
+        expect($document->created_by)->toBe($owner->id);
+        expect($document->currentVersion->version_number)->toBe(1);
+        expect($document->currentVersion->original_filename)->toBe('spec.pdf');
+        expect(Storage::disk('local')->exists($document->currentVersion->file_path))->toBeTrue();
+    });
+
+    it('lets a tender manager upload a document even when unrelated to the tender', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create();
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create');
+    });
+
+    it('rejects the calculation category as a selectable option for a user without the see-prices right', function () {
+        Storage::fake('local');
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('create', data: [
+                'title' => 'Pricing sheet',
+                'category' => DocumentCategory::CALCULATION->value,
+                'file' => UploadedFile::fake()->create('pricing.pdf', 100, 'application/pdf'),
+            ])
+            ->assertHasTableActionErrors(['category']);
+    });
+
+    it('hides a calculation document from a user without the see-prices right', function () {
+        $tender = Tender::factory()->create();
+        $calculationDocument = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::CALCULATION]);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanNotSeeTableRecords([$calculationDocument]);
+    });
+
+    it('shows a calculation document to a user with the see-prices right', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::SEE_PRICES->value);
+        $tender = Tender::factory()->create();
+        $calculationDocument = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::CALCULATION]);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$calculationDocument]);
+    });
+
+    it('lets a linked team member add a new version, incrementing the version number', function () {
+        Storage::fake('local');
+        $member = User::factory()->create();
+        $tender = Tender::factory()->create();
+        TenderTeamMember::factory()->create([
+            'tender_id' => $tender->id,
+            'user_id' => $member->id,
+            'functional_role' => TeamRole::EVIDENCE_DOCUMENTS,
+        ]);
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+        $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/original.pdf',
+            'original_filename' => 'original.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $document->created_by,
+        ]);
+        $this->actingAs($member);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('addVersion', $document)
+            ->callTableAction('addVersion', record: $document, data: [
+                'file' => UploadedFile::fake()->create('revised.pdf', 100, 'application/pdf'),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        expect($document->refresh()->currentVersion->version_number)->toBe(2);
+        expect($document->currentVersion->original_filename)->toBe('revised.pdf');
+    });
+
+    it('hides the new version action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('addVersion', $document);
+    });
+
+    it('hides the new version action once the document is locked', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+        $document->lock($owner);
+        $this->actingAs($owner);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('addVersion', $document);
+    });
+
+    it('lets the document creator delete it', function () {
+        Storage::fake('local');
+        $creator = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $creator->id]);
+        $document = TenderDocument::factory()->for($tender)->create([
+            'category' => DocumentCategory::TENDER_DOCUMENTS,
+            'created_by' => $creator->id,
+        ]);
+        Storage::disk('local')->put('tender-documents/original.pdf', 'contents');
+        $document->versions()->create([
+            'version_number' => 1,
+            'file_path' => 'tender-documents/original.pdf',
+            'original_filename' => 'original.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 100,
+            'uploaded_by' => $creator->id,
+        ]);
+        $this->actingAs($creator);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('delete', $document)
+            ->callTableAction('delete', record: $document)
+            ->assertHasNoTableActionErrors();
+
+        expect(TenderDocument::find($document->id))->toBeNull();
+        expect(Storage::disk('local')->exists('tender-documents/original.pdf'))->toBeFalse();
+    });
+
+    it('hides delete from a different linked user who did not create the document', function () {
+        $owner = User::factory()->create();
+        $otherMember = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        TenderTeamMember::factory()->create([
+            'tender_id' => $tender->id,
+            'user_id' => $otherMember->id,
+            'functional_role' => TeamRole::EVIDENCE_DOCUMENTS,
+        ]);
+        $document = TenderDocument::factory()->for($tender)->create([
+            'category' => DocumentCategory::TENDER_DOCUMENTS,
+            'created_by' => $owner->id,
+        ]);
+        $this->actingAs($otherMember);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('delete', $document);
+    });
+
+    it('lets a tender manager delete any document', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create();
+        $document = TenderDocument::factory()->for($tender)->create(['category' => DocumentCategory::TENDER_DOCUMENTS]);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('delete', $document);
+    });
+
+    it('hides delete once the document is locked, even for the creator', function () {
+        $creator = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $creator->id]);
+        $document = TenderDocument::factory()->for($tender)->create([
+            'category' => DocumentCategory::TENDER_DOCUMENTS,
+            'created_by' => $creator->id,
+        ]);
+        $document->lock($creator);
+        $this->actingAs($creator);
+
+        Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('delete', $document);
     });
 });
