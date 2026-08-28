@@ -564,8 +564,20 @@ Planned tasks for M3:
   re-verified (222 passed, up from 215 — one run hit an unrelated pre-existing order-dependent
   flake in `TenderResourceTest`, gone on rerun and in isolation), Pint clean, `npm run build`
   clean.
-- [ ] Wrap-up: full suite + Pint, new `.ai/rules/deadlines.md` rule file, docs page (ask the user
-  before drafting, per [[docs]]'s "confirm before starting each" rule).
+- [x] Wrap-up: new [[deadlines]] rule file consolidating the M3 model/scheduler/calendar/
+  relation-manager decisions (linked from the index for the relevant `app/**` paths). Docs: a
+  new "Deadlines, the calendar & escalation" section added to `docs/03-managing-tenders.md`
+  (not a new numbered page — folded into the existing tender-lifecycle page per the user's
+  explicit pick, since deadlines are tender-scoped) covering all remaining `DeadlineType` cases
+  beyond the 3 wizard fields, the Deadlines relation-manager tab and its team-lead/department-
+  head/super-admin manage gating, the derived bid-validity row, the tender calendar and its 4
+  filters, and the escalation levels/thresholds/recipients end-to-end (the user's explicit pick
+  over a lighter "skip escalation internals" option). Full suite re-verified (222 passed, up
+  from 215 pre-calendar-task — the calendar task's own run already covered the jump to 222),
+  Pint clean.
+
+**M3 — Deadlines & Escalation is now complete.** All planned M3 tasks above are checked. Don't
+build ahead into M4+ scope without the user asking for it explicitly.
 
 M13 (import connectors, AI-assisted extraction) is explicitly deferred — don't build it, but
 per idea.md's architectural note, don't make first-class structured data choices in earlier

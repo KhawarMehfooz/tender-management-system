@@ -8,7 +8,7 @@ A tender is created through a guided, multi-step form. You can move between step
 
 1. **Basic info.** The tender's title, procurement number, contracting authority, procurement office, and contact details.
 2. **Location & classification.** The service category the tender belongs to, its sector, procurement procedure, city, and its CPV and NUTS classification codes.
-3. **Dates & deadlines.** The submission deadline, the bidder-question deadline, a site visit date, the publication date, and the bid validity period.
+3. **Dates & deadlines.** The submission deadline, the bidder-question deadline, a site visit date, the publication date, and the bid validity period. These are the three most common deadlines; a tender can carry many more, covered below in [Deadlines, the calendar & escalation](#deadlines-the-calendar--escalation).
 4. **Contract terms.** The estimated contract volume, contract term, contract start and end dates, and any extension options.
 5. **Source & notes.** Where the tender was found, a link to the source portal, and free-text notes.
 
@@ -45,6 +45,33 @@ A tender can't move from **quality** to **submission** while any of its tasks ar
 
 ![A tender's detail page, including its status history](screenshots/tender-view-full-page.png)
 *A tender's detail page, including its status history.*
+
+## Deadlines, the calendar & escalation
+
+Beyond the submission deadline, bidder-question deadline, and site visit date set in the create wizard, a tender can carry any number of other deadlines: internal calculation, concept, document check, approval, quality check, upload, document requests, presentation, negotiation, and expected decision. Manage them from the **Deadlines** tab on a tender's detail page: add a deadline by picking its type and due date, and edit or remove one later the same way.
+
+![The Deadlines tab on a tender's detail page, listing several deadlines](screenshots/tender-deadlines-tab.jpg)
+*The Deadlines tab, listing a tender's scheduled deadlines.*
+
+Adding, editing, and removing deadlines is restricted to the tender's team lead, department head, or a super admin — the same people who manage the tender's team. Everyone else who can see the tender can still view its deadlines.
+
+One deadline type, **bid validity**, is calculated automatically from the submission deadline plus the bid validity period you set in the create wizard, and can't be edited directly — it updates whenever either of those two inputs changes.
+
+### The tender calendar
+
+Every deadline across every tender you can see also appears on the **Tender calendar**, reachable from the main navigation. It shows only tenders within your own category scope, same as everywhere else in the system. Use the filters at the top to narrow the calendar down to a specific employee, tender, contracting authority, or deadline type. Clicking an event takes you straight to that tender's detail page.
+
+![The tender calendar, showing deadlines across multiple tenders with the filter bar visible](screenshots/tender-calendar.jpg)
+*The tender calendar with its employee, tender, contracting authority, and deadline type filters.*
+
+### Automatic escalation
+
+If a task or a submission deadline is at risk of being missed, the system escalates it automatically, no action needed to trigger it:
+
+- An overdue task first notifies its **owner**. If it's still open 24 hours later, its **tender's owner** is notified too.
+- As a submission deadline approaches, if the tender still has an urgent-priority task open, **administrators** are notified once 48 hours remain, and a **management** alert follows once only 24 hours remain.
+
+Each of these notifications only fires once per task or tender, so you won't be notified repeatedly for the same overdue item. Escalation notifications appear in the notification centre like any other, and follow the same email preferences described in [Notifications](07-notifications.md).
 
 ## Archiving and invalidating
 
