@@ -39,6 +39,10 @@ To move a tender forward, open it from the tender list and use the **Change stat
 
 Every status change is recorded: who made it, when, what it changed from and to, and the reason if one was given. You can review this history on the tender's detail page, under **Status history**.
 
+### Final submission is gated on tasks
+
+A tender can't move from **quality** to **submission** while any of its tasks are still open. This stops a bid from being marked ready to submit while calculation, concepts, evidence documents, or any other work item is unfinished. If a task is still incomplete, **submission** simply won't appear in the list of next stages — finish or otherwise close out every task first.
+
 ![A tender's detail page, including its status history](screenshots/tender-view-full-page.png)
 *A tender's detail page, including its status history.*
 

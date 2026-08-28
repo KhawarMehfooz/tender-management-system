@@ -2,6 +2,7 @@
 
 use App\Enums\Right;
 use App\Enums\RoleName;
+use App\Enums\TaskStatus;
 use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
 use App\Filament\Resources\Tenders\Pages\CreateTender;
@@ -13,6 +14,7 @@ use App\Models\ProcurementProcedure;
 use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Source;
+use App\Models\Task;
 use App\Models\Tender;
 use App\Models\TenderHardDeletion;
 use App\Models\TenderTeamMember;
@@ -122,6 +124,32 @@ describe('status change action', function () {
 
         Livewire::test(ListTenders::class)
             ->assertActionHidden(TestAction::make('changeStatus')->table($tender));
+    });
+
+    it('rejects moving to submission while a task is not done', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::OPEN]);
+
+        Livewire::test(ListTenders::class)
+            ->callAction(TestAction::make('changeStatus')->table($tender), [
+                'status' => TenderStatus::SUBMISSION->value,
+            ])
+            ->assertHasFormErrors(['status']);
+
+        expect($tender->fresh()->status)->toBe(TenderStatus::QUALITY);
+    });
+
+    it('allows moving to submission once every task is done', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::DONE]);
+
+        Livewire::test(ListTenders::class)
+            ->callAction(TestAction::make('changeStatus')->table($tender), [
+                'status' => TenderStatus::SUBMISSION->value,
+            ])
+            ->assertHasNoFormErrors();
+
+        expect($tender->fresh()->status)->toBe(TenderStatus::SUBMISSION);
     });
 });
 

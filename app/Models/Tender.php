@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\TaskStatus;
 use App\Enums\TenderStatus;
 use App\Exceptions\InvalidTenderStatusTransitionException;
+use App\Exceptions\TenderTasksNotCompleteException;
 use App\Models\Scopes\ServiceCategoryScope;
 use Database\Factories\TenderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -271,6 +273,10 @@ class Tender extends Model
             throw InvalidTenderStatusTransitionException::make($this->status, $newStatus);
         }
 
+        if ($newStatus === TenderStatus::SUBMISSION && ! $this->tasksComplete()) {
+            throw TenderTasksNotCompleteException::make($this);
+        }
+
         DB::transaction(function () use ($newStatus, $actor, $reason): void {
             $fromStatus = $this->status;
             $changedAt = now();
@@ -285,6 +291,15 @@ class Tender extends Model
                 'changed_at' => $changedAt,
             ]);
         });
+    }
+
+    /**
+     * Whether every task on this tender is done — gates the SUBMISSION transition in
+     * changeStatusTo() per idea.md M2's "final submission is gated" rule.
+     */
+    public function tasksComplete(): bool
+    {
+        return ! $this->tasks()->where('status', '!=', TaskStatus::DONE->value)->exists();
     }
 
     public function isInvalid(): bool

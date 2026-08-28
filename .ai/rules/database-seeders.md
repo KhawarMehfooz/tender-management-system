@@ -1,6 +1,7 @@
 ---
 paths:
   - 'database/seeders/**'
+  - database/seeders/DemoDataSeeder.php
 ---
 
 # Database Seeders
@@ -10,3 +11,6 @@ paths:
 
 ## DatabaseSeeder's WithoutModelEvents mutes more than the Spatie cache — Tender internal_id too
 Any seeder called from DatabaseSeeder::run() (wrapped in WithoutModelEvents, which unsets the model event dispatcher for the whole nested $this->call() chain) that creates Tender rows will get `internal_id` NOT NULL violations — Tender::booted()'s `static::creating` hook that generates it never fires. Fix: at the top of the seeder's run(), call `Model::setEventDispatcher(app('events'));` to restore the dispatcher for that seeder's duration (see DemoDataSeeder::run() for the reference fix — same class of issue as the Spatie permission-cache trap already documented for RolesAndPermissionsSeeder).
+
+## Create/complete tasks before walking a tender's status forward
+Tender::changeStatusTo() gates the quality->submission transition on Tender::tasksComplete() (see [[tenders]]). Task creation in createTender() must happen BEFORE advanceTender()'s status walk, not after — otherwise the walk hits SUBMISSION while the tender has zero tasks yet (tasksComplete() is vacuously true) and the gate silently no-ops, leaving seeded tenders sitting at submission/follow-up/won/lost with open tasks once they're created afterward (confirmed via a live query: all 12 such tenders had open tasks before this was fixed). For the 4 statuses only reachable via SUBMISSION (submission/follow-up/won/lost), every created task must be forced to `done` (see REQUIRES_COMPLETE_TASKS and createTask()'s $forceDone param) — the random/overdue task-status logic only applies to earlier-phase tenders.

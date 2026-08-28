@@ -127,6 +127,20 @@ class DemoDataSeeder extends Seeder
         return $this->categories[$index % $this->categories->count()]->id;
     }
 
+    /**
+     * Statuses only reachable by passing through SUBMISSION in the transition map — per
+     * Tender::tasksComplete()'s gate, these require every task to be done before the status
+     * walk gets there (see [[tenders]]).
+     *
+     * @var array<int, TenderStatus>
+     */
+    private const array REQUIRES_COMPLETE_TASKS = [
+        TenderStatus::SUBMISSION,
+        TenderStatus::FOLLOW_UP,
+        TenderStatus::WON,
+        TenderStatus::LOST,
+    ];
+
     private function createTender(TenderStatus $status, int $variant): void
     {
         $category = $this->categories[$variant % $this->categories->count()];
@@ -140,6 +154,24 @@ class DemoDataSeeder extends Seeder
             'title' => fake()->catchPhrase().' — '.$category->name,
             'submission_deadline' => fake()->dateTimeBetween('+1 week', '+4 months'),
         ]);
+
+        // Tasks must exist and (for statuses reached via SUBMISSION) be done *before* the
+        // tender's status is walked forward, so Tender::tasksComplete()'s gate on the
+        // quality->submission transition sees an accurate picture rather than a
+        // not-yet-populated tender.
+        $requiresCompleteTasks = in_array($status, self::REQUIRES_COMPLETE_TASKS, true);
+        $taskCount = fake()->numberBetween(3, 5);
+        $tasks = [];
+
+        for ($i = 0; $i < $taskCount; $i++) {
+            $tasks[] = $this->createTask($tender, $team, $i, $requiresCompleteTasks);
+        }
+
+        // Chain the first two tasks for a dependency-gate demo, where both exist and aren't
+        // already forced done.
+        if (count($tasks) >= 2 && $tasks[1]->status !== TaskStatus::DONE) {
+            $tasks[1]->dependencies()->attach($tasks[0]->id);
+        }
 
         $this->advanceTender($tender, $status, $owner, $variant);
 
@@ -155,18 +187,6 @@ class DemoDataSeeder extends Seeder
             $tender->archive($owner);
         } elseif ($variant === 2 && in_array($status, [TenderStatus::REVIEW, TenderStatus::CANCELLED], true)) {
             $tender->markInvalid($owner, fake()->sentence(fake()->numberBetween(6, 12)));
-        }
-
-        $taskCount = fake()->numberBetween(3, 5);
-        $tasks = [];
-
-        for ($i = 0; $i < $taskCount; $i++) {
-            $tasks[] = $this->createTask($tender, $team, $i);
-        }
-
-        // Chain the first two tasks for a dependency-gate demo, where both exist.
-        if (count($tasks) >= 2 && $tasks[1]->status !== TaskStatus::DONE) {
-            $tasks[1]->dependencies()->attach($tasks[0]->id);
         }
     }
 
@@ -224,12 +244,12 @@ class DemoDataSeeder extends Seeder
         }
     }
 
-    private function createTask(Tender $tender, Collection $team, int $index): Task
+    private function createTask(Tender $tender, Collection $team, int $index, bool $forceDone = false): Task
     {
         $owner = $team->random();
         $reviewer = $team->count() > 1 ? $team->reject(fn (User $u) => $u->is($owner))->random() : null;
 
-        $overdue = $index === 0 && fake()->boolean(40);
+        $overdue = ! $forceDone && $index === 0 && fake()->boolean(40);
 
         $task = Task::factory()->create([
             'tender_id' => $tender->id,
@@ -267,7 +287,9 @@ class DemoDataSeeder extends Seeder
             ]);
         }
 
-        if (! $overdue) {
+        if ($forceDone) {
+            $this->advanceTaskStatus($task, $owner, TaskStatus::DONE);
+        } elseif (! $overdue) {
             $this->advanceTaskStatus($task, $owner);
         }
 
@@ -285,9 +307,9 @@ class DemoDataSeeder extends Seeder
         return $task;
     }
 
-    private function advanceTaskStatus(Task $task, User $actor): void
+    private function advanceTaskStatus(Task $task, User $actor, ?TaskStatus $target = null): void
     {
-        $target = fake()->randomElement([
+        $target ??= fake()->randomElement([
             TaskStatus::OPEN,
             TaskStatus::IN_PROGRESS,
             TaskStatus::WAITING_ON_ANOTHER_TASK,

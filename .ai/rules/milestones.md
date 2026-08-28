@@ -7,17 +7,10 @@ Full milestone specs live in [idea.md](../../idea.md) (M1–M13). This file just
 the build currently stands so an assistant knows what's in scope right now vs. not-yet-built
 vs. explicitly deferred.
 
-**M1 — Foundation is complete.** **M2 — Team & Tasks** is now in progress, started at the
-user's explicit request. Team assignment, the core Task feature, attachments, comments,
-cross-task dependencies, the notification centre foundation, and the User administration
-panel (below) are done. One thing remains in scope before M2 is complete:
-- The final-submission dependency gate — not started. Also needs an action that doesn't exist
-  yet (final submission isn't built until M5/M8). Whether it gates the Tender status
-  transition into `submission`, a specific Task, or something else is an open design question
-  to work through with the user before coding — don't begin it without the user asking
-  explicitly.
-
-Once that lands, M2's acceptance points (idea.md) will be met. Don't build ahead into
+**M1 — Foundation is complete.** **M2 — Team & Tasks is now complete** — team assignment, the
+core Task feature, attachments, comments, cross-task dependencies, the final-submission
+dependency gate, the notification centre foundation, and the User administration panel
+(below) are all done. M2's acceptance points (idea.md) are now met. Don't build ahead into
 M3+ without the user asking for it explicitly.
 
 **Planned next steps beyond M2 (recorded so a future session doesn't need to re-derive this
@@ -50,12 +43,36 @@ from chat history):**
   instead of `attach()`/`sync()`. Verified via an actual `migrate:fresh --seed` run (36
   tenders across all 12 statuses, 139 tasks, 109 team members, 295 comments, 216 attachments,
   410 checklist items, 5 archived, 2 invalidated, 18 overdue) plus the full test suite (176
-  passed).
+  passed). Later revised once the final-submission task gate landed (below) — task creation
+  now happens before the tender's status is walked forward, and every task is forced to `done`
+  for the four statuses only reachable via `SUBMISSION` (`submission`/`follow-up`/`won`/
+  `lost`), so seeded history never puts a tender past `submission` with an open task. Re-
+  verified via `migrate:fresh --seed` (36 tenders, 135 tasks, 9 overdue — down from 18 since
+  the 12 submission+ tenders' tasks can no longer be overdue-and-open) plus the full suite
+  (187 passed).
 - Product documentation for potential customers: English, user-story style ("as a team
   lead, I..."), no architecture content — the user will add screenshots themselves once the
   seeded data exists to screenshot.
 
 Progress within M2:
+- [x] Final-submission dependency gate: `Tender::changeStatusTo()` throws
+  `TenderTasksNotCompleteException` when transitioning to `TenderStatus::SUBMISSION` while any
+  of the tender's tasks aren't `done` (`Tender::tasksComplete()`) — since `SUBMISSION` is only
+  reachable from `QUALITY` in the transition map, this is effectively a quality→submission
+  gate. Deliberately built against what M2 already has (Task + Tender status) rather than
+  M5's not-yet-built 6-step approval chain (calculation/concept/evidence/review/management
+  sign-off) — a design choice confirmed explicitly with the user via two questions (gate the
+  status transition vs. a dedicated task vs. both; all tasks vs. a subset) before coding, per
+  the milestone note this replaced. Vacuously true (transition allowed) when the tender has no
+  tasks yet, mirroring `Task::dependenciesComplete()`'s same convention. UI belt-and-braces:
+  `TendersTable`'s changeStatus action Select rejects the `SUBMISSION` option via `->reject()`
+  when `!$record->tasksComplete()`, the same pattern `TasksTable::changeStatusAction()` uses
+  for `DONE`/`dependenciesComplete()`. See [[tenders]] for the full rule — including that this
+  may need revisiting once M5's approval chain actually exists. Tests: `TenderTest.php`'s
+  "final submission task gate" group (model-level: blocks/allows, no-tasks vacuous case, no
+  audit entry on rejection) and `TenderResourceTest.php`'s "status change action" group
+  (table-level: rejected/allowed via the Select's offered options). Docs:
+  `docs/03-managing-tenders.md` gained a "Final submission is gated on tasks" subsection.
 - [x] User administration panel: `UserResource` (list/create/edit only — no delete path, since
   every FK referencing users, e.g. task owner/creator/reviewer/attachment-uploader/
   comment-author, is `restrictOnDelete`, so a real delete would just fail once a user has any
@@ -359,16 +376,12 @@ Progress within M1:
   has no delete path at all. Tests cover: hidden from non-super-admins, visible/functional for a
   super admin, row actually gone afterward, log captures who/when/why, reason required.
 
-**M1 acceptance points (idea.md) are now all met** — every checklist item above is checked.
-M2 is in progress (team assignment, tasks, comments, cross-task dependencies, the notification
-centre foundation, and the User administration panel done; the final-submission dependency gate
-not started) — don't build ahead into remaining M2 scope, or into M3+, without the user asking
-for it explicitly.
+**M1 and M2 acceptance points (idea.md) are now all met** — every checklist item above is
+checked. Don't build ahead into M3+ scope without the user asking for it explicitly — e.g.
+don't wire up the M3 escalation levels or the M5 calculation engine just because it seems
+convenient.
 
-Update the checklist above as work lands, and flip the milestone line when M2's acceptance
-points (idea.md) are all met. Don't build ahead into a later milestone's scope without the
-user asking for it explicitly — e.g. don't wire up the M5 calculation engine while M2 is still
-in progress, even if it seems convenient.
+Update the checklist above as work lands on whichever milestone comes next.
 
 M13 (import connectors, AI-assisted extraction) is explicitly deferred — don't build it, but
 per idea.md's architectural note, don't make first-class structured data choices in earlier

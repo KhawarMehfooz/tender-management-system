@@ -1,11 +1,14 @@
 <?php
 
+use App\Enums\TaskStatus;
 use App\Enums\TenderStatus;
 use App\Exceptions\InvalidTenderStatusTransitionException;
+use App\Exceptions\TenderTasksNotCompleteException;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Source;
+use App\Models\Task;
 use App\Models\Tender;
 use App\Models\TenderHardDeletion;
 use App\Models\User;
@@ -174,6 +177,56 @@ describe('status lifecycle', function () {
         }
 
         expect($tender->statusChanges()->count())->toBe(0);
+    });
+});
+
+describe('final submission task gate', function () {
+    it('blocks the transition into submission while a task is not done', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $user = User::factory()->create();
+        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::OPEN]);
+
+        $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+    })->throws(TenderTasksNotCompleteException::class);
+
+    it('does not write an audit entry when the task gate rejects the transition', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $user = User::factory()->create();
+        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::OPEN]);
+
+        try {
+            $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+        } catch (TenderTasksNotCompleteException) {
+        }
+
+        expect($tender->statusChanges()->count())->toBe(0);
+    });
+
+    it('allows the transition into submission once every task is done', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $user = User::factory()->create();
+        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::DONE]);
+
+        $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+
+        expect($tender->fresh()->status)->toBe(TenderStatus::SUBMISSION);
+    });
+
+    it('allows the transition into submission when the tender has no tasks', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+
+        expect($tender->fresh()->status)->toBe(TenderStatus::SUBMISSION);
+    });
+
+    it('reports tasksComplete false when any task is not done', function () {
+        $tender = Tender::factory()->create();
+        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::IN_PROGRESS]);
+        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::DONE]);
+
+        expect($tender->tasksComplete())->toBeFalse();
     });
 });
 
