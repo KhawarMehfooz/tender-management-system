@@ -12,6 +12,7 @@ use App\Models\Source;
 use App\Models\Task;
 use App\Models\Tender;
 use App\Models\TenderDeadline;
+use App\Models\TenderDocument;
 use App\Models\TenderHardDeletion;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -221,6 +222,44 @@ describe('final submission task gate', function () {
         $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
 
         expect($tender->fresh()->status)->toBe(TenderStatus::SUBMISSION);
+    });
+});
+
+describe('document locking on submission', function () {
+    it('locks every pre-existing document once the tender reaches submission', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $user = User::factory()->create();
+        $document = TenderDocument::factory()->create(['tender_id' => $tender->id]);
+
+        $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+
+        expect($document->fresh()->isLocked())->toBeTrue();
+        expect($document->fresh()->locked_by)->toBe($user->id);
+    });
+
+    it('does not lock documents created after the tender is already in submission', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $user = User::factory()->create();
+
+        $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+
+        $document = TenderDocument::factory()->create(['tender_id' => $tender->id]);
+
+        expect($document->fresh()->isLocked())->toBeFalse();
+    });
+
+    it('leaves an already-locked document untouched', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $user = User::factory()->create();
+        $earlierActor = User::factory()->create();
+        $document = TenderDocument::factory()->create(['tender_id' => $tender->id]);
+        $document->lock($earlierActor);
+        $lockedAt = $document->fresh()->locked_at;
+
+        $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+
+        expect($document->fresh()->locked_by)->toBe($earlierActor->id);
+        expect($document->fresh()->locked_at)->toEqual($lockedAt);
     });
 
     it('reports tasksComplete false when any task is not done', function () {

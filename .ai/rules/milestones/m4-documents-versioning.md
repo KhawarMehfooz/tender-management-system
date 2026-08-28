@@ -21,28 +21,44 @@ Three design decisions were confirmed with the user before any code was written:
   versions; delete is uploader-or-manager.
 
 Planned tasks for M4:
-- [ ] Schema + models + enum: new `App\Enums\DocumentCategory` (11 cases per idea.md's list —
+- [x] Schema + models + enum: `App\Enums\DocumentCategory` (11 cases —
   `TENDER_DOCUMENTS`/`CALCULATION`/`CONCEPTS`/`EVIDENCE_DOCUMENTS`/`REFERENCES`/
   `BIDDER_QUESTIONS`/`COMMUNICATION`/`SITE_VISIT`/`FINAL_BID_DOCUMENTS`/`RESULT`/
   `POST_ANALYSIS`) + `lang/en/document_categories.php`, mirroring `DeadlineType`'s exact
   pattern ([[enums]]). Two new tables: `tender_documents` (`TenderDocument` model —
   `tender_id` FK `cascadeOnDelete`, `category`, `title`, `created_by` FK `restrictOnDelete`,
-  `locked_at`/`locked_by` nullable and forceFill-only, excluded from `#[Fillable(...)]` same
-  as `Tender`'s archive columns) and `tender_document_versions` (`TenderDocumentVersion`
-  model — `tender_document_id` FK `cascadeOnDelete`, `version_number` int starting at 1,
+  `locked_at`/`locked_by` nullable and forceFill-only via `lock()`, excluded from
+  `#[Fillable(...)]` same as `Tender`'s archive columns) and `tender_document_versions`
+  (`TenderDocumentVersion` model — `tender_document_id` FK `cascadeOnDelete`,
+  `version_number` unsigned int, unique per `(tender_document_id, version_number)`,
   `file_path`/`original_filename`/`mime_type`/`size`, `uploaded_by` FK `restrictOnDelete`, no
-  `updated_at` — immutable by construction). `TenderDocument::currentVersion()` is a `HasOne`
-  ordered `orderByDesc('version_number')->limit(1)` — deliberately not `ofMany()`, which can't
-  run `MAX()` against this app's UUID PKs ([[models]]'s trap). `Tender` gains `documents():
+  `updated_at` (`const UPDATED_AT = null`) — immutable by construction).
+  `TenderDocument::currentVersion()` is a `HasOne` ordered
+  `orderByDesc('version_number')->limit(1)` — deliberately not `ofMany()`, which can't run
+  `MAX()` against this app's UUID PKs ([[models]]'s trap). `Tender` gains `documents():
   HasMany` and `linkedToDocuments(User $user): bool` (true when the user is the tender's
-  owner or a `teamMembers` row, mirroring `Task::isLinkedTo()`). Factories for both new
-  models. Tests: model-level (version numbering, `currentVersion()`, `isLocked()`/`lock()`,
-  cascade delete, `linkedToDocuments()`).
-- [ ] Locking wired into `changeStatusTo()`: on a successful transition to `SUBMISSION`, loop
-  `$this->documents` and lock every one not already locked — same DB transaction that already
-  writes the status-change audit row and runs the final-submission task-completeness gate
-  ([[tenders]]). Tests covering pre-existing docs locked, post-submission new docs unlocked,
-  already-locked docs untouched.
+  owner or a `teamMembers` row, mirroring `Task::isLinkedTo()`). Neither model registers a
+  category-scoping global scope of its own yet — like `TaskAttachment`, they're only reached
+  through the parent `Tender` (already `ServiceCategoryScope`-scoped) until/unless a
+  standalone Filament resource queries them directly, per [[scopes-models]]'s "child models"
+  rule. `TenderDocumentVersion::downloadUrl()` references the `tender-documents.download`
+  named route, which doesn't exist yet — added by the download-controller task below.
+  Factories for both new models. Tests (`TenderDocumentTest`): version ordering,
+  `currentVersion()`, `isLocked()`/`lock()`, cascade delete (tender → document → version),
+  `linkedToDocuments()` for owner/team-member/stranger.
+- [x] Locking wired into `changeStatusTo()`: a new protected `Tender::lockDocuments(User
+  $actor)` queries `$this->documents()->whereNull('locked_at')` and calls `TenderDocument::lock()`
+  on each, called from inside `changeStatusTo()`'s existing `DB::transaction()` right after the
+  status update/audit-row write, gated on `$newStatus === TenderStatus::SUBMISSION` — same
+  transaction that runs the final-submission task-completeness gate ([[tenders]]). The
+  `whereNull('locked_at')` filter means already-locked documents are never re-touched (no
+  re-stamping `locked_by`/`locked_at`), and documents created after the tender is already in
+  `SUBMISSION` are untouched since the loop only runs once, at the moment of transition — they
+  stay unlocked by construction, no extra guard needed. Tests added to `TenderTest`'s new
+  "document locking on submission" group: pre-existing document locked with the transitioning
+  actor recorded, a document created after submission stays unlocked, and an
+  already-locked document's original `locked_by`/`locked_at` survive a later submission
+  transition untouched.
 - [ ] `DocumentsRelationManager` on `TenderResource`: table grouped/filterable by category;
   "new document" action (title + category Select + first-version `FileUpload`) and a
   per-document "new version" row action (single `FileUpload`, next `version_number`), both

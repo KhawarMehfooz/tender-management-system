@@ -248,6 +248,25 @@ class Tender extends Model
     }
 
     /**
+     * @return HasMany<TenderDocument, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(TenderDocument::class);
+    }
+
+    /**
+     * Whether the given user may upload/manage this tender's documents by virtue of being
+     * linked to the tender itself — the owner or any tender_team_members row — mirroring
+     * Task::isLinkedTo(). Distinct from TenderForm::canManageTeam()'s broader manager set,
+     * which is checked separately wherever this alone isn't enough (see [[documents]]).
+     */
+    public function linkedToDocuments(User $user): bool
+    {
+        return $this->owner_id === $user->id || $this->teamMembers()->where('user_id', $user->id)->exists();
+    }
+
+    /**
      * The tender's canonical deadline of a given type, if one has been recorded — the latest
      * by due date when more than one row of that type exists (e.g. a rescheduled deadline).
      */
@@ -341,7 +360,23 @@ class Tender extends Model
                 'reason' => $reason,
                 'changed_at' => $changedAt,
             ]);
+
+            if ($newStatus === TenderStatus::SUBMISSION) {
+                $this->lockDocuments($actor);
+            }
         });
+    }
+
+    /**
+     * Lock every document that already exists on the tender at the moment it reaches
+     * SUBMISSION (idea.md M4: "once a tender is submitted, its final submission version is
+     * locked/immutable"). Documents created afterwards (e.g. Result, Post-analysis in later
+     * milestones) are untouched — they're new documents, not edits to already-submitted ones.
+     * Already-locked documents are left alone (no re-stamping locked_at/locked_by).
+     */
+    protected function lockDocuments(User $actor): void
+    {
+        $this->documents()->whereNull('locked_at')->each(fn (TenderDocument $document) => $document->lock($actor));
     }
 
     /**
