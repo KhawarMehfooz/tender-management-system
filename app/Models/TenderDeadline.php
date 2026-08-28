@@ -6,6 +6,8 @@ use App\Enums\DeadlineType;
 use App\Enums\EscalationLevel;
 use App\Models\Scopes\TenderDeadlineCategoryScope;
 use Database\Factories\TenderDeadlineFactory;
+use Guava\Calendar\Contracts\Eventable;
+use Guava\Calendar\ValueObjects\CalendarEvent;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,7 +26,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  */
 #[Fillable(['tender_id', 'type', 'due_at'])]
-class TenderDeadline extends Model
+class TenderDeadline extends Model implements Eventable
 {
     /** @use HasFactory<TenderDeadlineFactory> */
     use HasFactory, HasUuids;
@@ -53,5 +55,16 @@ class TenderDeadline extends Model
     public function tender(): BelongsTo
     {
         return $this->belongsTo(Tender::class);
+    }
+
+    public function toCalendarEvent(): CalendarEvent
+    {
+        return CalendarEvent::make($this)
+            ->title("{$this->tender->internal_id}: {$this->type->getLabel()}")
+            ->start($this->due_at)
+            ->end($this->due_at)
+            ->extendedProps([
+                'tender_id' => $this->tender_id,
+            ]);
     }
 }

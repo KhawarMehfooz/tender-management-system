@@ -529,10 +529,41 @@ Planned tasks for M3:
   done-task no-ops, second-run idempotency for both level 1 and level 3, level 3 vs level 4
   thresholds, no-critical-task no-op, and beyond-48h no-op. Full suite re-verified (215 passed,
   up from 205), Pint clean.
-- [ ] Tender calendar: standalone `Filament\Pages\Page` (`TenderCalendar`) using `guava/calendar`,
-  filtered by employee/tender/contracting authority/deadline type — the "department" filter from
-  idea.md is explicitly skipped, since this app has no department concept distinct from
-  `ServiceCategory` and the user chose not to assume that mapping.
+- [x] Tender calendar: standalone `Filament\Pages\Page` (`App\Filament\Pages\TenderCalendar`,
+  top-level nav item, no role gate — read-only for everyone, category scoping does the real
+  restricting) embedding a single `App\Filament\Widgets\TenderDeadlineCalendarWidget extends
+  Guava\Calendar\Filament\CalendarWidget`, filtered by employee/tender/contracting authority/
+  deadline type — the "department" filter from idea.md is explicitly skipped, since this app has
+  no department concept distinct from `ServiceCategory` and the user chose not to assume that
+  mapping. `TenderDeadline` implements `Guava\Calendar\Contracts\Eventable::toCalendarEvent()`
+  (title `"{internal_id}: {type label}"`, a point event at `due_at`, `tender_id` in
+  `extendedProps`); clicking an event redirects to the tender's `ViewTender` page
+  (`onEventClick` override). Filtering reuses Filament's own Dashboard-widget-filter machinery
+  rather than inventing a new mechanism: the page uses
+  `Filament\Pages\Dashboard\Concerns\HasFiltersForm` (gives a `filters` state property, URL- and
+  session-persisted) with a 4-field `filtersForm()` (`employee_id`/`tender_id` Selects populated
+  from `User`/`Tender`, `contracting_authority` Select over distinct scoped values, `deadline_type`
+  Select over `DeadlineType::class`), and the widget uses
+  `Filament\Widgets\Concerns\InteractsWithPageFilters` (`#[Reactive] public ?array $pageFilters`,
+  auto-populated by Filament's own `Page::getWidgetsSchemaComponents()` whenever
+  `property_exists($this, 'filters')` on the page — no custom event wiring needed) plus a
+  `updatedPageFilters()` hook calling the package's `refreshRecords()` to re-fetch events when a
+  filter changes. `getEvents(FetchInfo $info)` queries `TenderDeadline::query()` scoped to
+  `$info->start`/`$info->end` — category scoping is automatic via the existing
+  `TenderDeadlineCategoryScope` global scope, no new scope needed. Employee filter matches tender
+  owner OR team member (`whereHas('tender', ...->where('owner_id', ...)->orWhereHas('teamMembers',
+  ...))`). Theme: `resources/css/filament/admin/theme.css` gained the package's `@import`/`@source`
+  lines per its README (assets were already published to `public/{css,js}/guava` by the earlier
+  composer-install task, and the package's service provider auto-registers its Alpine
+  components/stylesheet — no `->plugin()` call needed in `AdminPanelProvider`). Tests: new
+  `tests/Feature/Filament/Pages/TenderCalendarTest.php` — page loads for any authenticated user
+  (no role gate), and the widget's `getEvents()` (invoked directly via `ReflectionMethod` on a
+  bare `new TenderDeadlineCalendarWidget` with `pageFilters` set by hand, sidestepping full
+  Livewire component hydration since the method only reads that one public property) is checked
+  for date-range windowing, each of the 4 filters individually, and category scoping. Full suite
+  re-verified (222 passed, up from 215 — one run hit an unrelated pre-existing order-dependent
+  flake in `TenderResourceTest`, gone on rerun and in isolation), Pint clean, `npm run build`
+  clean.
 - [ ] Wrap-up: full suite + Pint, new `.ai/rules/deadlines.md` rule file, docs page (ask the user
   before drafting, per [[docs]]'s "confirm before starting each" rule).
 

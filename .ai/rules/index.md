@@ -30,3 +30,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Filament/Resources/Tasks/RelationManagers/*,app/Filament/Resources/Tenders/RelationManagers/TasksRelationManager.php | .ai/rules/tenders-relation-managers.md |
 | app/Models/Tender.php,app/Enums/TenderStatus.php,app/Filament/Resources/Tenders/** | .ai/rules/tenders.md |
 | resources/views/** | .ai/rules/views.md |
+| app/Filament/Pages/TenderCalendar.php,app/Filament/Widgets/** | .ai/rules/widgets.md |
