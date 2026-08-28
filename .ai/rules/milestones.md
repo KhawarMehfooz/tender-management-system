@@ -457,13 +457,49 @@ Planned tasks for M3:
   `DemoDataSeeder` overrides that default via `upsertDeadline()` for its wider realistic date
   range. Re-verified via `migrate:fresh --seed` (36 tenders, 36 tender_deadlines rows, all
   `SUBMISSION` type) and the full suite (194 passed, Pint clean).
-- [ ] `DeadlinesRelationManager` on `TenderResource` (form + table), mirrors
-  `TasksRelationManager`'s structure — full 14-type list lives here.
-- [ ] Escalation notifications: 4 new `NotificationType` cases + 4 new Notification classes
-  (mirroring `TaskStatusChangedNotification`'s dual-channel pattern) + lang keys. Recipients:
-  level 1 assignee = task owner; level 2 team lead = `Tender.owner_id`; level 3
-  administrator/level 4 management = every `RoleName::SUPER_ADMIN` user (no distinct
-  administrator/management role exists). "Critical" task = `TaskPriority::URGENT`.
+- [x] `DeadlinesRelationManager` on `TenderResource` (form + table): a plain 2-field form
+  (`type` Select over `DeadlineType::cases()`, `due_at` `DateTimePicker`) — matches
+  `TenderDeadline`'s `#[Fillable(...)]` list exactly, since `escalation_level`/
+  `last_escalated_at` are forceFill-only system fields (see the earlier schema task) and stay
+  read-only table columns instead. `DeadlineType::BID_VALIDITY` is excluded from the type
+  Select's options (`manageableTypes()`) since that row is derived and kept in sync
+  automatically by `Tender::syncBidValidityDeadline()` on every tender save — a manually
+  created/edited one would just be silently overwritten; it still displays read-only in the
+  table once synced. Gated by `TenderForm::canManageTeam()` (team lead/department head/super
+  admin) — the same role set that manages the tender's team, reused rather than introducing a
+  new permission concept for tender-level scheduling. Unlike `TasksRelationManager`, create/
+  edit/delete are plain header/record actions with no dedicated status-change or comment/
+  attachment actions (deadlines have no lifecycle beyond escalation, which the not-yet-built
+  scheduler owns). New `lang/en/tender_deadlines.php` (`fields.type`/`due_at`/
+  `escalation_level`/`last_escalated_at`), following [[i18n]]'s semantic-key convention. Tests
+  in `TenderResourceTest`'s "deadlines relation manager" group cover: tender-scoped listing,
+  manage actions hidden for a non-manager, a team lead creating a deadline, `BID_VALIDITY`
+  rejected as a submitted type, and a team lead deleting a deadline. Full suite re-verified
+  (199 passed, up from 194), Pint clean.
+- [x] Escalation notifications: 4 new `NotificationType` cases (`task-escalated-assignee`/
+  `task-escalated-team-lead`/`task-escalated-administrator`/`tender-escalated-management`,
+  named after `EscalationLevel`'s own case values for consistency) + 4 new Notification
+  classes, mirroring `TaskStatusChangedNotification`'s dual-channel pattern (`ShouldQueue`,
+  `via()` always includes `database` and gates `mail` on `User::wantsEmailFor()`, `toDatabase()`
+  via `Filament\Notifications\Notification::make()->getDatabaseMessage()`) + lang keys in
+  `lang/en/notifications.php`. Levels 1-3 (`TaskEscalatedToAssigneeNotification`/
+  `ToTeamLeadNotification`/`ToAdministratorNotification`) take a single `Task $task` — matches
+  idea.md's singular "a task" wording for those levels; recipients are the task owner, the
+  task's `Tender.owner_id`, and every `RoleName::SUPER_ADMIN` user respectively (no distinct
+  administrator role exists, so level 3 and level 4 both land on super admins). Level 4
+  (`TenderEscalatedToManagementNotification`) deliberately takes `Tender $tender` +
+  `int $openCriticalTaskCount` instead — idea.md phrases it as "critical items" (plural) still
+  open tender-wide, not one task, so it doesn't fit the same single-task shape as the other
+  three. "Critical" is `TaskPriority::URGENT` per the milestone note, though the notification
+  classes themselves don't yet enforce that filter — that condition, along with the actual
+  overdue/48h/24h-before-submission trigger logic, is the next task's job (the scheduler);
+  this task only builds the dispatchable classes + recipient-shape decisions. Not yet wired to
+  any trigger point. Tests: new `tests/Feature/EscalationNotificationsTest.php` (one describe
+  block per class) dispatches each directly via `$user->notify(new X(...))` under
+  `Notification::fake()` and asserts recipient + channel-gating (database always, mail
+  suppressed by an opted-out `NotificationPreference`) — the same pattern
+  `TaskTest.php`'s "notifications" group uses, adapted since there's no trigger action to call
+  yet. Full suite re-verified (205 passed, up from 199), Pint clean.
 - [ ] Escalation scheduler: `CheckDeadlineEscalations` Artisan command (hourly, first scheduled
   task in this app) implementing idea.md's 4 escalation levels.
 - [ ] Tender calendar: standalone `Filament\Pages\Page` (`TenderCalendar`) using `guava/calendar`,

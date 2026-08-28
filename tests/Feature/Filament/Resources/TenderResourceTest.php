@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\DeadlineType;
 use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Enums\TaskStatus;
@@ -9,6 +10,7 @@ use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
+use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\TenderResource;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
@@ -16,6 +18,7 @@ use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Task;
 use App\Models\Tender;
+use App\Models\TenderDeadline;
 use App\Models\TenderHardDeletion;
 use App\Models\TenderTeamMember;
 use App\Models\User;
@@ -541,5 +544,72 @@ describe('team assignment', function () {
             ->assertHasNoFormErrors();
 
         expect($tender->refresh()->owner_id)->toBe($newOwner->id);
+    });
+});
+
+describe('deadlines relation manager', function () {
+    it('lists only the tender\'s own deadlines', function () {
+        $tender = Tender::factory()->create();
+        $deadline = TenderDeadline::factory()->for($tender)->create(['type' => DeadlineType::SITE_VISIT]);
+        $foreignDeadline = TenderDeadline::factory()->create();
+
+        Livewire::test(DeadlinesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$deadline])
+            ->assertCanNotSeeTableRecords([$foreignDeadline]);
+    });
+
+    it('hides the manage actions for a user without team-assignment rights', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(DeadlinesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets a team lead create a deadline', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $tender = Tender::factory()->create();
+        $dueAt = now()->addWeeks(3);
+
+        Livewire::test(DeadlinesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('create', data: [
+                'type' => DeadlineType::BIDDER_QUESTIONS->value,
+                'due_at' => $dueAt,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $deadline = TenderDeadline::where('tender_id', $tender->id)
+            ->where('type', DeadlineType::BIDDER_QUESTIONS)
+            ->firstOrFail();
+        expect($deadline->due_at->format('Y-m-d H:i'))->toBe($dueAt->format('Y-m-d H:i'));
+    });
+
+    it('rejects bid validity as a selectable type since it is derived automatically', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $tender = Tender::factory()->create();
+
+        Livewire::test(DeadlinesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('create', data: [
+                'type' => DeadlineType::BID_VALIDITY->value,
+                'due_at' => now()->addWeeks(3),
+            ])
+            ->assertHasTableActionErrors(['type']);
+    });
+
+    it('lets a team lead delete a deadline', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $tender = Tender::factory()->create();
+        $deadline = TenderDeadline::factory()->for($tender)->create(['type' => DeadlineType::PRESENTATION]);
+
+        Livewire::test(DeadlinesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('delete', record: $deadline)
+            ->assertHasNoTableActionErrors();
+
+        expect(TenderDeadline::find($deadline->id))->toBeNull();
     });
 });
