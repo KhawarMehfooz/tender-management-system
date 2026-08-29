@@ -86,9 +86,12 @@ class DocumentsRelationManager extends RelationManager
         return $schema->components([
             TextInput::make('title')
                 ->label(__('tender_documents.fields.title'))
+                ->prefixIcon(Heroicon::OutlinedDocumentText)
                 ->required(),
             Select::make('category')
                 ->label(__('tender_documents.fields.category'))
+                ->prefixIcon(Heroicon::OutlinedTag)
+                ->searchable()
                 ->options(fn (): array => $this->categoryOptions())
                 ->required(),
             FileUpload::make('file')

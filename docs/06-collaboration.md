@@ -1,6 +1,6 @@
 # Collaboration
 
-_Last updated: 28/08/2026_
+_Last updated: 29/08/2026_
 
 ## Who can comment and attach files
 
@@ -19,7 +19,7 @@ A comment can't be edited once posted. It can only be deleted, and only by whoev
 
 ## Attachments
 
-Attachments let you attach files, such as evidence documents or supporting material, directly to the task they belong to, rather than storing them somewhere separate and having to link back to them.
+Attachments let you attach files, such as evidence documents or supporting material, directly to the task they belong to, rather than storing them somewhere separate and having to link back to them. For files that belong to the tender as a whole rather than one specific task, such as the calculation or the final bid documents, see [Tender Documents](09-tender-documents.md) instead.
 
 ![A task's attachments table, listing a few uploaded files](screenshots/tender-tasks-attachments.jpg)
 *A task's attachments.*

@@ -1,6 +1,6 @@
 # Administration
 
-_Last updated: 28/08/2026_
+_Last updated: 29/08/2026_
 
 This page covers the parts of TMS reserved for administrators: managing user accounts, adjusting roles and rights, maintaining the reference data the rest of the system runs on, and removing genuine junk entries.
 
@@ -53,6 +53,6 @@ Tenders are never deleted through the normal edit flow, as covered in [Managing 
 
 This is reserved for true mistakes. A tender that's simply no longer active should be archived instead, not removed.
 
-## That's the full walkthrough
+## Where to go next
 
-That covers TMS end to end, from a tender's first entry through to administration. If you're new here, [Overview](01-overview.md) is a good place to start again from the top.
+- [Tender Documents](09-tender-documents.md), covering each tender's own versioned document library, separate from the reference data covered above.

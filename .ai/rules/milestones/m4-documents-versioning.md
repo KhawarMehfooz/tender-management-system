@@ -104,6 +104,14 @@ Planned tasks for M4:
   download" describe block in `TenderResourceTest`: 200 in-category, 404 out-of-category, 403
   CALCULATION without see-prices, 200 CALCULATION with see-prices, unsigned/expired rejected —
   plus two download-action-visibility tests in the "documents relation manager" group.
-- [ ] Docs + wrap-up: a `[[documents]]` rule file consolidating the model/locking/gating
-  decisions above (linked from `.ai/rules/index.md` for the relevant `app/**` paths), a new or
-  extended `docs/*.md` page, this milestone entry's boxes checked off.
+- [x] Docs + wrap-up: `.ai/rules/documents.md` created, consolidating the model/versioning/
+  locking/rights-gating/authorization decisions above, linked from `.ai/rules/index.md` for
+  the relevant `app/**` paths, and cross-linked from `[[controllers]]` (which keeps only the
+  download-path detail) and `[[docs]]`. New customer-doc page `docs/09-tender-documents.md`
+  (categories, versioning, download, calculation's see-prices gate, submission locking),
+  appended after the original 8-page sequence since M4 didn't exist when that sequence was
+  planned — cross-linked from `03-managing-tenders.md`, `06-collaboration.md`, and
+  `08-administration.md` (which now points forward to 09 instead of being the sequence's
+  final page).
+
+**M4 — Documents & Versioning is now complete.**

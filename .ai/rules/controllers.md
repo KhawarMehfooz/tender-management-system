@@ -18,6 +18,9 @@ Attachment downloads are documented for end users in `docs/06-collaboration.md`.
 download mechanism or its expiry changes, update that page too — see [[docs]].
 
 ## Tender document downloads use short-lived signed URLs, plus a see-prices check
+See [[documents]] for the document library's categories, versioning, locking, and
+upload/delete authorization — this section covers only the download path.
+
 `tender-documents.download` (routes/web.php) carries `auth`+`signed` middleware. Every link must go through `TenderDocumentVersion::downloadUrl()` (`URL::temporarySignedRoute(..., now()->addMinutes(5), ...)`), never a plain `route()` call — mirrors [[controllers]]'s TaskAttachment pattern.
 
 The controller re-runs `Tender::query()->findOrFail($document->tender_id)` so `ServiceCategoryScope` turns an out-of-category request into a 404. It additionally `abort_unless`s on `Right::SEE_PRICES` when the parent `TenderDocument`'s category is `CALCULATION` — the only place besides `DocumentsRelationManager`'s `modifyQueryUsing()` that this gate is enforced, since a signed download URL bypasses the table query entirely if leaked/guessed.
@@ -25,3 +28,7 @@ The controller re-runs `Tender::query()->findOrFail($document->tender_id)` so `S
 `DocumentsRelationManager`'s recordActions download `Action` uses `->url(fn ($record) => $record->currentVersion->downloadUrl())->openUrlInNewTab()` and is hidden when `currentVersion` is null (no version uploaded yet).
 
 Tests: `TenderResourceTest.php`'s "document download" describe group covers in-category 200, out-of-category 404, CALCULATION without see-prices 403, CALCULATION with see-prices 200, unsigned link 403, expired (>5min via `$this->travel()`) link 403.
+
+## Docs
+Tender document downloads are documented for end users in `docs/09-tender-documents.md`. If
+the download mechanism or its expiry changes, update that page too — see [[docs]].

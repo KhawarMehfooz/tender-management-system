@@ -16,7 +16,7 @@ in-progress one) before planning or editing.
 | M1: Foundation | Complete | [milestones/m1-foundation.md](milestones/m1-foundation.md) |
 | M2: Team & Tasks | Complete | [milestones/m2-team-tasks.md](milestones/m2-team-tasks.md) |
 | M3: Deadlines & Escalation | Complete | [milestones/m3-deadlines-escalation.md](milestones/m3-deadlines-escalation.md) |
-| M4: Documents & Versioning | In progress | [milestones/m4-documents-versioning.md](milestones/m4-documents-versioning.md) |
+| M4: Documents & Versioning | Complete | [milestones/m4-documents-versioning.md](milestones/m4-documents-versioning.md) |
 | M5: Calculation & Approvals | Not started | see idea.md |
 | M6: Bid / No-Bid Decision | Not started | see idea.md |
 | M7: References, Certificates, Concept Library | Not started | see idea.md |

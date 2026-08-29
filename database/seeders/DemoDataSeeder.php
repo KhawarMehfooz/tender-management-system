@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\DeadlineType;
+use App\Enums\DocumentCategory;
 use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Enums\TaskStatus;
@@ -11,6 +12,7 @@ use App\Enums\TenderStatus;
 use App\Models\ServiceCategory;
 use App\Models\Task;
 use App\Models\Tender;
+use App\Models\TenderDocument;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -177,7 +179,25 @@ class DemoDataSeeder extends Seeder
             $tasks[1]->dependencies()->attach($tasks[0]->id);
         }
 
+        // Same ordering trap as tasks above: documents created here (before the status walk)
+        // are what Tender::lockDocuments() locks once the walk reaches SUBMISSION (see
+        // [[documents]]). RESULT/POST_ANALYSIS are held back for tenders that reach
+        // SUBMISSION-or-later and added after the walk instead, to demo a document created
+        // post-lock staying unlocked.
+        $reachesSubmission = in_array($status, self::REQUIRES_COMPLETE_TASKS, true);
+        $initialCategories = $reachesSubmission
+            ? array_filter(
+                DocumentCategory::cases(),
+                fn (DocumentCategory $category): bool => ! in_array($category, [DocumentCategory::RESULT, DocumentCategory::POST_ANALYSIS], true)
+            )
+            : DocumentCategory::cases();
+        $this->createDocuments($tender, $team, $initialCategories);
+
         $this->advanceTender($tender, $status, $owner, $variant);
+
+        if ($reachesSubmission) {
+            $this->createDocuments($tender, $team, [DocumentCategory::RESULT, DocumentCategory::POST_ANALYSIS]);
+        }
 
         foreach ($team->skip(1) as $index => $member) {
             $tender->teamMembers()->create([
@@ -334,6 +354,45 @@ class DemoDataSeeder extends Seeder
         foreach ($path as $status) {
             $task->changeStatusTo($status, $actor);
         }
+    }
+
+    /**
+     * @param  array<int, DocumentCategory>  $categories
+     */
+    private function createDocuments(Tender $tender, Collection $team, array $categories): void
+    {
+        foreach ($categories as $category) {
+            $document = $tender->documents()->create([
+                'category' => $category,
+                'title' => $category->getLabel().' – '.ucfirst(fake()->words(3, true)),
+                'created_by' => $team->random()->id,
+            ]);
+
+            // A minority of documents get a couple of extra versions, to demo version history.
+            $versionCount = fake()->boolean(35) ? fake()->numberBetween(2, 3) : 1;
+
+            for ($version = 1; $version <= $versionCount; $version++) {
+                $this->createDocumentVersion($document, $team, $version);
+            }
+        }
+    }
+
+    private function createDocumentVersion(TenderDocument $document, Collection $team, int $versionNumber): void
+    {
+        $filename = fake()->slug(3).'.txt';
+        $path = 'tender-documents/'.fake()->uuid().'.txt';
+        $content = fake()->paragraphs(fake()->numberBetween(1, 3), true);
+
+        Storage::disk('local')->put($path, $content);
+
+        $document->versions()->create([
+            'version_number' => $versionNumber,
+            'file_path' => $path,
+            'original_filename' => $filename,
+            'mime_type' => 'text/plain',
+            'size' => strlen($content),
+            'uploaded_by' => $team->random()->id,
+        ]);
     }
 
     private function createAttachment(Task $task): void

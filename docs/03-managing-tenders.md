@@ -1,6 +1,6 @@
 # Managing Tenders
 
-_Last updated: 28/08/2026_
+_Last updated: 29/08/2026_
 
 ## Creating a tender
 
@@ -38,6 +38,8 @@ To move a tender forward, open it from the tender list and use the **Change stat
 *Choosing the next stage and adding a reason.*
 
 Every status change is recorded: who made it, when, what it changed from and to, and the reason if one was given. You can review this history on the tender's detail page, under **Status history**.
+
+Reaching the **submission** stage also locks every document already in the tender's document library at that moment, covered in [Tender Documents](09-tender-documents.md).
 
 ### Final submission is gated on tasks
 
@@ -92,3 +94,4 @@ In rare cases, such as a tender created by mistake with no real data attached to
 
 - [Team assignment](04-team-assignment.md), covering assigning an owner and team members to a tender.
 - [Tasks](05-tasks.md), covering breaking a tender's work into tracked, assignable tasks.
+- [Tender Documents](09-tender-documents.md), covering each tender's versioned document library.

@@ -11,6 +11,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/**, database/seeders/DemoDataSeeder.php | .ai/rules/database-seeders.md |
 | app/Models/TenderDeadline.php,app/Models/Tender.php,app/Enums/DeadlineType.php,app/Enums/EscalationLevel.php,app/Console/Commands/CheckDeadlineEscalations.php,app/Filament/Resources/Tenders/RelationManagers/DeadlinesRelationManager.php,app/Filament/Pages/TenderCalendar.php,app/Filament/Widgets/TenderDeadlineCalendarWidget.php | .ai/rules/deadlines.md |
+| app/Models/TenderDocument.php,app/Models/TenderDocumentVersion.php,app/Enums/DocumentCategory.php,app/Filament/Resources/Tenders/RelationManagers/DocumentsRelationManager.php,database/migrations/*tender_documents*,database/migrations/*tender_document_versions* | .ai/rules/documents.md |
 | docs/** | .ai/rules/docs.md |
 | app/Enums/** | .ai/rules/enums.md |
 | app/Models/Task.php,database/factories/TaskFactory.php,database/seeders/** | .ai/rules/factories-seeders.md |
