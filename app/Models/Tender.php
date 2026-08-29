@@ -6,7 +6,7 @@ use App\Enums\DeadlineType;
 use App\Enums\TaskStatus;
 use App\Enums\TenderStatus;
 use App\Exceptions\InvalidTenderStatusTransitionException;
-use App\Exceptions\TenderTasksNotCompleteException;
+use App\Exceptions\TenderCalculationNotApprovedException;
 use App\Models\Scopes\ServiceCategoryScope;
 use Database\Factories\TenderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -256,6 +257,24 @@ class Tender extends Model
     }
 
     /**
+     * @return HasMany<TenderCalculation, $this>
+     */
+    public function calculations(): HasMany
+    {
+        return $this->hasMany(TenderCalculation::class)->orderByDesc('version_number');
+    }
+
+    /**
+     * Not ofMany() — Postgres can't run MAX() against this app's UUID PKs ([[models]]).
+     *
+     * @return HasOne<TenderCalculation, $this>
+     */
+    public function currentCalculation(): HasOne
+    {
+        return $this->hasOne(TenderCalculation::class)->orderByDesc('version_number')->limit(1);
+    }
+
+    /**
      * Whether the given user may upload/manage this tender's documents by virtue of being
      * linked to the tender itself — the owner or any tender_team_members row — mirroring
      * Task::isLinkedTo(). Distinct from TenderForm::canManageTeam()'s broader manager set,
@@ -343,8 +362,8 @@ class Tender extends Model
             throw InvalidTenderStatusTransitionException::make($this->status, $newStatus);
         }
 
-        if ($newStatus === TenderStatus::SUBMISSION && ! $this->tasksComplete()) {
-            throw TenderTasksNotCompleteException::make($this);
+        if ($newStatus === TenderStatus::SUBMISSION && ! ($this->currentCalculation()->first()?->isFullyApproved() ?? false)) {
+            throw TenderCalculationNotApprovedException::make($this);
         }
 
         DB::transaction(function () use ($newStatus, $actor, $reason): void {

@@ -111,7 +111,7 @@ class TendersTable
                                 ->label(__('tenders.fields.status'))
                                 ->prefixIcon(Heroicon::OutlinedFlag)
                                 ->options(fn () => collect($record->status->allowedTransitions())
-                                    ->reject(fn (TenderStatus $status) => $status === TenderStatus::SUBMISSION && ! $record->tasksComplete())
+                                    ->reject(fn (TenderStatus $status) => $status === TenderStatus::SUBMISSION && ! ($record->currentCalculation()->first()?->isFullyApproved() ?? false))
                                     ->mapWithKeys(fn (TenderStatus $status) => [$status->value => $status->getLabel()]))
                                 ->required(),
                             Textarea::make('reason')

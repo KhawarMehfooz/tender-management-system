@@ -6,6 +6,7 @@ use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
+use App\Filament\Resources\Tenders\RelationManagers\CalculationsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\TasksRelationManager;
@@ -79,6 +80,7 @@ class TenderResource extends Resource
             TasksRelationManager::class,
             DeadlinesRelationManager::class,
             DocumentsRelationManager::class,
+            CalculationsRelationManager::class,
         ];
     }
 

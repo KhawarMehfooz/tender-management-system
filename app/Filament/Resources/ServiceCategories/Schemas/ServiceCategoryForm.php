@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\ServiceCategories\Schemas;
 
+use App\Enums\CalculationModel;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -34,6 +36,10 @@ class ServiceCategoryForm
                         Textarea::make('description')
                             ->label(__('service_categories.fields.description'))
                             ->rows(3),
+                        Select::make('calculation_model')
+                            ->label(__('service_categories.fields.calculation_model'))
+                            ->helperText(__('service_categories.fields.calculation_model_helper'))
+                            ->options(CalculationModel::class),
                         Toggle::make('active')
                             ->label(__('service_categories.fields.active'))
                             ->helperText(__('service_categories.fields.active_helper'))

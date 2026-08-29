@@ -17,7 +17,7 @@ in-progress one) before planning or editing.
 | M2: Team & Tasks | Complete | [milestones/m2-team-tasks.md](milestones/m2-team-tasks.md) |
 | M3: Deadlines & Escalation | Complete | [milestones/m3-deadlines-escalation.md](milestones/m3-deadlines-escalation.md) |
 | M4: Documents & Versioning | Complete | [milestones/m4-documents-versioning.md](milestones/m4-documents-versioning.md) |
-| M5: Calculation & Approvals | Not started | see idea.md |
+| M5: Calculation & Approvals | Complete | [milestones/m5-calculation-approvals.md](milestones/m5-calculation-approvals.md) |
 | M6: Bid / No-Bid Decision | Not started | see idea.md |
 | M7: References, Certificates, Concept Library | Not started | see idea.md |
 | M8: Communication, Site Visits, Submission, Follow-up | Not started | see idea.md |
@@ -27,9 +27,8 @@ in-progress one) before planning or editing.
 | M12: Dashboards, Search, Statistics, Archive, Reporting | Not started | see idea.md |
 | M13: Later Expansion | Explicitly deferred | see idea.md |
 
-Don't build ahead of the current in-progress milestone (M4) without the user asking for it
-explicitly — e.g. don't wire up M5's calculation engine or M6's bid/no-bid score just because
-it seems convenient.
+M1-M5 are complete. Don't start the next milestone (M6) without the user asking for it
+explicitly — e.g. don't wire up M6's bid/no-bid score just because it seems convenient.
 
 When a not-started milestone kicks off, create its file under `.ai/rules/milestones/` (see
 [[general]]'s "Plan new milestones" rule for the exact workflow) and add its row above.

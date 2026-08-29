@@ -1,16 +1,19 @@
 <?php
 
+use App\Enums\CalculationApprovalStep;
 use App\Enums\DeadlineType;
 use App\Enums\TaskStatus;
 use App\Enums\TenderStatus;
 use App\Exceptions\InvalidTenderStatusTransitionException;
-use App\Exceptions\TenderTasksNotCompleteException;
+use App\Exceptions\TenderCalculationNotApprovedException;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Source;
 use App\Models\Task;
 use App\Models\Tender;
+use App\Models\TenderCalculation;
+use App\Models\TenderCalculationApproval;
 use App\Models\TenderDeadline;
 use App\Models\TenderDocument;
 use App\Models\TenderHardDeletion;
@@ -183,45 +186,68 @@ describe('status lifecycle', function () {
     });
 });
 
-describe('final submission task gate', function () {
-    it('blocks the transition into submission while a task is not done', function () {
+describe('final submission calculation gate', function () {
+    it('blocks the transition into submission when there is no calculation at all', function () {
         $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
         $user = User::factory()->create();
-        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::OPEN]);
 
         $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
-    })->throws(TenderTasksNotCompleteException::class);
+    })->throws(TenderCalculationNotApprovedException::class);
 
-    it('does not write an audit entry when the task gate rejects the transition', function () {
+    it('blocks the transition into submission while the approval chain is incomplete', function () {
         $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
         $user = User::factory()->create();
-        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::OPEN]);
+        $calculation = TenderCalculation::factory()->create(['tender_id' => $tender->id]);
+        TenderCalculationApproval::factory()->create([
+            'tender_calculation_id' => $calculation->id,
+            'step' => CalculationApprovalStep::CALCULATION_CHECKED,
+            'approved_by' => User::factory(),
+            'approved_at' => now(),
+        ]);
+
+        $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+    })->throws(TenderCalculationNotApprovedException::class);
+
+    it('does not write an audit entry when the calculation gate rejects the transition', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $user = User::factory()->create();
 
         try {
             $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
-        } catch (TenderTasksNotCompleteException) {
+        } catch (TenderCalculationNotApprovedException) {
         }
 
         expect($tender->statusChanges()->count())->toBe(0);
     });
 
-    it('allows the transition into submission once every task is done', function () {
+    it('allows the transition into submission once the current calculation is fully approved', function () {
         $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
         $user = User::factory()->create();
-        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::DONE]);
+        fullyApprovedCalculationFor($tender);
 
         $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
 
         expect($tender->fresh()->status)->toBe(TenderStatus::SUBMISSION);
     });
 
-    it('allows the transition into submission when the tender has no tasks', function () {
-        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
-        $user = User::factory()->create();
+    it('is not affected by tasksComplete() either way', function () {
+        $blockedTender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $blockedUser = User::factory()->create();
 
-        $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
+        expect($blockedTender->tasksComplete())->toBeTrue();
+        expect(fn () => $blockedTender->changeStatusTo(TenderStatus::SUBMISSION, $blockedUser))
+            ->toThrow(TenderCalculationNotApprovedException::class);
 
-        expect($tender->fresh()->status)->toBe(TenderStatus::SUBMISSION);
+        $allowedTender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+        $allowedUser = User::factory()->create();
+        Task::factory()->create(['tender_id' => $allowedTender->id, 'status' => TaskStatus::OPEN]);
+        fullyApprovedCalculationFor($allowedTender);
+
+        expect($allowedTender->tasksComplete())->toBeFalse();
+
+        $allowedTender->changeStatusTo(TenderStatus::SUBMISSION, $allowedUser);
+
+        expect($allowedTender->fresh()->status)->toBe(TenderStatus::SUBMISSION);
     });
 });
 
@@ -230,6 +256,7 @@ describe('document locking on submission', function () {
         $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
         $user = User::factory()->create();
         $document = TenderDocument::factory()->create(['tender_id' => $tender->id]);
+        fullyApprovedCalculationFor($tender);
 
         $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
 
@@ -240,6 +267,7 @@ describe('document locking on submission', function () {
     it('does not lock documents created after the tender is already in submission', function () {
         $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
         $user = User::factory()->create();
+        fullyApprovedCalculationFor($tender);
 
         $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
 
@@ -255,6 +283,7 @@ describe('document locking on submission', function () {
         $document = TenderDocument::factory()->create(['tender_id' => $tender->id]);
         $document->lock($earlierActor);
         $lockedAt = $document->fresh()->locked_at;
+        fullyApprovedCalculationFor($tender);
 
         $tender->changeStatusTo(TenderStatus::SUBMISSION, $user);
 

@@ -1,25 +1,29 @@
 <?php
 
+use App\Enums\CalculationApprovalStep;
+use App\Enums\CalculationModel;
+use App\Enums\CostDriverFieldType;
 use App\Enums\DeadlineType;
 use App\Enums\DocumentCategory;
 use App\Enums\Right;
 use App\Enums\RoleName;
-use App\Enums\TaskStatus;
 use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
 use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
+use App\Filament\Resources\Tenders\RelationManagers\CalculationsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Tenders\TenderResource;
 use App\Models\ProcurementProcedure;
 use App\Models\Sector;
 use App\Models\ServiceCategory;
+use App\Models\ServiceCategoryCostDriverField;
 use App\Models\Source;
-use App\Models\Task;
 use App\Models\Tender;
+use App\Models\TenderCalculation;
 use App\Models\TenderDeadline;
 use App\Models\TenderDocument;
 use App\Models\TenderHardDeletion;
@@ -134,9 +138,8 @@ describe('status change action', function () {
             ->assertActionHidden(TestAction::make('changeStatus')->table($tender));
     });
 
-    it('rejects moving to submission while a task is not done', function () {
+    it('rejects moving to submission while the calculation approval chain is incomplete', function () {
         $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
-        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::OPEN]);
 
         Livewire::test(ListTenders::class)
             ->callAction(TestAction::make('changeStatus')->table($tender), [
@@ -147,9 +150,9 @@ describe('status change action', function () {
         expect($tender->fresh()->status)->toBe(TenderStatus::QUALITY);
     });
 
-    it('allows moving to submission once every task is done', function () {
+    it('allows moving to submission once the current calculation is fully approved', function () {
         $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
-        Task::factory()->create(['tender_id' => $tender->id, 'status' => TaskStatus::DONE]);
+        fullyApprovedCalculationFor($tender);
 
         Livewire::test(ListTenders::class)
             ->callAction(TestAction::make('changeStatus')->table($tender), [
@@ -967,5 +970,198 @@ describe('document download', function () {
         $this->actingAs(User::factory()->create())
             ->get($expiredUrl)
             ->assertForbidden();
+    });
+});
+
+/**
+ * A service category configured with the deployment-hours model and its required cost-driver
+ * fields, matching DeploymentHoursCalculationEngine's fixture in CalculationEngineTest.
+ */
+function deploymentHoursServiceCategory(): ServiceCategory
+{
+    $category = ServiceCategory::factory()->create(['calculation_model' => CalculationModel::DEPLOYMENT_HOURS]);
+
+    foreach ([
+        'hours' => CostDriverFieldType::NUMBER,
+        'wage_rate' => CostDriverFieldType::DECIMAL,
+        'supplements_pct' => CostDriverFieldType::DECIMAL,
+        'social_costs_pct' => CostDriverFieldType::DECIMAL,
+        'target_margin_pct' => CostDriverFieldType::DECIMAL,
+        'min_margin_pct' => CostDriverFieldType::DECIMAL,
+        'risk_surcharge_pct' => CostDriverFieldType::DECIMAL,
+    ] as $fieldKey => $type) {
+        ServiceCategoryCostDriverField::factory()->create([
+            'service_category_id' => $category->id,
+            'field_key' => $fieldKey,
+            'type' => $type,
+        ]);
+    }
+
+    return $category;
+}
+
+describe('calculations relation manager', function () {
+    it('lists only the tender\'s own calculations', function () {
+        $tender = Tender::factory()->create();
+        $calculation = TenderCalculation::factory()->for($tender)->create();
+        $foreignCalculation = TenderCalculation::factory()->create();
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$calculation])
+            ->assertCanNotSeeTableRecords([$foreignCalculation]);
+    });
+
+    it('hides the new calculation action from a user without the see-prices right', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'service_category_id' => deploymentHoursServiceCategory()->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('hides the new calculation action when the service category has no calculation model configured', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $owner = User::factory()->create();
+        $owner->givePermissionTo(Right::SEE_PRICES->value);
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner with see-prices create a calculation and computes its outputs', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $owner = User::factory()->create();
+        $owner->givePermissionTo(Right::SEE_PRICES->value);
+        $category = deploymentHoursServiceCategory();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'service_category_id' => $category->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'input_values' => [
+                    'hours' => 100,
+                    'wage_rate' => 20,
+                    'supplements_pct' => 0.1,
+                    'social_costs_pct' => 0.2,
+                    'target_margin_pct' => 0.15,
+                    'min_margin_pct' => 0.1,
+                    'risk_surcharge_pct' => 0.05,
+                ],
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $calculation = $tender->calculations()->firstOrFail();
+        expect($calculation->version_number)->toBe(1);
+        expect($calculation->created_by)->toBe($owner->id);
+        expect((float) $calculation->bid_price)->toEqualWithDelta(3187.8, 0.01);
+    });
+
+    it('lets a manager duplicate a calculation, pre-filling and incrementing the version number', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        auth()->user()->givePermissionTo(Right::SEE_PRICES->value);
+        $category = deploymentHoursServiceCategory();
+        $tender = Tender::factory()->create(['service_category_id' => $category->id]);
+        $inputs = [
+            'hours' => 100,
+            'wage_rate' => 20,
+            'supplements_pct' => 0.1,
+            'social_costs_pct' => 0.2,
+            'target_margin_pct' => 0.15,
+            'min_margin_pct' => 0.1,
+            'risk_surcharge_pct' => 0.05,
+        ];
+        $calculation = TenderCalculation::factory()->for($tender)->create([
+            'version_number' => 1,
+            'input_values' => $inputs,
+        ]);
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->mountTableAction('duplicate', $calculation)
+            ->assertTableActionDataSet(['input_values' => $inputs])
+            ->callMountedTableAction()
+            ->assertHasNoTableActionErrors();
+
+        expect($tender->calculations()->count())->toBe(2);
+        $duplicate = $tender->calculations()->where('version_number', 2)->firstOrFail();
+        expect($duplicate->input_values)->toEqual($inputs);
+        expect($duplicate->bid_price)->not->toBeNull();
+    });
+
+    it('lets the calculation-role team member approve the chain\'s first step', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $member = User::factory()->create();
+        $tender = Tender::factory()->create();
+        TenderTeamMember::factory()->create([
+            'tender_id' => $tender->id,
+            'user_id' => $member->id,
+            'functional_role' => TeamRole::CALCULATION,
+        ]);
+        $calculation = TenderCalculation::factory()->for($tender)->create();
+        $this->actingAs($member);
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('approveNextStep', $calculation)
+            ->callTableAction('approveNextStep', record: $calculation, data: ['comment' => 'Looks good'])
+            ->assertHasNoTableActionErrors();
+
+        $approval = $calculation->approvals()->where('step', CalculationApprovalStep::CALCULATION_CHECKED)->firstOrFail();
+        expect($approval->approved_by)->toBe($member->id);
+        expect($approval->comment)->toBe('Looks good');
+    });
+
+    it('hides the approve action from a user without the matching team role', function () {
+        $tender = Tender::factory()->create();
+        $calculation = TenderCalculation::factory()->for($tender)->create();
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('approveNextStep', $calculation);
+    });
+
+    it('hides the approve action once the chain is fully approved', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $user = User::factory()->create();
+        $user->givePermissionTo(Right::EXECUTE_FINAL_SUBMISSION->value);
+        $tender = Tender::factory()->create();
+        $calculation = fullyApprovedCalculationFor($tender);
+        $this->actingAs($user);
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('approveNextStep', $calculation);
+    });
+
+    it('hides financial columns from a user without the see-prices right', function () {
+        $tender = Tender::factory()->create();
+        TenderCalculation::factory()->for($tender)->create(['bid_price' => 100]);
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertTableColumnHidden('bid_price')
+            ->assertTableColumnVisible('version_number');
+    });
+
+    it('shows financial columns to a user with the see-prices right', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::SEE_PRICES->value);
+        $tender = Tender::factory()->create();
+        TenderCalculation::factory()->for($tender)->create(['bid_price' => 100]);
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertTableColumnVisible('bid_price');
+    });
+
+    it('shows the formula reference for the tender\'s calculation model in the view action', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::SEE_PRICES->value);
+        $category = deploymentHoursServiceCategory();
+        $tender = Tender::factory()->create(['service_category_id' => $category->id]);
+        $calculation = TenderCalculation::factory()->for($tender)->create();
+
+        Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->mountTableAction('view', $calculation)
+            ->assertMountedActionModalSee('cost_per_hour = wage_rate');
     });
 });

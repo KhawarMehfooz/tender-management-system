@@ -26,6 +26,10 @@ class ServiceCategoryInfolist
                         IconEntry::make('active')
                             ->label(__('service_categories.fields.active'))
                             ->boolean(),
+                        TextEntry::make('calculation_model')
+                            ->label(__('service_categories.fields.calculation_model'))
+                            ->badge()
+                            ->placeholder('-'),
                         TextEntry::make('description')
                             ->label(__('service_categories.fields.description'))
                             ->placeholder('-')

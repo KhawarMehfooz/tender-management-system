@@ -41,9 +41,9 @@ Every status change is recorded: who made it, when, what it changed from and to,
 
 Reaching the **submission** stage also locks every document already in the tender's document library at that moment, covered in [Tender Documents](09-tender-documents.md).
 
-### Final submission is gated on tasks
+### Final submission is gated on the calculation approval chain
 
-A tender can't move from **quality** to **submission** while any of its tasks are still open. This stops a bid from being marked ready to submit while calculation, concepts, evidence documents, or any other work item is unfinished. If a task is still incomplete, **submission** simply won't appear in the list of next stages — finish or otherwise close out every task first.
+A tender can't move from **quality** to **submission** until its current calculation has gone through all 6 steps of its approval chain. This stops a bid from being marked ready to submit while its pricing hasn't been checked, reviewed, and formally signed off. If the chain isn't complete yet, **submission** simply won't appear in the list of next stages. See [Calculations & Approvals](10-calculations-approvals.md) for the full chain and who approves each step.
 
 ![A tender's detail page, including its status history](screenshots/tender-view-full-page.png)
 *A tender's detail page, including its status history.*
@@ -95,3 +95,4 @@ In rare cases, such as a tender created by mistake with no real data attached to
 - [Team assignment](04-team-assignment.md), covering assigning an owner and team members to a tender.
 - [Tasks](05-tasks.md), covering breaking a tender's work into tracked, assignable tasks.
 - [Tender Documents](09-tender-documents.md), covering each tender's versioned document library.
+- [Calculations & Approvals](10-calculations-approvals.md), covering pricing calculations and the 6-step approval chain that gates final submission.

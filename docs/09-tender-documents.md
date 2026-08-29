@@ -49,4 +49,4 @@ Documents you add *after* the tender has already reached submission, for example
 
 ## Where to go next
 
-That covers TMS end to end, from a tender's first entry through to administration and its document library. If you're new here, [Overview](01-overview.md) is a good place to start again from the top.
+- [Calculations & Approvals](10-calculations-approvals.md), covering pricing calculations and the 6-step approval chain that gates final submission. The **calculation** document category above is for supporting pricing documents, separate from the structured calculation covered there.

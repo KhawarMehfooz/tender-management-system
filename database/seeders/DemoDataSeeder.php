@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Enums\CalculationApprovalStep;
+use App\Enums\CalculationModel;
 use App\Enums\DeadlineType;
 use App\Enums\DocumentCategory;
 use App\Enums\Right;
@@ -12,6 +14,7 @@ use App\Enums\TenderStatus;
 use App\Models\ServiceCategory;
 use App\Models\Task;
 use App\Models\Tender;
+use App\Models\TenderCalculation;
 use App\Models\TenderDocument;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -148,7 +151,12 @@ class DemoDataSeeder extends Seeder
     {
         $category = $this->categories[$variant % $this->categories->count()];
 
-        $team = $this->pickTeam($category);
+        // Statuses only reachable via SUBMISSION need every TeamRole represented on the team
+        // (owner + one member per role) so TenderCalculation::approve()'s team-role gate can
+        // find an eligible approver for all 5 role-gated steps below — a 3-5 person team drawn
+        // without this floor can easily miss FINAL_APPROVAL (5th in TeamRole::cases()) entirely.
+        $reachesSubmission = in_array($status, self::REQUIRES_COMPLETE_TASKS, true);
+        $team = $reachesSubmission ? $this->pickTeam($category, 6, 7) : $this->pickTeam($category);
         $owner = $team->first();
 
         $tender = Tender::factory()->create([
@@ -161,16 +169,33 @@ class DemoDataSeeder extends Seeder
         // range for screenshot variety.
         $tender->upsertDeadline(DeadlineType::SUBMISSION, fake()->dateTimeBetween('+1 week', '+4 months'));
 
+        // Functional-role team members must exist before the calculation approval chain below
+        // (and before the status walk further down), which both depend on tender_team_members
+        // rows already being in place — same "create before consuming" ordering as tasks/
+        // documents further down.
+        //
+        // ->values() re-keys from 0: Collection::skip() keeps each member's ORIGINAL index, so
+        // without this the round-robin below started at whatever index the owner happened to
+        // occupy (1, since the owner is always $team->first()) instead of 0 — TeamRole::CALCULATION
+        // (index 0) was then only ever reachable once the team had 6+ members and the index
+        // wrapped back around, silently starving TenderCalculation::approve()'s first step of any
+        // eligible approver on every normally-sized team.
+        foreach ($team->skip(1)->values() as $index => $member) {
+            $tender->teamMembers()->create([
+                'user_id' => $member->id,
+                'functional_role' => TeamRole::cases()[$index % count(TeamRole::cases())],
+            ]);
+        }
+
         // Tasks must exist and (for statuses reached via SUBMISSION) be done *before* the
         // tender's status is walked forward, so Tender::tasksComplete()'s gate on the
         // quality->submission transition sees an accurate picture rather than a
         // not-yet-populated tender.
-        $requiresCompleteTasks = in_array($status, self::REQUIRES_COMPLETE_TASKS, true);
         $taskCount = fake()->numberBetween(3, 5);
         $tasks = [];
 
         for ($i = 0; $i < $taskCount; $i++) {
-            $tasks[] = $this->createTask($tender, $team, $i, $requiresCompleteTasks);
+            $tasks[] = $this->createTask($tender, $team, $i, $reachesSubmission);
         }
 
         // Chain the first two tasks for a dependency-gate demo, where both exist and aren't
@@ -184,7 +209,6 @@ class DemoDataSeeder extends Seeder
         // [[documents]]). RESULT/POST_ANALYSIS are held back for tenders that reach
         // SUBMISSION-or-later and added after the walk instead, to demo a document created
         // post-lock staying unlocked.
-        $reachesSubmission = in_array($status, self::REQUIRES_COMPLETE_TASKS, true);
         $initialCategories = $reachesSubmission
             ? array_filter(
                 DocumentCategory::cases(),
@@ -193,17 +217,24 @@ class DemoDataSeeder extends Seeder
             : DocumentCategory::cases();
         $this->createDocuments($tender, $team, $initialCategories);
 
+        // Calculation + approval chain, same "before the status walk" ordering as tasks/
+        // documents: Tender::changeStatusTo()'s SUBMISSION guard (see [[tenders]]) requires the
+        // current calculation's 6-step chain fully approved. Tenders that don't reach
+        // SUBMISSION still get a calculation (for the tab to have something to show), but only
+        // a random prefix of steps approved, to demo the in-progress state too.
+        if ($category->calculation_model !== null) {
+            $calculation = $this->createCalculation($tender, $category->calculation_model, $team);
+            $this->approveCalculationChain(
+                $calculation,
+                $tender,
+                $reachesSubmission ? null : fake()->numberBetween(0, count(CalculationApprovalStep::cases()) - 1),
+            );
+        }
+
         $this->advanceTender($tender, $status, $owner, $variant);
 
         if ($reachesSubmission) {
             $this->createDocuments($tender, $team, [DocumentCategory::RESULT, DocumentCategory::POST_ANALYSIS]);
-        }
-
-        foreach ($team->skip(1) as $index => $member) {
-            $tender->teamMembers()->create([
-                'user_id' => $member->id,
-                'functional_role' => TeamRole::cases()[$index % count(TeamRole::cases())],
-            ]);
         }
 
         // Edge cases for documentation screenshots: archive/invalidate a slice of the data.
@@ -215,11 +246,11 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
-     * Pick a small team (owner + 2-4 members) from category-scoped users plus management.
+     * Pick a small team (owner + members) from category-scoped users plus management.
      *
      * @return Collection<int, User>
      */
-    private function pickTeam(ServiceCategory $category): Collection
+    private function pickTeam(ServiceCategory $category, int $minSize = 3, int $maxSize = 5): Collection
     {
         $scoped = collect($this->usersByRole)
             ->except(array_map(fn (RoleName $role) => $role->value, self::MANAGEMENT_ROLES))
@@ -230,7 +261,74 @@ class DemoDataSeeder extends Seeder
         $management = collect($this->usersByRole[RoleName::TEAM_LEAD->value])
             ->merge($this->usersByRole[RoleName::DEPARTMENT_HEAD->value]);
 
-        return $management->merge($scoped)->unique('id')->shuffle()->take(fake()->numberBetween(3, 5))->values();
+        return $management->merge($scoped)->unique('id')->shuffle()->take(fake()->numberBetween($minSize, $maxSize))->values();
+    }
+
+    /**
+     * Realistic cost-driver inputs per calculation model, matching CalculationEngineTest's
+     * known fixtures (field keys must match ServiceCategorySeeder's configured fields).
+     *
+     * @param  Collection<int, User>  $team
+     */
+    private function createCalculation(Tender $tender, CalculationModel $model, Collection $team): TenderCalculation
+    {
+        $inputs = match ($model) {
+            CalculationModel::DEPLOYMENT_HOURS => [
+                'hours' => fake()->numberBetween(80, 400),
+                'wage_rate' => fake()->randomFloat(2, 15, 30),
+                'supplements_pct' => fake()->randomFloat(2, 0.05, 0.15),
+                'social_costs_pct' => fake()->randomFloat(2, 0.15, 0.25),
+                'target_margin_pct' => fake()->randomFloat(2, 0.10, 0.20),
+                'min_margin_pct' => 0.08,
+                'risk_surcharge_pct' => fake()->randomFloat(2, 0.02, 0.08),
+            ],
+            CalculationModel::AREA_BASED => [
+                'area' => fake()->numberBetween(200, 2000),
+                'labour_hours' => fake()->numberBetween(50, 300),
+                'wage_rate' => fake()->randomFloat(2, 15, 25),
+                'machines_consumables_cost' => fake()->randomFloat(2, 100, 800),
+                'target_margin_pct' => fake()->randomFloat(2, 0.10, 0.18),
+                'min_margin_pct' => 0.08,
+                'risk_surcharge_pct' => fake()->randomFloat(2, 0.02, 0.06),
+            ],
+        };
+
+        $calculation = $tender->calculations()->create([
+            'version_number' => 1,
+            'created_by' => $team->random()->id,
+            'input_values' => $inputs,
+        ]);
+
+        $calculation->computeOutputs();
+
+        return $calculation;
+    }
+
+    /**
+     * Approves CalculationApprovalStep::cases() in order, using whichever tender_team_members
+     * row matches each step's functional role (see CalculationApprovalStep::teamRole()), or the
+     * rights-holding team-lead demo user for the final right-gated step. Stops at the first step
+     * with no eligible approver rather than throwing, so a deliberately partial $upToStep still
+     * degrades gracefully. Pass null to approve the full chain.
+     */
+    private function approveCalculationChain(TenderCalculation $calculation, Tender $tender, ?int $upToStep): void
+    {
+        $steps = CalculationApprovalStep::cases();
+        $stepsToApprove = $upToStep === null ? $steps : array_slice($steps, 0, $upToStep);
+
+        foreach ($stepsToApprove as $step) {
+            $teamRole = $step->teamRole();
+
+            $actor = $teamRole !== null
+                ? $tender->teamMembers()->where('functional_role', $teamRole)->first()?->user
+                : $this->usersByRole[RoleName::TEAM_LEAD->value]->first();
+
+            if ($actor === null) {
+                break;
+            }
+
+            $calculation->approve($step, $actor, fake()->optional(0.4)->sentence());
+        }
     }
 
     private function advanceTender(Tender $tender, TenderStatus $target, User $actor, int $variant): void

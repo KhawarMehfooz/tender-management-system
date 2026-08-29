@@ -44,6 +44,8 @@ Several classification lists feed the dropdowns used elsewhere in TMS, such as w
 ![The Service categories list, showing the active flag and add/edit actions](screenshots/data-service-categories.jpg)
 *Managing a reference data list.*
 
+A service category also carries its own calculation setup: which pricing model it uses, and the specific cost-driver fields a calculation for that category asks for. See [Calculations & Approvals](10-calculations-approvals.md) for how that's configured and how it's used.
+
 ## Removing a genuine junk entry
 
 Tenders are never deleted through the normal edit flow, as covered in [Managing tenders](03-managing-tenders.md). For the rare case of a genuine mistake, such as a duplicate created by accident with no real activity on it, a super admin can permanently remove it through a separate, logged action that always requires a reason.

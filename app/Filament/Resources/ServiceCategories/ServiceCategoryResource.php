@@ -6,6 +6,7 @@ use App\Filament\Resources\ServiceCategories\Pages\CreateServiceCategory;
 use App\Filament\Resources\ServiceCategories\Pages\EditServiceCategory;
 use App\Filament\Resources\ServiceCategories\Pages\ListServiceCategories;
 use App\Filament\Resources\ServiceCategories\Pages\ViewServiceCategory;
+use App\Filament\Resources\ServiceCategories\RelationManagers\CostDriverFieldsRelationManager;
 use App\Filament\Resources\ServiceCategories\Schemas\ServiceCategoryForm;
 use App\Filament\Resources\ServiceCategories\Schemas\ServiceCategoryInfolist;
 use App\Filament\Resources\ServiceCategories\Tables\ServiceCategoriesTable;
@@ -75,7 +76,7 @@ class ServiceCategoryResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            CostDriverFieldsRelationManager::class,
         ];
     }
 
