@@ -55,6 +55,15 @@ it('grants only the pricing-related default rights to calculation', function () 
     expect($role->hasPermissionTo(Right::SEE_COMPETITOR_DATA->value))->toBeFalse();
     expect($role->hasPermissionTo(Right::EXECUTE_FINAL_SUBMISSION->value))->toBeFalse();
     expect($role->hasPermissionTo(Right::VIEW_EMPLOYEE_STATISTICS->value))->toBeFalse();
+    expect($role->hasPermissionTo(Right::MAKE_BID_DECISION->value))->toBeFalse();
+});
+
+it('grants the bid decision right to team lead alongside its other defaults', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+
+    $role = Role::findByName(RoleName::TEAM_LEAD->value);
+
+    expect($role->hasPermissionTo(Right::MAKE_BID_DECISION->value))->toBeTrue();
 });
 
 it('grants no default rights to staff', function () {

@@ -18,7 +18,7 @@ in-progress one) before planning or editing.
 | M3: Deadlines & Escalation | Complete | [milestones/m3-deadlines-escalation.md](milestones/m3-deadlines-escalation.md) |
 | M4: Documents & Versioning | Complete | [milestones/m4-documents-versioning.md](milestones/m4-documents-versioning.md) |
 | M5: Calculation & Approvals | Complete | [milestones/m5-calculation-approvals.md](milestones/m5-calculation-approvals.md) |
-| M6: Bid / No-Bid Decision | Not started | see idea.md |
+| M6: Bid / No-Bid Decision | In progress | [milestones/m6-bid-no-bid-decision.md](milestones/m6-bid-no-bid-decision.md) |
 | M7: References, Certificates, Concept Library | Not started | see idea.md |
 | M8: Communication, Site Visits, Submission, Follow-up | Not started | see idea.md |
 | M9: Result & Lessons Learned | Not started | see idea.md |
@@ -27,8 +27,9 @@ in-progress one) before planning or editing.
 | M12: Dashboards, Search, Statistics, Archive, Reporting | Not started | see idea.md |
 | M13: Later Expansion | Explicitly deferred | see idea.md |
 
-M1-M5 are complete. Don't start the next milestone (M6) without the user asking for it
-explicitly — e.g. don't wire up M6's bid/no-bid score just because it seems convenient.
+M1-M5 are complete, M6 is in progress. Don't start the next not-started milestone (M7) without
+the user asking for it explicitly — e.g. don't wire up M7's reference/certificate library just
+because it seems convenient.
 
 When a not-started milestone kicks off, create its file under `.ai/rules/milestones/` (see
 [[general]]'s "Plan new milestones" rule for the exact workflow) and add its row above.

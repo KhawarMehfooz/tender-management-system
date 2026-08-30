@@ -24,6 +24,7 @@ class RolesAndPermissionsSeeder extends Seeder
             Right::SEE_COMPETITOR_DATA,
             Right::EXECUTE_FINAL_SUBMISSION,
             Right::VIEW_EMPLOYEE_STATISTICS,
+            Right::MAKE_BID_DECISION,
         ],
         RoleName::DEPARTMENT_HEAD->value => [
             Right::SEE_PRICES,
@@ -31,11 +32,13 @@ class RolesAndPermissionsSeeder extends Seeder
             Right::SEE_COMPETITOR_DATA,
             Right::EXECUTE_FINAL_SUBMISSION,
             Right::VIEW_EMPLOYEE_STATISTICS,
+            Right::MAKE_BID_DECISION,
         ],
         RoleName::TEAM_LEAD->value => [
             Right::SEE_PRICES,
             Right::SEE_MARGINS,
             Right::EXECUTE_FINAL_SUBMISSION,
+            Right::MAKE_BID_DECISION,
         ],
         RoleName::CALCULATION->value => [
             Right::SEE_PRICES,
