@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BidDecision;
 use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
 use App\Enums\CostDriverFieldType;
@@ -13,6 +14,7 @@ use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
+use App\Filament\Resources\Tenders\RelationManagers\BidDecisionRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CalculationsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
@@ -23,10 +25,12 @@ use App\Models\ServiceCategory;
 use App\Models\ServiceCategoryCostDriverField;
 use App\Models\Source;
 use App\Models\Tender;
+use App\Models\TenderBidDecision;
 use App\Models\TenderCalculation;
 use App\Models\TenderDeadline;
 use App\Models\TenderDocument;
 use App\Models\TenderHardDeletion;
+use App\Models\TenderParticipationScore;
 use App\Models\TenderTeamMember;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -1163,5 +1167,109 @@ describe('calculations relation manager', function () {
         Livewire::test(CalculationsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
             ->mountTableAction('view', $calculation)
             ->assertMountedActionModalSee('cost_per_hour = wage_rate');
+    });
+});
+
+describe('bid decision relation manager', function () {
+    it('lists only the tender\'s own bid decisions', function () {
+        $tender = Tender::factory()->create();
+        $decision = TenderBidDecision::factory()->for($tender)->create();
+        $foreignDecision = TenderBidDecision::factory()->create();
+
+        Livewire::test(BidDecisionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$decision])
+            ->assertCanNotSeeTableRecords([$foreignDecision]);
+    });
+
+    it('hides both actions from a user without the make-bid-decision right', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(BidDecisionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('editScoreInputs')
+            ->assertTableActionHidden('recordDecision');
+    });
+
+    it('shows the incomplete-ratings summary when no ratings have been entered', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(BidDecisionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertSee('Incomplete — 7 of 7 ratings missing');
+    });
+
+    it('shows the computed score once all ratings are entered', function () {
+        $tender = Tender::factory()->create(['estimated_contract_volume' => 2_000_000]);
+        TenderCalculation::factory()->for($tender)->create(['version_number' => 1, 'actual_margin' => 25]);
+        TenderParticipationScore::factory()->rated(5)->create(['tender_id' => $tender->id]);
+
+        Livewire::test(BidDecisionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertSee('96 / 100');
+    });
+
+    it('lets a user with the right edit the score inputs', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::MAKE_BID_DECISION->value);
+        $tender = Tender::factory()->create();
+
+        Livewire::test(BidDecisionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('editScoreInputs')
+            ->callTableAction('editScoreInputs', data: [
+                'distance_rating' => 4,
+                'staffing_requirement_rating' => 4,
+                'wage_qualification_rating' => 4,
+                'reference_position_rating' => 4,
+                'competitive_intensity_rating' => 4,
+                'contractual_penalties_rating' => 4,
+                'strategic_value_rating' => 4,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $score = $tender->participationScore()->firstOrFail();
+        expect($score->distance_rating)->toBe(4);
+        expect($score->strategic_value_rating)->toBe(4);
+    });
+
+    it('lets a user with the right record a BID decision without a reason', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::MAKE_BID_DECISION->value);
+        $tender = Tender::factory()->create();
+
+        Livewire::test(BidDecisionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('recordDecision')
+            ->callTableAction('recordDecision', data: ['decision' => BidDecision::BID->value])
+            ->assertHasNoTableActionErrors();
+
+        $decision = $tender->currentBidDecision()->firstOrFail();
+        expect($decision->decision)->toBe(BidDecision::BID);
+        expect($decision->decided_by)->toBe(auth()->id());
+    });
+
+    it('requires a reason when recording a NO_BID decision', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::MAKE_BID_DECISION->value);
+        $tender = Tender::factory()->create();
+
+        Livewire::test(BidDecisionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('recordDecision', data: ['decision' => BidDecision::NO_BID->value])
+            ->assertHasTableActionErrors(['reason' => 'required']);
+    });
+
+    it('records a NO_BID decision with a reason, snapshotting the current score', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::MAKE_BID_DECISION->value);
+        $tender = Tender::factory()->create(['estimated_contract_volume' => 2_000_000]);
+        TenderCalculation::factory()->for($tender)->create(['version_number' => 1, 'actual_margin' => 25]);
+        TenderParticipationScore::factory()->rated(5)->create(['tender_id' => $tender->id]);
+
+        Livewire::test(BidDecisionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('recordDecision', data: [
+                'decision' => BidDecision::NO_BID->value,
+                'reason' => 'Margin too thin.',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $decision = $tender->currentBidDecision()->firstOrFail();
+        expect($decision->decision)->toBe(BidDecision::NO_BID);
+        expect($decision->reason)->toBe('Margin too thin.');
+        expect($decision->score)->toBe(96);
     });
 });

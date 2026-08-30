@@ -11,7 +11,6 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/**, database/seeders/DemoDataSeeder.php | .ai/rules/database-seeders.md |
 | app/Models/TenderDeadline.php,app/Models/Tender.php,app/Enums/DeadlineType.php,app/Enums/EscalationLevel.php,app/Console/Commands/CheckDeadlineEscalations.php,app/Filament/Resources/Tenders/RelationManagers/DeadlinesRelationManager.php,app/Filament/Pages/TenderCalendar.php,app/Filament/Widgets/TenderDeadlineCalendarWidget.php | .ai/rules/deadlines.md |
-| app/Models/TenderDocument.php,app/Models/TenderDocumentVersion.php,app/Enums/DocumentCategory.php,app/Filament/Resources/Tenders/RelationManagers/DocumentsRelationManager.php,database/migrations/*tender_documents*,database/migrations/*tender_document_versions* | .ai/rules/documents.md |
 | docs/** | .ai/rules/docs.md |
 | app/Enums/** | .ai/rules/enums.md |
 | app/Models/Task.php,database/factories/TaskFactory.php,database/seeders/** | .ai/rules/factories-seeders.md |
@@ -21,7 +20,6 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Notifications/** | .ai/rules/notifications.md |
 | app/Filament/Pages/** | .ai/rules/pages.md |
 | app/Filament/Resources/Tasks/RelationManagers/* | .ai/rules/relation-managers.md |
-| app/Models/TenderCalculation.php,app/Models/TenderCalculationApproval.php,app/Models/ServiceCategoryCostDriverField.php,app/Enums/CalculationApprovalStep.php,app/Enums/CalculationModel.php,app/Enums/CostDriverFieldType.php,app/Calculations/**,app/Filament/Resources/Tenders/RelationManagers/CalculationsRelationManager.php,app/Filament/Resources/ServiceCategories/RelationManagers/CostDriverFieldsRelationManager.php,database/migrations/*cost_driver_fields*,database/migrations/*tender_calculations*,database/migrations/*tender_calculation_approvals*,database/seeders/ServiceCategorySeeder.php | .ai/rules/calculations.md |
 | app/Filament/Resources/**/Pages/*.php | .ai/rules/resources-pages.md |
 | app/Filament/Resources/**/Tables/*.php,app/Filament/Resources/**/RelationManagers/*.php | .ai/rules/resources-relation-managers.md |
 | app/Models/Tender.php,app/Models/TenderHardDeletion.php,app/Filament/Resources/Tenders/**, app/Models/Tender.php,app/Models/TenderTeamMember.php,app/Filament/Resources/Tenders/** | .ai/rules/resources-tenders.md |

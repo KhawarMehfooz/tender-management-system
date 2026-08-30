@@ -34,3 +34,10 @@ For any FileUpload field backing a persisted attachment/document row: use ->pres
 ProcurementProcedure, CpvCode, NutsCode) are documented for end users in
 `docs/08-administration.md`. If a resource covered there changes user-visible behavior, update
 that page too — see [[docs]].
+
+## Get() inside a conditional required()/visible() sees the enum instance, not ->value, for enum-backed Select options
+When a Select uses `->options(SomeBackedEnum::class)`, a sibling field's `Get $get` closure (e.g. `Textarea::make('reason')->required(fn (Get $get) => $get('decision') === SomeEnum::CASE->value)`) sees `$get('decision')` as the hydrated enum INSTANCE, not its raw string value, once the field has been set — but as `null` before anything is set. Comparing directly against `->value` silently evaluates false forever, so the conditional never fires (validation never blocks, defense-in-depth model guards catch it instead — confirmed via BidDecisionRelationManager's recordDecision action, where `reason` stayed optional for NO_BID until fixed).
+
+Fix: unwrap defensively — `($decision instanceof SomeEnum ? $decision->value : $decision) === SomeEnum::CASE->value`. Confirmed via Log::info dump inside the closure: first evaluations (initial mount) return null, later ones (after setTableActionData/fillForm) return the enum instance, never the raw string.
+
+Also: Filament's `callTableAction()`/`mountTableAction()` test helpers throw an assertion failure ("action ... is visible") if the action's own `->visible()` already evaluates false — you cannot use `callTableAction(...)->assertForbidden()` to test a `->before(fn () => abort_unless(...))` server-side guard on an action that is ALSO hidden for that user via `->visible()`. For that combination, `assertTableActionHidden(...)` alone is the correct (and sufficient) server-side-rejection test — it already runs the real `->visible()` closure through PHP, not a client-side mock.

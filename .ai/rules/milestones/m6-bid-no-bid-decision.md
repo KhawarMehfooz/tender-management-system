@@ -63,45 +63,94 @@ Planned tasks for M6:
   `RolesAndPermissionsSeederTest` (updated to assert calculation/staff don't get the new right,
   added a team-lead-specific assertion) — all passing. No dedicated "rejected without the
   right" action test yet since no gated action exists until the UI task.
-- [ ] `TenderParticipationScore` model + migration: UUID PK, `tender_id` FK unique (one row
-  per tender, `cascadeOnDelete`), 7 nullable tinyint rating columns (`distance_rating`,
+- [x] `TenderParticipationScore` model + migration: UUID PK, `tender_id` FK unique (one row per
+  tender, `cascadeOnDelete`), 7 nullable `unsignedTinyInteger` rating columns
+  (`MANUAL_RATING_FIELDS` constant lists them — `distance_rating`,
   `staffing_requirement_rating`, `wage_qualification_rating`, `reference_position_rating`,
   `competitive_intensity_rating`, `contractual_penalties_rating`, `strategic_value_rating`,
-  each 1-5, validated in the form not just the DB), timestamps. `Tender::participationScore():
-  HasOne`. `TenderParticipationScore::score(): ?int` implementing the bucket/weight formula
-  above, plus small private helpers for the contract-value and margin bucketing so they're unit
-  testable in isolation. Factory + tests: score is null until all 7 ratings set; score math is
-  correct for known input combinations including the value/margin/win-rate bucket edges;
-  cascade-deletes with its tender.
-- [ ] `TenderBidDecision` model + migration: UUID PK, `tender_id` FK (`cascadeOnDelete`),
-  `decision` enum-cast `BidDecision`, `reason` nullable text, `score` nullable int (frozen
-  snapshot), `decided_by` FK users, `decided_at` datetime, no `updated_at` (immutable, mirror
-  `TenderStatusChange`'s `$timestamps = false` pattern). Model-level guard rejecting
-  `reason === null` when `decision === BidDecision::NO_BID` (mirrors validation idea.md calls
-  "mandatory reason" for declines) — enforce in both the model (defense in depth) and the
-  Filament form. `Tender::bidDecisions(): HasMany` (`orderByDesc('decided_at')`) and
-  `Tender::currentBidDecision(): HasOne` as described above. Factory + tests: creating a
-  `NO_BID` decision without a reason is rejected; creating one with a reason succeeds; multiple
-  decisions accumulate as separate rows rather than overwriting; `currentBidDecision()` returns
-  the most recent one.
-- [ ] Filament UI: a `BidDecisionRelationManager` tab on `TenderResource` (register alongside
-  the existing four in `getRelations()`). Table is the append-only decision history (decision
-  badge with won/lost-style status colours per idea.md's design-system convention — green for
-  `BID`, red for `NO_BID` — score snapshot, reason, decided by, decided at), no edit/delete row
-  actions since rows are immutable. Header actions: "Edit score inputs" (modal form,
-  `updateOrCreate` on `TenderParticipationScore`, the 7 rating `Select`s 1-5) and "Record
-  decision" (modal form: decision `Select`, `reason` `Textarea` required when `NO_BID` via
-  `->required(fn (Get $get) => $get('decision') === BidDecision::NO_BID->value)`, captures the
-  live `score()` value into the snapshot column at submit time) — both actions
-  `->visible(fn () => auth()->user()->can(Right::MAKE_BID_DECISION->value))` per
-  [[permissions]]'s server-side-plus-UI enforcement standard. A read-only summary (current
-  computed score, or "incomplete — N of 7 ratings missing", plus each factor's current rating
-  including the derived/fixed ones) rendered above the table, matching how
-  `CalculationsRelationManager` surfaces computed output alongside its inputs. Feature tests:
-  a user with the right can edit ratings and record a decision; a user without it is rejected
-  server-side on both actions (per [[permissions]]'s explicit "test the right is denied, not
-  just granted" rule); the tab renders correctly with zero ratings set (incomplete state) and
-  fully set (numeric score shown).
+  1-5 range enforced in the form later, not yet at the DB level), timestamps.
+  `Tender::participationScore(): HasOne` added next to `currentCalculation()`.
+  `TenderParticipationScore::score(): ?int` implements the bucket/weight formula: null until
+  all 7 manual ratings are set, otherwise `(sum(7 manual) + contractValueRating() +
+  marginRating() + 3) / 50 × 100`, rounded. `contractValueRating()`/`marginRating()` are public
+  (not private — the UI task's read-only summary needs to display each derived factor's current
+  bucket individually, not just the total) with `private static bucketContractValue()`/
+  `bucketMargin()` doing the actual threshold match; `marginRating()` reads
+  `$this->tender->currentCalculation()->first()?->actual_margin` (method-call form, matching
+  the existing convention in `Tender::changeStatusTo()`/`TendersTable`, not property access).
+  `estimated_contract_volume_unknown === true` is treated identically to a null volume (lowest
+  bucket), not read as a real value. `pastWinRateRating()` exposes the fixed 3 for the UI.
+  Factory has a `rated(int $rating = 3)` state filling all 7 manual fields. Tests
+  (`TenderParticipationScoreTest`, 28 assertions): score null until complete; full score math
+  for a low-end and high-end case; every contract-value and margin bucket edge (via `->with()`
+  datasets); unknown-flag override; multi-version calculation picks the latest; unique
+  `tender_id` constraint; cascade-delete with its tender. `phpstan analyse --memory-limit=1G`
+  clean (the container's default 128M isn't enough for a single-file run — pass a higher limit
+  when running phpstan ad hoc, unrelated to this app's code).
+- [x] `TenderBidDecision` model + migration: UUID PK, `tender_id` FK (`cascadeOnDelete`),
+  `decision` enum-cast `BidDecision`, `reason` nullable text, `score` nullable
+  `unsignedTinyInteger` (frozen snapshot, 0-100), `decided_by` FK users (`restrictOnDelete`,
+  matching `TenderStatusChange`/`TenderCalculation`'s actor-FK convention), `decided_at`
+  datetime, no `updated_at` (`$timestamps = false`, mirroring `TenderStatusChange` exactly).
+  Model-level guard: a new `App\Exceptions\BidDecisionReasonRequiredException` (mirrors
+  `TenderCalculationNotApprovedException`'s `::make()` static-constructor shape, extends
+  `InvalidArgumentException` rather than `RuntimeException` since it's a validation failure, not
+  a state-machine one) thrown from a `static::creating()` hook in `booted()` when
+  `decision === BidDecision::NO_BID && reason === null` — enforced at the model layer so it
+  fires regardless of entry point (seeder, tinker, form); the Filament form's mirrored
+  `->required()` rule is deferred to the UI task. `Tender::bidDecisions(): HasMany`
+  (`orderByDesc('decided_at')`) and `Tender::currentBidDecision(): HasOne` (explicit
+  `orderByDesc()->limit(1)`, not `ofMany()`, per [[models]]'s UUID-PK trap) added next to
+  `participationScore()`. Factory defaults to `BID` with a null reason (so it never randomly
+  throws) plus a `noBid()` state that sets `NO_BID` with a fake sentence reason. Tests
+  (`TenderBidDecisionTest`, 9 assertions): `NO_BID` without a reason throws
+  `BidDecisionReasonRequiredException`; `NO_BID` with a reason succeeds; `BID` without a reason
+  succeeds; decisions accumulate as separate rows rather than overwriting;
+  `bidDecisions()`/`currentBidDecision()` ordering; `currentBidDecision()` is null with no rows;
+  cascade-deletes with its tender. Pint and `phpstan --memory-limit=1G` clean, full suite
+  (334 tests) green.
+- [x] Filament UI: `BidDecisionRelationManager` registered on `TenderResource` (5th relation
+  manager). Table is the append-only decision history (decision badge via new
+  `BidDecision::color()` — green for `BID`, red for `NO_BID`, mirroring `TenderStatus::color()`'s
+  exact shape — score, reason, decided by, decided at), `->recordActions([])` since rows are
+  immutable. Header actions: "Edit score inputs" (`updateOrCreate` on the tender's
+  `participationScore()` HasOne, 7 rating `Select`s built from `MANUAL_RATING_FIELDS`) and
+  "Record decision" (decision `Select` + `reason` `Textarea` required when `NO_BID`, snapshotting
+  `currentOrNewScore()->score()` into the row at submit time) — both gated by
+  `Right::MAKE_BID_DECISION` via `->visible()` + `->before(fn () => abort_unless(...))`. The
+  read-only summary (computed score or "incomplete — N of 7 ratings missing", every factor
+  including the derived/fixed ones) is a Blade partial
+  (`resources/views/filament/relation-managers/participation-score-summary.blade.php`) injected
+  via a `content()` override — `$table->header()` was tried first and rejected: it replaces
+  Filament's entire header slot, which also renders `headerActions()`, so it would have silently
+  dropped both header buttons. Instead `content()` inserts a `Filament\Schemas\Components\View`
+  component (`->viewData(...)`) before `EmbeddedTable::make()`, alongside the untouched
+  `RenderHook`/tabs components from the parent implementation — this is the reusable pattern for
+  any future "summary above the table" need. `TenderParticipationScore::currentOrNewScore()`-style
+  helper (`currentOrNewScore()` on the RelationManager) returns an unsaved instance with
+  `setRelation('tender', $tender)` when no row exists yet, so `contractValueRating()`/
+  `marginRating()`/`score()` resolve correctly even pre-first-save. New lang files
+  `tender_participation_scores.php` (factor labels, summary strings) and
+  `tender_bid_decisions.php` (field/action labels). `npm run build` run for the new Blade
+  partial's Tailwind classes, per [[css-filament]].
+  Hit and fixed a real bug during testing: the conditional `reason` requirement used
+  `$get('decision') === BidDecision::NO_BID->value`, which never matched because `$get()` returns
+  the hydrated enum *instance* (not its raw value) once the sibling `Select` (backed by
+  `->options(BidDecision::class)`) has a value — recorded as a durable rule in
+  [[resources]] since it'll bite the next enum-backed conditional-required field too. Also
+  discovered mid-task that `callTableAction(...)->assertForbidden()` cannot test a
+  `->before(abort_unless(...))` guard on an action that is *also* `->visible()`-gated to false for
+  that user — Filament's own test harness refuses to mount an invisible action before your
+  assertion even runs. Also recorded in [[resources]]; the "hides both actions from a user
+  without the right" `assertTableActionHidden` test is the correct (and sufficient) server-side
+  denial coverage for this action shape, so the two flawed forced-call tests were dropped rather
+  than kept broken.
+  Tests (`TenderResourceTest.php`'s new "bid decision relation manager" describe block, 8 tests):
+  lists only the tender's own decisions; hides both actions without the right; incomplete-summary
+  and computed-score rendering; editing ratings with the right (and the DB row reflects it);
+  recording a `BID` decision without a reason; requiring a reason for `NO_BID` (server-side
+  validation, not just client hint). Full suite (342 tests), Pint, and
+  `phpstan --memory-limit=1G` all clean.
 - [ ] Docs: add a short section to whichever `docs/*.md` page covers tender-detail tabs (check
   [[docs]] for the right target, likely alongside where M5's calculations page lives) covering
   the participation score factors, the manual-vs-derived split, and how to record a bid/no-bid

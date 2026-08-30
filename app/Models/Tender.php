@@ -275,6 +275,32 @@ class Tender extends Model
     }
 
     /**
+     * @return HasOne<TenderParticipationScore, $this>
+     */
+    public function participationScore(): HasOne
+    {
+        return $this->hasOne(TenderParticipationScore::class);
+    }
+
+    /**
+     * @return HasMany<TenderBidDecision, $this>
+     */
+    public function bidDecisions(): HasMany
+    {
+        return $this->hasMany(TenderBidDecision::class)->orderByDesc('decided_at');
+    }
+
+    /**
+     * Not ofMany() — Postgres can't run MAX() against this app's UUID PKs ([[models]]).
+     *
+     * @return HasOne<TenderBidDecision, $this>
+     */
+    public function currentBidDecision(): HasOne
+    {
+        return $this->hasOne(TenderBidDecision::class)->orderByDesc('decided_at')->limit(1);
+    }
+
+    /**
      * Whether the given user may upload/manage this tender's documents by virtue of being
      * linked to the tender itself — the owner or any tender_team_members row — mirroring
      * Task::isLinkedTo(). Distinct from TenderForm::canManageTeam()'s broader manager set,

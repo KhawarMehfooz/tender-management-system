@@ -13,4 +13,12 @@ enum BidDecision: string implements HasLabel
     {
         return __('bid_decisions.'.$this->value);
     }
+
+    public function color(): string
+    {
+        return match ($this) {
+            self::BID => 'success',
+            self::NO_BID => 'danger',
+        };
+    }
 }
