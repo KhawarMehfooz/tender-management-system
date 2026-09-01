@@ -12,6 +12,7 @@ enum Right: string implements HasLabel
     case EXECUTE_FINAL_SUBMISSION = 'execute-final-submission';
     case VIEW_EMPLOYEE_STATISTICS = 'view-employee-statistics';
     case MAKE_BID_DECISION = 'make-bid-decision';
+    case MANAGE_CERTIFICATES = 'manage-certificates';
 
     public function getLabel(): string
     {
