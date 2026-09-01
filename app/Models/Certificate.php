@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 
@@ -90,6 +91,14 @@ class Certificate extends Model
         }
 
         return CertificateStatus::VALID;
+    }
+
+    /**
+     * @return BelongsToMany<Tender, $this>
+     */
+    public function tenders(): BelongsToMany
+    {
+        return $this->belongsToMany(Tender::class, 'tender_certificate')->withTimestamps();
     }
 
     /**

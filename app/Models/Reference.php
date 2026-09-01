@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
@@ -96,5 +97,13 @@ class Reference extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(ReferenceAttachment::class);
+    }
+
+    /**
+     * @return BelongsToMany<Tender, $this>
+     */
+    public function tenders(): BelongsToMany
+    {
+        return $this->belongsToMany(Tender::class, 'tender_bid_reference', 'bid_reference_id', 'tender_id')->withTimestamps();
     }
 }

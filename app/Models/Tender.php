@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
@@ -309,6 +310,42 @@ class Tender extends Model
     public function linkedToDocuments(User $user): bool
     {
         return $this->owner_id === $user->id || $this->teamMembers()->where('user_id', $user->id)->exists();
+    }
+
+    /**
+     * References from the global library actually used on this bid — attach/detach only,
+     * creation stays on ReferenceResource (see [[milestones]]).
+     *
+     * @return BelongsToMany<Reference, $this>
+     */
+    public function bidReferences(): BelongsToMany
+    {
+        return $this->belongsToMany(Reference::class, 'tender_bid_reference', 'tender_id', 'bid_reference_id')->withTimestamps();
+    }
+
+    /**
+     * Certificates from the global library actually used on this bid — attach/detach only,
+     * creation stays on CertificateResource (see [[milestones]]).
+     *
+     * @return BelongsToMany<Certificate, $this>
+     */
+    public function certificates(): BelongsToMany
+    {
+        return $this->belongsToMany(Certificate::class, 'tender_certificate')->withTimestamps();
+    }
+
+    /**
+     * Concept blocks from the global library actually used on this bid. The pivot pins the
+     * specific ConceptBlockVersion used at attach time (concept_block_version_id) — editing the
+     * block afterward must not silently change what a past bid is recorded as having submitted.
+     *
+     * @return BelongsToMany<ConceptBlock, $this>
+     */
+    public function conceptBlocks(): BelongsToMany
+    {
+        return $this->belongsToMany(ConceptBlock::class, 'tender_concept_block')
+            ->withPivot('concept_block_version_id')
+            ->withTimestamps();
     }
 
     /**

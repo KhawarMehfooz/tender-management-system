@@ -185,31 +185,98 @@ Planned tasks for M7:
   up from the prior task's noted 67 — confirmed by file-by-file diffing the phpstan output that
   every erroring file is unrelated to anything this task touched, so the drift predates this
   task).
-- [ ] `ConceptBlock` + `ConceptBlockVersion`: migration for `concept_blocks` (UUID PK,
+- [x] `ConceptBlock` + `ConceptBlockVersion`: migration for `concept_blocks` (UUID PK,
   `category` enum-cast `ConceptBlockCategory`, `title`, `created_by` FK users
   `restrictOnDelete`, timestamps) and `concept_block_versions` (mirrors
-  `tender_document_versions`: UUID PK, `concept_block_id` FK `cascadeOnDelete`,
+  `tender_document_versions` exactly: UUID PK, `concept_block_id` FK `cascadeOnDelete`,
   `version_number` unsigned int, `content` long text, `created_by` FK users
-  `restrictOnDelete`, `created_at` only, no `updated_at`). `ConceptBlock::currentVersion(): HasOne`
-  (explicit `orderByDesc('version_number')->limit(1)`). `ConceptBlockResource` (list/create/edit/
-  view; "edit" creates a new version rather than mutating an existing row — mirrors
-  `DocumentsRelationManager`'s upload-new-version action shape) with a version-history table
-  (view-only past versions, no delete/edit on old rows — immutable by construction). Not
-  rights-gated (see design-decisions note above). Factory + tests (versioning: edit creates a
-  new row not a mutation, `currentVersion()` picks the latest, history is browsable and old
-  versions are unreachable via any edit/delete action).
-- [ ] Tender-side linking: three pivots (`tender_bid_reference`, `tender_certificate`,
-  `tender_concept_block` — the last with an extra `concept_block_version_id` FK pinning the
-  version used, per the design decision above) plus relation managers on `TenderResource`
-  attaching existing library records to a tender (attach/detach only — creation stays on the
-  library resources, not inline). Confirm with the user whether this is 3 separate relation-
-  manager tabs (consistent with the existing one-tab-per-concern pattern:
-  Tasks/Documents/Deadlines/Calculations/BidDecision) or one combined "Reference Library" tab
-  with 3 sections, before building — `TenderResource` already has 5 tabs and this adds real UI
-  surface, worth a quick check rather than assuming. Tests: attach/detach, the concept-block
-  pivot correctly freezes the version at attach time (editing the block afterward doesn't change
-  what's shown as attached to the tender), category-scope re-check on the relation manager
-  query (mirrors [[scopes-models]]'s existing pattern for tender-scoped relation managers).
+  `restrictOnDelete`, `created_at` only via `const UPDATED_AT = null`, unique on
+  `[concept_block_id, version_number]`). `ConceptBlock::currentVersion(): HasOne` (explicit
+  `orderByDesc('version_number')->limit(1)`, per [[models]]'s UUID-PK/`ofMany()` trap).
+  `ConceptBlockResource` (own `reference_library` nav group, `OutlinedBookOpen` icon — grepped
+  `Heroicon.php` first, no clash with `Reference`'s `OutlinedIdentification` or `Certificate`'s
+  `OutlinedShieldCheck`; not rights-gated, matching the master-data-resource convention per the
+  design decision above). `ConceptBlockForm`'s `content` field is NOT a real `concept_blocks`
+  column — `EditConceptBlock` overrides `mutateFormDataBeforeFill()` to inject
+  `currentVersion?->content` into the form on load, then `mutateFormDataBeforeSave()` diffs the
+  submitted content against that same value: unchanged content is stripped from `$data` and
+  nothing else happens; changed content is captured on a private property (same
+  capture-before-`afterSave()` shape [[resources-pages]] documents for `CreateTender`/
+  `EditTender`, needed here because `content` isn't a `#[Fillable(...)]` column so it can't just
+  flow through `update()`) and `afterSave()` creates a new `ConceptBlockVersion` row at
+  `versions()->max('version_number') + 1`. `CreateConceptBlock` mirrors the same capture shape
+  for the always-created version 1. A new `VersionsRelationManager` tab lists a block's own
+  version history (`recordActions([])`, `headerActions([])`, `toolbarActions([])` — no
+  create/edit/delete anywhere, since rows are immutable by construction; the only writer is
+  `EditConceptBlock`/`CreateConceptBlock` above), newest version first. Tests:
+  `ConceptBlockTest` (versions ordering, `currentVersion()`, cascade-delete of versions, factory
+  category), `ConceptBlockResourceTest` (create writes both the block and its version-1 row;
+  editing with changed content creates version 2 and `currentVersion` moves to it; editing with
+  unchanged content leaves exactly one version row; the relation manager shows a block's own
+  versions newest-first and not another block's). Full suite (385 tests, up from 377), Pint, and
+  `phpstan --memory-limit=1G` clean (no new errors — confirmed no `ConceptBlock*` file appears
+  in phpstan's output). One environment quirk hit and worked around: the app container's clock
+  was a day behind the host, so `make:migration` generated `2026_09_01_...` filenames that would
+  have sorted before the same day's already-applied `2026_09_02_...` migrations; renamed both
+  files to `2026_09_02_1100{00,01}_...` before running them, no functional impact since neither
+  table has an FK dependency on that day's other new tables.
+- [x] Tender-side linking: three pivots — `tender_bid_reference`, `tender_certificate` (plain
+  composite-PK pivots, `primary(['tender_id', 'x_id'])`, deliberately with NO separate `id`
+  column, to sidestep [[migrations]]'s known `task_participants.id` bug outright rather than
+  fix it after the fact), and `tender_concept_block` (same shape plus `concept_block_version_id`
+  FK `restrictOnDelete` to `concept_block_versions`, pinning the version used). `Tender`'s
+  `bidReferences()`/`certificates()`/`conceptBlocks()` `BelongsToMany`s plus the inverse
+  `tenders()` on `Reference`/`Certificate`/`ConceptBlock`; `Reference`'s pivot table name doesn't
+  match Eloquent's model-name-derived default key (`bid_reference_id`, not `reference_id`, since
+  the pivot is named after the table not the model — see [[models]]'s `bid_references` trap), so
+  both sides of that one relation pass explicit foreign/related pivot keys — Certificate/
+  ConceptBlock don't need this since their table names already match their model names.
+  Asked the user whether `TenderResource` should get 3 separate relation-manager tabs or one
+  combined "Reference Library" tab with 3 sections; they chose combined. Implemented via
+  Filament's built-in `Filament\Resources\RelationManagers\RelationGroup::make($label, [...])`
+  (found by reading the vendor source — not previously used anywhere in this app) wrapping three
+  ordinary `RelationManager` classes (`ReferencesRelationManager`, `CertificatesRelationManager`,
+  `ConceptBlocksRelationManager`), which Filament natively renders as one "Reference Library" tab
+  with a sub-tab per manager — no custom Blade/Livewire needed. Each uses Filament's built-in
+  `AttachAction`/`DetachAction`/`DetachBulkAction` (also new to this app; the existing
+  `DocumentsRelationManager`/`AttachmentsRelationManager` precedents are `hasMany`, not
+  `belongsToMany`, so they use `CreateAction` instead). Gating: References/ConceptBlocks reuse
+  `TenderForm::canManageTeam() || $tender->linkedToDocuments($user)` (same gate
+  `DocumentsRelationManager` uses for uploads — any tender-linked user or team manager); Certificates
+  is instead gated behind `Right::MANAGE_CERTIFICATES`, matching the resource's own gate — a
+  deliberate deviation, since recording which certificate backs a bid carries the same
+  disqualification-risk weight idea.md assigns certificates generally, not a routine tender-team
+  task. `ConceptBlocksRelationManager`'s attach action is fully custom (`->action(...)` overrides
+  `AttachAction`'s default entirely) rather than using its `->schema()` extra-pivot-field
+  mechanism: it looks up the selected block's `currentVersion` server-side and pins that id via
+  `syncWithoutDetaching()`, with no version-picker exposed in the UI — idea.md never asks for
+  choosing an older version at attach time, only for the pin to exist. No extra category-scope
+  code was needed for the "own tender's attached records" query: `$tender->bidReferences()` etc.
+  are accessed through the already-fetched (and thus already `ServiceCategoryScope`-scoped)
+  Tender, the same "automatic for relation-manager access" reasoning [[scopes-models]] documents
+  for `Task`; Reference/Certificate/ConceptBlock themselves carry no `service_category_id` at all
+  (they're an explicitly global library, per the design decision above), so the *attachable*
+  record list is correctly unscoped too. `lang/en/reference_library.php` added for the shared tab
+  label and per-section attach-button labels. Three phpstan findings fixed mid-task, all in
+  `ConceptBlocksRelationManager` (none elsewhere): `$record->pivot` needed a
+  `@property-read Pivot|null $pivot` addition to `ConceptBlock`'s docblock (no prior pivot-column
+  read existed anywhere in this app to copy from); `ConceptBlockVersion::find()` and
+  `ConceptBlock::findOrFail()` both resolve to a `Model|Collection` union under Larastan when
+  called as static facades — fixed via `::query()->first()`/`::query()->findOrFail()` plus a
+  local `/** @var */` typed variable, mirroring `EditCertificate`'s existing fix for the same
+  class of issue (task 3 above); and `Pivot`'s base class doesn't declare dynamic pivot columns,
+  fixed with `->getAttribute('concept_block_version_id')` instead of magic-property access.
+  Tests: `TenderTest` (attach/detach for references and certificates; concept-block version
+  pinning is unaffected by a later new version), `TenderResourceTest` (three new `describe()`
+  blocks — list-scoping to the owning tender for all three, attach/detach gating and success for
+  each, the certificates gate specifically rejecting a non-`MANAGE_CERTIFICATES` user, and the
+  concept-block attach pinning `currentVersion` at that moment). Full suite (395 tests, up from
+  385 — one unrelated pre-existing flake seen and confirmed by rerun, same class of Filament
+  tel-format/faker flake noted in task 2 above, in `TenderResourceTest`'s "team assignment"
+  group, nothing to do with this task), Pint, and `phpstan --memory-limit=1G` clean (72
+  pre-existing errors, same count/files as the prior task, none in anything touched here). Same
+  migration-filename-ordering workaround as task 4 needed again: renamed the three new pivot
+  migrations from container-clock-generated `2026_09_01_...` to `2026_09_02_1200{00,01,02}_...`.
 - [ ] Docs: new standalone page `docs/12-references-certificates-concepts.md` (mirrors how
   09/10/11 were added as milestones landed) covering the three library resources, certificate
   expiry reminders and who receives them, concept block versioning, and attaching library

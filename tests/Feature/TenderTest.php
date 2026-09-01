@@ -6,7 +6,11 @@ use App\Enums\TaskStatus;
 use App\Enums\TenderStatus;
 use App\Exceptions\InvalidTenderStatusTransitionException;
 use App\Exceptions\TenderCalculationNotApprovedException;
+use App\Models\Certificate;
+use App\Models\ConceptBlock;
+use App\Models\ConceptBlockVersion;
 use App\Models\ProcurementProcedure;
+use App\Models\Reference;
 use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Source;
@@ -484,5 +488,45 @@ describe('deadlines', function () {
         $this->actingAs($scopedUser);
 
         expect(TenderDeadline::query()->pluck('id')->all())->toBe([$deadline->id]);
+    });
+});
+
+describe('reference library links', function () {
+    it('attaches and detaches a reference', function () {
+        $tender = Tender::factory()->create();
+        $reference = Reference::factory()->create();
+
+        $tender->bidReferences()->attach($reference->id);
+        expect($tender->bidReferences->pluck('id')->all())->toBe([$reference->id]);
+        expect($reference->tenders->pluck('id')->all())->toBe([$tender->id]);
+
+        $tender->bidReferences()->detach($reference->id);
+        expect($tender->fresh()->bidReferences)->toBeEmpty();
+    });
+
+    it('attaches and detaches a certificate', function () {
+        $tender = Tender::factory()->create();
+        $certificate = Certificate::factory()->create();
+
+        $tender->certificates()->attach($certificate->id);
+        expect($tender->certificates->pluck('id')->all())->toBe([$certificate->id]);
+        expect($certificate->tenders->pluck('id')->all())->toBe([$tender->id]);
+
+        $tender->certificates()->detach($certificate->id);
+        expect($tender->fresh()->certificates)->toBeEmpty();
+    });
+
+    it('pins the concept block version attached at that moment, unaffected by later edits', function () {
+        $tender = Tender::factory()->create();
+        $block = ConceptBlock::factory()->create();
+        $v1 = ConceptBlockVersion::factory()->create(['concept_block_id' => $block->id, 'version_number' => 1]);
+
+        $tender->conceptBlocks()->attach($block->id, ['concept_block_version_id' => $v1->id]);
+
+        ConceptBlockVersion::factory()->create(['concept_block_id' => $block->id, 'version_number' => 2]);
+
+        $pivot = $tender->conceptBlocks()->firstOrFail()->pivot;
+        expect($pivot->concept_block_version_id)->toBe($v1->id);
+        expect($block->fresh()->currentVersion->id)->not->toBe($v1->id);
     });
 });

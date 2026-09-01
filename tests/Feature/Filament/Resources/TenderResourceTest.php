@@ -16,10 +16,17 @@ use App\Filament\Resources\Tenders\Pages\ListTenders;
 use App\Filament\Resources\Tenders\Pages\ViewTender;
 use App\Filament\Resources\Tenders\RelationManagers\BidDecisionRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CalculationsRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\CertificatesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\ConceptBlocksRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\ReferencesRelationManager;
 use App\Filament\Resources\Tenders\TenderResource;
+use App\Models\Certificate;
+use App\Models\ConceptBlock;
+use App\Models\ConceptBlockVersion;
 use App\Models\ProcurementProcedure;
+use App\Models\Reference;
 use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\ServiceCategoryCostDriverField;
@@ -1271,5 +1278,104 @@ describe('bid decision relation manager', function () {
         expect($decision->decision)->toBe(BidDecision::NO_BID);
         expect($decision->reason)->toBe('Margin too thin.');
         expect($decision->score)->toBe(96);
+    });
+});
+
+describe('reference library: references relation manager', function () {
+    it('lists only the tender\'s own attached references', function () {
+        $tender = Tender::factory()->create();
+        $reference = Reference::factory()->create();
+        $tender->bidReferences()->attach($reference->id);
+        $foreignReference = Reference::factory()->create();
+
+        Livewire::test(ReferencesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$reference])
+            ->assertCanNotSeeTableRecords([$foreignReference]);
+    });
+
+    it('hides attach/detach from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(ReferencesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('attach');
+    });
+
+    it('lets the tender owner attach and detach a reference', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $reference = Reference::factory()->create();
+        $this->actingAs($owner);
+
+        Livewire::test(ReferencesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('attach', data: ['recordId' => $reference->id])
+            ->assertHasNoTableActionErrors();
+
+        expect($tender->bidReferences->pluck('id')->all())->toBe([$reference->id]);
+
+        Livewire::test(ReferencesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('detach', record: $reference)
+            ->assertHasNoTableActionErrors();
+
+        expect($tender->fresh()->bidReferences)->toBeEmpty();
+    });
+});
+
+describe('reference library: certificates relation manager', function () {
+    it('hides attach/detach from a user without the manage-certificates right', function () {
+        $tender = Tender::factory()->create();
+        $certificate = Certificate::factory()->create();
+        $tender->certificates()->attach($certificate->id);
+
+        Livewire::test(CertificatesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('attach')
+            ->assertTableActionHidden('detach', record: $certificate);
+    });
+
+    it('lets a manage-certificates right holder attach and detach a certificate', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::MANAGE_CERTIFICATES->value);
+        $tender = Tender::factory()->create();
+        $certificate = Certificate::factory()->create();
+
+        Livewire::test(CertificatesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('attach', data: ['recordId' => $certificate->id])
+            ->assertHasNoTableActionErrors();
+
+        expect($tender->certificates->pluck('id')->all())->toBe([$certificate->id]);
+
+        Livewire::test(CertificatesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('detach', record: $certificate)
+            ->assertHasNoTableActionErrors();
+
+        expect($tender->fresh()->certificates)->toBeEmpty();
+    });
+});
+
+describe('reference library: concept blocks relation manager', function () {
+    it('pins the block\'s current version at attach time', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $block = ConceptBlock::factory()->create();
+        $v1 = ConceptBlockVersion::factory()->create(['concept_block_id' => $block->id, 'version_number' => 1]);
+        $this->actingAs($owner);
+
+        Livewire::test(ConceptBlocksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('attach', data: ['recordId' => $block->id])
+            ->assertHasNoTableActionErrors();
+
+        $pivot = $tender->conceptBlocks()->firstOrFail()->pivot;
+        expect($pivot->concept_block_version_id)->toBe($v1->id);
+    });
+
+    it('lists only the tender\'s own attached concept blocks', function () {
+        $tender = Tender::factory()->create();
+        $block = ConceptBlock::factory()->create();
+        ConceptBlockVersion::factory()->create(['concept_block_id' => $block->id, 'version_number' => 1]);
+        $tender->conceptBlocks()->attach($block->id, ['concept_block_version_id' => $block->currentVersion->id]);
+        $foreignBlock = ConceptBlock::factory()->create();
+
+        Livewire::test(ConceptBlocksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$block])
+            ->assertCanNotSeeTableRecords([$foreignBlock]);
     });
 });
