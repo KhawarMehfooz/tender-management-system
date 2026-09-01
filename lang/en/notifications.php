@@ -15,11 +15,13 @@ return [
         'task-escalated-team-lead' => 'Task overdue (team lead)',
         'task-escalated-administrator' => 'Critical task nearing submission (administrator)',
         'tender-escalated-management' => 'Submission deadline critical (management)',
+        'certificate-expiring' => 'Certificate expiring or expired',
     ],
 
     'actions' => [
         'view_task' => 'View task',
         'view_tender' => 'View tender',
+        'view_certificate' => 'View certificate',
     ],
 
     'task_status_changed' => [
@@ -69,5 +71,14 @@ return [
         'body' => 'Less than 24 hours before submission, with :count critical item(s) still open.',
         'mail_subject' => 'Submission deadline critical: :tender',
         'mail_line' => 'Tender ":tender" has less than 24 hours before its submission deadline, with :count critical item(s) still open.',
+    ],
+
+    'certificate_expiring' => [
+        'title' => 'Certificate needs attention: :certificate',
+        'body_expiring' => 'This certificate expires in :days day(s).',
+        'body_expired' => 'This certificate has expired.',
+        'mail_subject' => 'Certificate needs attention: :certificate',
+        'mail_line_expiring' => 'Certificate ":certificate" expires in :days day(s).',
+        'mail_line_expired' => 'Certificate ":certificate" has expired.',
     ],
 ];

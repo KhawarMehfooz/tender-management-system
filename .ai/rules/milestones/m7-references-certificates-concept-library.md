@@ -154,22 +154,37 @@ Planned tasks for M7:
   on `CertificateResource` is pre-existing baseline noise, confirmed identical on
   `UserResource`'s own `canManage()`. Full suite (373 tests), Pint, and
   `phpstan --memory-limit=1G` all clean.
-- [ ] `CheckCertificateExpiry` scheduled command (`certificates:check-expiry`,
+- [x] `CheckCertificateExpiry` scheduled command (`certificates:check-expiry`,
   `App\Console\Commands`) + `CertificateExpiringNotification` (dual-channel per
   [[notifications]]'s pattern — `ShouldQueue`, mail gated by
-  `User::wantsEmailFor(NotificationType::CERTIFICATE_EXPIRY)` — new `NotificationType` case
-  needed, `toDatabase()` via `Filament\Notifications\Notification::make()`). Command runs daily
-  (registered in `routes/console.php`, `->daily()` — no hourly urgency like deadline escalation),
-  queries certificates with `expiry_date` in the future crossing the 90/30/7-day thresholds (or
-  already past, one final "expired" notice) that haven't already had that threshold's reminder
-  sent (`last_reminder_threshold_days` comparison, same "state only moves forward, fires once
-  per threshold" shape as [[deadlines]]'s escalation columns), notifies every
-  `Right::MANAGE_CERTIFICATES` holder (`User::query()->whereHas('roles.permissions', ...)`
-  or the Spatie `permission` direct-grant equivalent — check how `MAKE_BID_DECISION` holders are
-  queried elsewhere in the codebase and reuse that exact lookup, don't invent a new one).
-  Tests: each threshold fires once and not twice on a second run; a certificate below no
-  threshold yet sends nothing; expired-with-no-final-notice-yet fires once; recipients are
-  exactly the right's holders.
+  `User::wantsEmailFor(NotificationType::CERTIFICATE_EXPIRING)` — new `NotificationType` case
+  added, `toDatabase()` via `Filament\Notifications\Notification::make()->getDatabaseMessage()`,
+  `toMail()` links to the certificate's edit page). Notification takes a nullable
+  `thresholdDays` — a real value (90/30/7) for a reminder, `null` for the final "already expired"
+  notice — and switches copy accordingly. Command runs daily (registered in `routes/console.php`,
+  `->daily()` — no hourly urgency like deadline escalation). No `MAKE_BID_DECISION`-holder lookup
+  precedent existed anywhere yet (BidDecision doesn't send notifications) — used Spatie's built-in
+  `User::permission(Right::MANAGE_CERTIFICATES->value)->get()` (`HasPermissions::scopePermission`,
+  confirmed by reading the vendor trait) since it already covers both role-granted and
+  directly-granted rights and needs no bespoke join. Guarded with an
+  `App\Models\Permission::where('name', ...)->exists()` check first, mirroring
+  `CheckDeadlineEscalations`'s `Role::where(...)->exists()` guard — `scopePermission()` throws
+  `PermissionDoesNotExist` outright on a fresh install before the seeder runs.
+  `last_reminder_threshold_days` (`0` reserved as an `EXPIRED_MARKER`, distinct from every real
+  threshold which is `>0`) only ever moves downward through `[90, 30, 7]` then to the marker,
+  exactly mirroring [[deadlines]]'s escalation-column shape — including its catch-up behavior:
+  a certificate that crosses multiple thresholds between runs (e.g. no run for 3 months) fires
+  every newly-crossed threshold's notification in the same run, not just the nearest one, since
+  each threshold's own "already sent" check is independent. Tests
+  (`CheckCertificateExpiryTest`): 90-day reminder fires once and not twice on a second run; a
+  certificate outside every threshold sends nothing; the final expired notice fires once and not
+  twice on a second run (even though the same first run also fires the 90/30/7 catch-up
+  reminders ahead of it); recipients are exactly `Right::MANAGE_CERTIFICATES` holders (a
+  `STAFF`-role user, which the seeder doesn't grant the right to, gets nothing). Full suite (377
+  tests, up from 373), Pint, and `phpstan --memory-limit=1G` clean (72 pre-existing errors seen,
+  up from the prior task's noted 67 — confirmed by file-by-file diffing the phpstan output that
+  every erroring file is unrelated to anything this task touched, so the drift predates this
+  task).
 - [ ] `ConceptBlock` + `ConceptBlockVersion`: migration for `concept_blocks` (UUID PK,
   `category` enum-cast `ConceptBlockCategory`, `title`, `created_by` FK users
   `restrictOnDelete`, timestamps) and `concept_block_versions` (mirrors

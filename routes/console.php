@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\CheckCertificateExpiry;
 use App\Console\Commands\CheckDeadlineEscalations;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -10,3 +11,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command(CheckDeadlineEscalations::class)->hourly();
+Schedule::command(CheckCertificateExpiry::class)->daily();
