@@ -12,7 +12,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Escalation level 2 (idea.md M3): inform the tender's owner (the "team lead" role for this
+ * Escalation level 2: inform the tender's owner (the "team lead" role for this
  * tender) once a task has been overdue for 24 hours.
  */
 class TaskEscalatedToTeamLeadNotification extends Notification implements ShouldQueue

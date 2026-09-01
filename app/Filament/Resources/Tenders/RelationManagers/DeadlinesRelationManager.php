@@ -20,7 +20,7 @@ use Filament\Tables\Table;
  * Gated by TenderForm::canManageTeam() (team lead/department head/super admin) — the same
  * role set that manages the tender's team, since deadline scheduling is the same kind of
  * tender-level management responsibility. Everyone who can see the tender can still browse
- * its deadlines, per idea.md M3's "submission deadline always visible" requirement.
+ * its deadlines, since the submission deadline must always be visible.
  *
  * DeadlineType::BID_VALIDITY is excluded from the type Select — that row is derived and kept
  * in sync automatically by Tender::syncBidValidityDeadline() (submission due date +

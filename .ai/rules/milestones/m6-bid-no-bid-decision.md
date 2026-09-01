@@ -2,8 +2,8 @@
 
 Full spec: [idea.md](../../../idea.md)'s M6 section. Index: [../milestones.md](../milestones.md).
 
-**M6 — Bid / No-Bid Decision is in progress**, started 2026-08-30 at the user's explicit
-request, building incrementally task-by-task (same rhythm as M3–M5).
+**M6 — Bid / No-Bid Decision is complete**, started 2026-08-30 and finished 2026-09-01 at the
+user's explicit request, built incrementally task-by-task (same rhythm as M3–M5).
 
 Four design decisions were confirmed with the user before any code was written:
 - **Missing score inputs are manual entry fields.** idea.md lists 10 participation-score
@@ -151,10 +151,39 @@ Planned tasks for M6:
   recording a `BID` decision without a reason; requiring a reason for `NO_BID` (server-side
   validation, not just client hint). Full suite (342 tests), Pint, and
   `phpstan --memory-limit=1G` all clean.
-- [ ] Docs: add a short section to whichever `docs/*.md` page covers tender-detail tabs (check
-  [[docs]] for the right target, likely alongside where M5's calculations page lives) covering
-  the participation score factors, the manual-vs-derived split, and how to record a bid/no-bid
-  decision including the mandatory-reason-on-decline rule.
+- [x] Docs: new standalone page `docs/11-bid-no-bid-decision.md` (the user chose a new page over
+  appending to `10-calculations-approvals.md`, mirroring how 09/10 were added alongside their
+  milestones) covering the ten participation-score factors and their manual/derived/fixed
+  split, entering the seven manual ratings, the score being computed live rather than stored,
+  recording a decision with the mandatory reason on decline, the frozen score snapshot, the
+  append-only history, the `MAKE_BID_DECISION`-right-vs-general-viewing split, and that the
+  decision doesn't gate status transitions. Cross-linked from `03-managing-tenders.md`,
+  `08-administration.md`, and `10-calculations-approvals.md`; all three timestamps bumped to
+  01/09/2026 per [[docs]]'s sync rule. See [[docs]] for full detail.
+
+M6 UI/data follow-ups after the task list above was closed out (2026-09-01, same session):
+- **Form layout**: `BidDecisionRelationManager`'s two header-action forms redone to match
+  [[resources]]'s `Section`/`Grid`/`prefixIcon` convention instead of one bare full-width
+  `Select` per line. "Edit score inputs"' 7 rating `Select`s now sit in a `Grid::make(2)`, each
+  with a `prefixIcon` matching its factor (`OutlinedMapPin` distance, `OutlinedUserGroup`
+  staffing, `OutlinedAcademicCap` wage/qualification, `OutlinedTrophy` reference position,
+  `OutlinedFire` competitive intensity, `OutlinedScale` contractual penalties, `OutlinedStar`
+  strategic value — new `RATING_FIELD_ICONS` const map). "Record decision"'s `decision` `Select`
+  got `prefixIcon(OutlinedCheckBadge)` and sits in a `Grid::make(2)` next to the `reason`
+  `Textarea` (`Textarea` has no `prefixIcon` — `HasAffixes` isn't in its trait list — so it keeps
+  `->columnSpanFull()` instead). No lang or behavior changes; all 8 relation-manager tests still
+  pass unchanged.
+- **Demo data**: `DemoDataSeeder::createTender()` now seeds a `TenderParticipationScore` (+
+  `TenderBidDecision` for 2 of every 3 variants) per tender via a new `createBidDecision()`
+  helper, called after the calculation block (so the expected-margin factor reads a real
+  calculation) and before `advanceTender()`. Variant 0 gets a complete score + `BID`; variant 1
+  gets a complete score + `NO_BID` with a reason; variant 2 is left with only 3 of 7 manual
+  ratings and no decision at all, to demo both the "incomplete" summary and the empty
+  decision-history state. `decided_by` prefers a team member holding `MAKE_BID_DECISION` over
+  the tender owner, since the owner isn't guaranteed to hold it. Verified via a throwaway Pest
+  test invoking `DemoDataSeeder` against the sqlite testing DB (per [[database-seeders]]'s
+  established pattern — never run `migrate:fresh --seed` against the real dev Postgres DB for
+  this), then deleted; full suite (342 tests), Pint, and `phpstan --memory-limit=1G` all clean.
 
 M6 is additive: it introduces one new right, two new tables, and one new tender-detail tab; it
 does not touch `Tender::changeStatusTo()`, the M5 approval chain, or any existing transition

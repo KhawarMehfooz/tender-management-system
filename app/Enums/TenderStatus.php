@@ -42,7 +42,7 @@ enum TenderStatus: string implements HasLabel
     }
 
     /**
-     * Allowed next statuses per idea.md's 8-phase workflow: the 7 active phases progress
+     * Allowed next statuses in the 8-phase workflow: the 7 active phases progress
      * linearly (no skipping, no going back), and cancelled/not-evaluated/excluded can end
      * the tender from any active phase. Won/lost only make sense once a bid has actually
      * been submitted, so they're only reachable from submission/follow-up. Terminal states

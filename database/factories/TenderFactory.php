@@ -53,10 +53,9 @@ class TenderFactory extends Factory
     }
 
     /**
-     * Every tender gets a SUBMISSION deadline by default, matching idea.md M3's "submission
-     * deadline always visible" requirement — submission_deadline was a required Tender column
-     * before it moved into tender_deadlines, and this preserves that guarantee for factory-made
-     * tenders.
+     * Every tender gets a SUBMISSION deadline by default, since it must always be visible —
+     * submission_deadline was a required Tender column before it moved into tender_deadlines,
+     * and this preserves that guarantee for factory-made tenders.
      */
     public function configure(): static
     {

@@ -40,7 +40,7 @@ class TaskResource extends Resource
     /**
      * Tasks are never hard-deleted, per the project's default no-hard-delete stance
      * (.ai/rules/data-integrity.md) — there's no admin escape hatch for junk tasks the
-     * way Tender has one, since idea.md doesn't call for one.
+     * way Tender has one.
      */
     public static function canDelete(Model $record): bool
     {

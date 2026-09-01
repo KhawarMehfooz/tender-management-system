@@ -321,8 +321,7 @@ class Tender extends Model
     }
 
     /**
-     * The tender's canonical submission deadline, matching idea.md M3's "submission deadline
-     * always visible" requirement.
+     * The tender's canonical submission deadline, which must always be visible.
      */
     public function submissionDeadline(): ?TenderDeadline
     {
@@ -380,7 +379,7 @@ class Tender extends Model
 
     /**
      * Move the tender to a new status, enforcing the allowed-transitions map in
-     * TenderStatus and recording an audit entry (who, when, from/to) per idea.md M1.
+     * TenderStatus and recording an audit entry (who, when, from/to).
      */
     public function changeStatusTo(TenderStatus $newStatus, User $actor, ?string $reason = null): void
     {
@@ -414,8 +413,8 @@ class Tender extends Model
 
     /**
      * Lock every document that already exists on the tender at the moment it reaches
-     * SUBMISSION (idea.md M4: "once a tender is submitted, its final submission version is
-     * locked/immutable"). Documents created afterwards (e.g. Result, Post-analysis in later
+     * SUBMISSION — once a tender is submitted, its final submission version is
+     * locked/immutable. Documents created afterwards (e.g. Result, Post-analysis in later
      * milestones) are untouched — they're new documents, not edits to already-submitted ones.
      * Already-locked documents are left alone (no re-stamping locked_at/locked_by).
      */
@@ -426,7 +425,7 @@ class Tender extends Model
 
     /**
      * Whether every task on this tender is done — gates the SUBMISSION transition in
-     * changeStatusTo() per idea.md M2's "final submission is gated" rule.
+     * changeStatusTo() per the "final submission is gated" rule.
      */
     public function tasksComplete(): bool
     {
@@ -439,9 +438,9 @@ class Tender extends Model
     }
 
     /**
-     * Archive the tender (idea.md M1: tenders are never hard-deleted, only
-     * archived or flagged invalid). Distinct from TenderStatus: a tender can
-     * be archived from any status, including a terminal one like `won`.
+     * Archive the tender. Tenders are never hard-deleted, only archived or
+     * flagged invalid. Distinct from TenderStatus: a tender can be archived
+     * from any status, including a terminal one like `won`.
      */
     public function archive(User $actor): void
     {
@@ -462,8 +461,8 @@ class Tender extends Model
     }
 
     /**
-     * Flag the tender invalid (idea.md M1: an alternative to hard-delete for
-     * junk/mistaken entries, preserving the record rather than removing it).
+     * Flag the tender invalid — an alternative to hard-delete for
+     * junk/mistaken entries, preserving the record rather than removing it.
      */
     public function markInvalid(User $actor, string $reason): void
     {
@@ -484,8 +483,8 @@ class Tender extends Model
     }
 
     /**
-     * Permanently remove the tender. Per idea.md M1 this is an admin-only
-     * escape hatch for true junk entries — every call must be logged with
+     * Permanently remove the tender. This is an admin-only escape hatch for
+     * true junk entries — every call must be logged with
      * who/when/why before the row disappears, via a TenderHardDeletion
      * snapshot (which carries no FK back to `tenders`, since the row it
      * describes won't exist once this method returns).

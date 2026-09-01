@@ -12,7 +12,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Escalation level 1 (idea.md M3): notify the task's owner once it's overdue.
+ * Escalation level 1: notify the task's owner once it's overdue.
  */
 class TaskEscalatedToAssigneeNotification extends Notification implements ShouldQueue
 {

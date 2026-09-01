@@ -12,7 +12,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Escalation level 3 (idea.md M3): add the administrator when a critical (urgent-priority)
+ * Escalation level 3: add the administrator when a critical (urgent-priority)
  * task is still open with less than 48 hours left before its tender's submission deadline.
  * Recipients are every RoleName::SUPER_ADMIN user — this app has no distinct "administrator"
  * role, see [[milestones]].

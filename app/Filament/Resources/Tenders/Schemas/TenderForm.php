@@ -29,7 +29,7 @@ class TenderForm
 {
     /**
      * Only team leads, department heads, and super admins may assign the owner or
-     * team members (idea.md M2) — everyone else sees the Team step read-only.
+     * team members — everyone else sees the Team step read-only.
      */
     public static function canManageTeam(): bool
     {

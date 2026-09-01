@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * CALCULATION-category documents are the only category gated behind the see-prices right
- * (idea.md's explicit example, mirrored from TenderInfolist's price fields) — every other
+ * (mirrored from TenderInfolist's price fields) — every other
  * category is visible to anyone with tender access. Upload/new-version is gated on
  * Tender::linkedToDocuments() (owner or tender_team_members row) or
  * TenderForm::canManageTeam() (team lead/department head/super admin); delete is

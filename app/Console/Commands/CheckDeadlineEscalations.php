@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
 /**
- * Implements idea.md M3's 4 escalation levels. Escalation state is one-directional (the
+ * Implements the 4 escalation levels. Escalation state is one-directional (the
  * highest level reached so far, per [[deadlines]]) — Task.escalation_level only ever holds
  * ASSIGNEE/TEAM_LEAD (levels 1-2, task-overdue), TenderDeadline.escalation_level on the
  * tender's canonical SUBMISSION row only ever holds ADMINISTRATOR/MANAGEMENT (levels 3-4,
@@ -29,7 +29,7 @@ use Spatie\Permission\Models\Role;
  * resets it (no reset path exists yet, matching the "not yet built" scope of this task).
  */
 #[Signature('tenders:check-deadline-escalations')]
-#[Description('Escalates overdue tasks and critical tenders nearing their submission deadline (idea.md M3).')]
+#[Description('Escalates overdue tasks and critical tenders nearing their submission deadline.')]
 class CheckDeadlineEscalations extends Command
 {
     public function handle(): int

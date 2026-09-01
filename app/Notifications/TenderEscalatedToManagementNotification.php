@@ -12,10 +12,10 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Escalation level 4 (idea.md M3): raise a management alert when less than 24 hours remain
+ * Escalation level 4: raise a management alert when less than 24 hours remain
  * before a tender's submission deadline with critical (urgent-priority) items still open.
- * Tender-wide rather than per-task, since idea.md phrases this level as "critical items"
- * (plural), unlike level 3's single-task wording. Recipients are every RoleName::SUPER_ADMIN
+ * Tender-wide rather than per-task, phrased as "critical items" (plural), unlike
+ * level 3's single-task wording. Recipients are every RoleName::SUPER_ADMIN
  * user — this app has no distinct "management" role, see [[milestones]].
  */
 class TenderEscalatedToManagementNotification extends Notification implements ShouldQueue

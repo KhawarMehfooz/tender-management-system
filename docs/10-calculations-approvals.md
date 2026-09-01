@@ -1,6 +1,6 @@
 # Calculations & Approvals
 
-_Last updated: 29/08/2026_
+_Last updated: 01/09/2026_
 
 Every tender needs a priced calculation before it can be submitted. This page covers entering a calculation, comparing versions, understanding the results, and the 6-step approval chain that has to complete before the tender can reach the **submission** stage.
 
@@ -70,3 +70,4 @@ A tender can't move from **quality** to **submission** until its current calcula
 - [Managing tenders](03-managing-tenders.md), covering the tender lifecycle and the submission stage this chain gates.
 - [Team assignment](04-team-assignment.md), covering the functional roles that approve steps 1 through 5 of the chain.
 - [Administration](08-administration.md), covering how a service category's pricing model and cost-driver fields are configured.
+- [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering how a calculation's actual margin feeds the participation score.

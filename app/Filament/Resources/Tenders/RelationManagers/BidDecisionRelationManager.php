@@ -12,18 +12,20 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\EmbeddedTable;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 
 /**
- * The decision history is append-only (idea.md's "edits create a new logged entry, not a
- * silent overwrite") — no edit/delete row actions. Both header actions are gated behind the
- * new Right::MAKE_BID_DECISION, independent of role or team membership, unlike
+ * The decision history is append-only — edits create a new logged entry, not a
+ * silent overwrite — so there are no edit/delete row actions. Both header actions
+ * are gated behind the new Right::MAKE_BID_DECISION, independent of role or team membership, unlike
  * DocumentsRelationManager/CalculationsRelationManager's team-linkage checks. The read-only
  * score summary above the table is visible to anyone with tender access, same as
  * CalculationsRelationManager's approval-chain section — only the two record-mutating actions
@@ -61,19 +63,36 @@ class BidDecisionRelationManager extends RelationManager
     }
 
     /**
-     * @return array<int, Select>
+     * @var array<string, Heroicon>
+     */
+    private const RATING_FIELD_ICONS = [
+        'distance_rating' => Heroicon::OutlinedMapPin,
+        'staffing_requirement_rating' => Heroicon::OutlinedUserGroup,
+        'wage_qualification_rating' => Heroicon::OutlinedAcademicCap,
+        'reference_position_rating' => Heroicon::OutlinedTrophy,
+        'competitive_intensity_rating' => Heroicon::OutlinedFire,
+        'contractual_penalties_rating' => Heroicon::OutlinedScale,
+        'strategic_value_rating' => Heroicon::OutlinedStar,
+    ];
+
+    /**
+     * @return array<int, Grid>
      */
     private function ratingSelects(): array
     {
         $options = array_combine(range(1, 5), array_map(strval(...), range(1, 5)));
 
-        return array_map(
-            fn (string $field): Select => Select::make($field)
-                ->label(__('tender_participation_scores.factors.'.$field))
-                ->options($options)
-                ->native(false),
-            TenderParticipationScore::MANUAL_RATING_FIELDS,
-        );
+        return [
+            Grid::make(2)
+                ->schema(array_map(
+                    fn (string $field): Select => Select::make($field)
+                        ->label(__('tender_participation_scores.factors.'.$field))
+                        ->options($options)
+                        ->prefixIcon(self::RATING_FIELD_ICONS[$field])
+                        ->native(false),
+                    TenderParticipationScore::MANUAL_RATING_FIELDS,
+                )),
+        ];
     }
 
     public function content(Schema $schema): Schema
@@ -142,19 +161,24 @@ class BidDecisionRelationManager extends RelationManager
                     ->visible(fn (): bool => $this->canMakeBidDecision())
                     ->before(fn () => abort_unless($this->canMakeBidDecision(), 403))
                     ->schema([
-                        Select::make('decision')
-                            ->label(__('tender_bid_decisions.fields.decision'))
-                            ->options(BidDecision::class)
-                            ->required()
-                            ->live(),
-                        Textarea::make('reason')
-                            ->label(__('tender_bid_decisions.fields.reason'))
-                            ->rows(3)
-                            ->required(function (Get $get): bool {
-                                $decision = $get('decision');
+                        Grid::make(2)
+                            ->schema([
+                                Select::make('decision')
+                                    ->label(__('tender_bid_decisions.fields.decision'))
+                                    ->options(BidDecision::class)
+                                    ->prefixIcon(Heroicon::OutlinedCheckBadge)
+                                    ->required()
+                                    ->live(),
+                                Textarea::make('reason')
+                                    ->label(__('tender_bid_decisions.fields.reason'))
+                                    ->rows(3)
+                                    ->columnSpanFull()
+                                    ->required(function (Get $get): bool {
+                                        $decision = $get('decision');
 
-                                return ($decision instanceof BidDecision ? $decision->value : $decision) === BidDecision::NO_BID->value;
-                            }),
+                                        return ($decision instanceof BidDecision ? $decision->value : $decision) === BidDecision::NO_BID->value;
+                                    }),
+                            ]),
                     ])
                     ->action(function (array $data): void {
                         /** @var Tender $tender */

@@ -7,12 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
 
 /**
- * Restricts a category-scoped query to the acting user's own service category
- * (idea.md M1: "category-level views stay scoped"). A user with no
- * `service_category_id` (e.g. the seeded super admin) is management-level and
- * spans all categories, so the scope is a no-op for them — this mirrors the
- * nullable FK already on `users.service_category_id`. No-ops entirely outside
- * a web-authenticated request (console commands, seeders, queued jobs).
+ * Restricts a category-scoped query to the acting user's own service category —
+ * category-level views stay scoped. A user with no `service_category_id` (e.g.
+ * the seeded super admin) is management-level and spans all categories, so the
+ * scope is a no-op for them — this mirrors the nullable FK already on
+ * `users.service_category_id`. No-ops entirely outside a web-authenticated
+ * request (console commands, seeders, queued jobs).
  */
 class ServiceCategoryScope implements Scope
 {

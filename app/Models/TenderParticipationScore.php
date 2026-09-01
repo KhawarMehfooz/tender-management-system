@@ -39,8 +39,8 @@ class TenderParticipationScore extends Model
     use HasFactory, HasUuids;
 
     /**
-     * The 7 manually-rated factors (idea.md's remaining participation-score factors that have
-     * no other data source yet). Each is 1-5, validated in the form as well as here.
+     * The 7 manually-rated participation-score factors that have no other data source yet.
+     * Each is 1-5, validated in the form as well as here.
      *
      * @var list<string>
      */

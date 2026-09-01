@@ -11,9 +11,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * Immutable audit record for a hard-deleted tender (idea.md M1: "every hard
- * delete is logged with a reason"). `tender_id` intentionally carries no
- * foreign key — the referenced row is gone by the time this log is read, so
+ * Immutable audit record for a hard-deleted tender — every hard delete is
+ * logged with a reason. `tender_id` intentionally carries no foreign key —
+ * the referenced row is gone by the time this log is read, so
  * `internal_id`/`title` are snapshotted here for identification.
  *
  * @property string $id

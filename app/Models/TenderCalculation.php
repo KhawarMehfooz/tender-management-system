@@ -100,7 +100,7 @@ class TenderCalculation extends Model
     }
 
     /**
-     * Approves one step of the 6-step chain (idea.md M5). Steps must be approved in order —
+     * Approves one step of the 6-step chain. Steps must be approved in order —
      * a step cannot be approved while any earlier step in CalculationApprovalStep's declared
      * order is still unapproved, regardless of the acting user's rights for later steps.
      * Gated by the matching tender_team_members functional role for every step except

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\BidDecision;
 use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
 use App\Enums\DeadlineType;
@@ -14,8 +15,10 @@ use App\Enums\TenderStatus;
 use App\Models\ServiceCategory;
 use App\Models\Task;
 use App\Models\Tender;
+use App\Models\TenderBidDecision;
 use App\Models\TenderCalculation;
 use App\Models\TenderDocument;
+use App\Models\TenderParticipationScore;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -231,6 +234,11 @@ class DemoDataSeeder extends Seeder
             );
         }
 
+        // Informational only — independent of tender status. Placed after the calculation above
+        // since the expected-margin factor reads the tender's current calculation, so it demos a
+        // real derived value rather than the lowest bucket every time.
+        $this->createBidDecision($tender, $team, $owner, $variant);
+
         $this->advanceTender($tender, $status, $owner, $variant);
 
         if ($reachesSubmission) {
@@ -329,6 +337,43 @@ class DemoDataSeeder extends Seeder
 
             $calculation->approve($step, $actor, fake()->optional(0.4)->sentence());
         }
+    }
+
+    /**
+     * Seeds the participation score and, for 2 of every 3 tenders, a recorded bid decision.
+     * The 3rd (variant 2) is left with only a partial score and no decision at all, to demo
+     * the "incomplete" summary and the empty decision history state.
+     *
+     * @param  Collection<int, User>  $team
+     */
+    private function createBidDecision(Tender $tender, Collection $team, User $owner, int $variant): void
+    {
+        if ($variant === 2) {
+            $partialFields = collect(TenderParticipationScore::MANUAL_RATING_FIELDS)->shuffle()->take(3);
+
+            TenderParticipationScore::factory()->for($tender)->create(
+                $partialFields->mapWithKeys(fn (string $field): array => [$field => fake()->numberBetween(1, 5)])->all(),
+            );
+
+            return;
+        }
+
+        $score = TenderParticipationScore::factory()->for($tender)->create(
+            collect(TenderParticipationScore::MANUAL_RATING_FIELDS)
+                ->mapWithKeys(fn (string $field): array => [$field => fake()->numberBetween(1, 5)])
+                ->all(),
+        );
+
+        $decisionMaker = $team->first(fn (User $user): bool => $user->can(Right::MAKE_BID_DECISION->value)) ?? $owner;
+
+        TenderBidDecision::create([
+            'tender_id' => $tender->id,
+            'decision' => $variant === 1 ? BidDecision::NO_BID : BidDecision::BID,
+            'reason' => $variant === 1 ? fake()->sentence(fake()->numberBetween(8, 15)) : null,
+            'score' => $score->score(),
+            'decided_by' => $decisionMaker->id,
+            'decided_at' => fake()->dateTimeBetween('-2 months', 'now'),
+        ]);
     }
 
     private function advanceTender(Tender $tender, TenderStatus $target, User $actor, int $variant): void

@@ -1,6 +1,6 @@
 # Administration
 
-_Last updated: 29/08/2026_
+_Last updated: 01/09/2026_
 
 This page covers the parts of TMS reserved for administrators: managing user accounts, adjusting roles and rights, maintaining the reference data the rest of the system runs on, and removing genuine junk entries.
 
@@ -58,3 +58,4 @@ This is reserved for true mistakes. A tender that's simply no longer active shou
 ## Where to go next
 
 - [Tender Documents](09-tender-documents.md), covering each tender's own versioned document library, separate from the reference data covered above.
+- [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering the right to make bid decisions, one of the individually grantable rights managed on the roles and rights page above.

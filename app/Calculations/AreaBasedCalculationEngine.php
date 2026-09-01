@@ -8,9 +8,9 @@ use App\Calculations\Concerns\ExtractsCostDriverInputs;
  * Cost-driver fields expected in input_values: area, labour_hours, wage_rate,
  * machines_consumables_cost, target_margin_pct, min_margin_pct, risk_surcharge_pct.
  *
- * performance_rate is a category-configurable field for this model too (idea.md lists it
- * alongside area/labour hours/machines), but it's informational only here — labour_hours is
- * entered directly rather than derived from area / performance_rate.
+ * performance_rate is a category-configurable field for this model too, but it's
+ * informational only here — labour_hours is entered directly rather than derived
+ * from area / performance_rate.
  */
 class AreaBasedCalculationEngine implements CalculationEngine
 {
