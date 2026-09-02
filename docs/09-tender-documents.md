@@ -1,12 +1,14 @@
 # Tender Documents
 
-_Last updated: 29/08/2026_
+_Last updated: 02/09/2026_
 
 Every tender has its own document library, separate from the file attachments you can add to individual tasks (covered in [Collaboration](06-collaboration.md)). It's where the tender's actual paperwork lives, such as the tender documents themselves, the calculation, concepts, evidence documents, and everything else that builds up as a bid moves toward submission.
 
 ## Categories
 
 Each document belongs to one of 11 categories: tender documents, calculation, concepts, evidence documents, references, bidder questions, communication, site visit, final bid documents, result, and post-analysis. Grouping by category keeps a tender's growing pile of files organized without you having to invent your own naming scheme.
+
+The **references** and **concepts** categories here are just filing spots for whatever bid-specific files land in them; they're separate from the company-wide reference and concept-block libraries described in [References, Certificates & Concept Library](12-references-certificates-concepts.md), which are reusable across many tenders and linked in from the tender's own Reference Library tab.
 
 Open a tender and go to its **Documents** tab to see the full library, grouped by category, with a filter to narrow it down to one category at a time.
 

@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Enums\BidDecision;
 use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
+use App\Enums\CertificateType;
+use App\Enums\ConceptBlockCategory;
 use App\Enums\DeadlineType;
 use App\Enums\DocumentCategory;
 use App\Enums\Right;
@@ -12,6 +14,9 @@ use App\Enums\RoleName;
 use App\Enums\TaskStatus;
 use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
+use App\Models\Certificate;
+use App\Models\ConceptBlock;
+use App\Models\Reference;
 use App\Models\ServiceCategory;
 use App\Models\Task;
 use App\Models\Tender;
@@ -63,6 +68,15 @@ class DemoDataSeeder extends Seeder
     /** @var array<string, Collection<int, User>> role-value => users */
     private array $usersByRole = [];
 
+    /** @var Collection<int, Reference> the company-wide reference library, seeded once before any tender */
+    private Collection $references;
+
+    /** @var Collection<int, Certificate> the company-wide certificate library, seeded once before any tender */
+    private Collection $certificates;
+
+    /** @var Collection<int, ConceptBlock> the company-wide concept library, seeded once before any tender */
+    private Collection $conceptBlocks;
+
     public function run(): void
     {
         // DatabaseSeeder wraps every seeder call in Model::withoutEvents(), which mutes
@@ -75,6 +89,13 @@ class DemoDataSeeder extends Seeder
         $this->categories = ServiceCategory::query()->orderBy('code')->get();
 
         $this->createUsers();
+
+        // The three M7 libraries are company-wide, not per-tender, so they're seeded once
+        // up front (mirrors ServiceCategory/Sector reference-data seeding) and then a slice of
+        // each is linked to individual tenders below via attachLibraryRecords().
+        $this->references = $this->createReferenceLibrary();
+        $this->certificates = $this->createCertificateLibrary();
+        $this->conceptBlocks = $this->createConceptLibrary();
 
         foreach (TenderStatus::cases() as $status) {
             for ($i = 0; $i < 3; $i++) {
@@ -238,6 +259,10 @@ class DemoDataSeeder extends Seeder
         // since the expected-margin factor reads the tender's current calculation, so it demos a
         // real derived value rather than the lowest bucket every time.
         $this->createBidDecision($tender, $team, $owner, $variant);
+
+        // Also informational only, independent of tender status — links a slice of the
+        // company-wide libraries seeded in run() to this tender's Reference Library tab.
+        $this->attachLibraryRecords($tender);
 
         $this->advanceTender($tender, $status, $owner, $variant);
 
@@ -553,5 +578,139 @@ class DemoDataSeeder extends Seeder
             'mime_type' => 'text/plain',
             'size' => strlen($content),
         ]);
+    }
+
+    /**
+     * A user to attribute a library record (reference/certificate/concept block/version) to —
+     * these are company-wide, not scoped to one tender's team, so any seeded user will do.
+     */
+    private function randomLibraryAuthor(): User
+    {
+        return collect($this->usersByRole)->flatten()->random();
+    }
+
+    /**
+     * @return Collection<int, Reference>
+     */
+    private function createReferenceLibrary(): Collection
+    {
+        return collect(range(1, 12))->map(function (): Reference {
+            $category = $this->categories->random();
+            $author = $this->randomLibraryAuthor();
+
+            $factory = Reference::factory()->state([
+                'service_category_id' => $category->id,
+                'created_by' => $author->id,
+            ]);
+
+            // A minority are seeded with the volume-unknown toggle, to demo that state too.
+            $reference = fake()->boolean(20) ? $factory->volumeUnknown()->create() : $factory->create();
+
+            foreach (range(1, fake()->numberBetween(1, 2)) as $ignored) {
+                $this->createReferenceAttachment($reference, $this->randomLibraryAuthor());
+            }
+
+            return $reference;
+        });
+    }
+
+    private function createReferenceAttachment(Reference $reference, User $uploader): void
+    {
+        $filename = fake()->slug(3).'.txt';
+        $path = 'reference-attachments/'.fake()->uuid().'.txt';
+        $content = fake()->paragraphs(fake()->numberBetween(1, 3), true);
+
+        Storage::disk('local')->put($path, $content);
+
+        $reference->attachments()->create([
+            'uploaded_by' => $uploader->id,
+            'file_path' => $path,
+            'original_filename' => $filename,
+            'mime_type' => 'text/plain',
+            'size' => strlen($content),
+        ]);
+    }
+
+    /**
+     * One certificate per CertificateType, with a mix of valid/expiring-soon/expired statuses
+     * and a majority carrying an uploaded file, so the status badge and file column both show
+     * real variety in screenshots.
+     *
+     * @return Collection<int, Certificate>
+     */
+    private function createCertificateLibrary(): Collection
+    {
+        return collect(CertificateType::cases())->map(function (CertificateType $type): Certificate {
+            $factory = Certificate::factory()->state([
+                'type' => $type,
+                'created_by' => $this->randomLibraryAuthor()->id,
+            ]);
+
+            $factory = match (fake()->randomElement(['valid', 'valid', 'expiringSoon', 'expired'])) {
+                'expiringSoon' => $factory->expiringSoon(),
+                'expired' => $factory->expired(),
+                default => $factory,
+            };
+
+            if (fake()->boolean(60)) {
+                $factory = $factory->withFile();
+            }
+
+            return $factory->create();
+        });
+    }
+
+    /**
+     * One block per ConceptBlockCategory, each starting at version 1; a minority get 1-2 extra
+     * versions to demo the version history tab, mirroring createDocuments()'s same
+     * minority-gets-multiple-versions pattern.
+     *
+     * @return Collection<int, ConceptBlock>
+     */
+    private function createConceptLibrary(): Collection
+    {
+        return collect(ConceptBlockCategory::cases())->map(function (ConceptBlockCategory $category): ConceptBlock {
+            $block = ConceptBlock::factory()->create([
+                'category' => $category,
+                'created_by' => $this->randomLibraryAuthor()->id,
+            ]);
+
+            $versionCount = fake()->boolean(35) ? fake()->numberBetween(2, 3) : 1;
+
+            for ($version = 1; $version <= $versionCount; $version++) {
+                $block->versions()->create([
+                    'version_number' => $version,
+                    'content' => fake()->paragraphs(fake()->numberBetween(2, 4), true),
+                    'created_by' => $this->randomLibraryAuthor()->id,
+                ]);
+            }
+
+            return $block;
+        });
+    }
+
+    /**
+     * Links a slice of the company-wide libraries to this tender's Reference Library tab.
+     * Concept blocks pin currentVersion() at attach time, mirroring
+     * ConceptBlocksRelationManager's real attach behavior (see [[milestones]]'s M7 file) —
+     * editing the block afterward must not change what this tender is recorded as having used.
+     */
+    private function attachLibraryRecords(Tender $tender): void
+    {
+        $tender->bidReferences()->attach(
+            $this->references->random(fake()->numberBetween(1, 3))->pluck('id')->all(),
+        );
+
+        if (fake()->boolean(70)) {
+            $tender->certificates()->attach(
+                $this->certificates->random(fake()->numberBetween(1, 2))->pluck('id')->all(),
+            );
+        }
+
+        $this->conceptBlocks->random(fake()->numberBetween(1, 2))->each(
+            fn (ConceptBlock $block) => $tender->conceptBlocks()->attach($block->id, [
+                'concept_block_version_id' => $block->currentVersion?->id,
+            ])
+        );
     }
 }

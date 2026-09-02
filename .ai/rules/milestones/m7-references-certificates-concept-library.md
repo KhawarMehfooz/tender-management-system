@@ -277,14 +277,22 @@ Planned tasks for M7:
   pre-existing errors, same count/files as the prior task, none in anything touched here). Same
   migration-filename-ordering workaround as task 4 needed again: renamed the three new pivot
   migrations from container-clock-generated `2026_09_01_...` to `2026_09_02_1200{00,01,02}_...`.
-- [ ] Docs: new standalone page `docs/12-references-certificates-concepts.md` (mirrors how
+- [x] Docs: new standalone page `docs/12-references-certificates-concepts.md` (mirrors how
   09/10/11 were added as milestones landed) covering the three library resources, certificate
   expiry reminders and who receives them, concept block versioning, and attaching library
-  records to a tender (including the frozen-version-on-attach behavior). Cross-linked from
-  `03-managing-tenders.md` and `08-administration.md` (new nav group, new right); all touched
-  pages' timestamps bumped per [[docs]]'s sync rule.
+  records to a tender (including the frozen-version-on-attach behavior, called out as its own
+  subsection per explicit user emphasis). Audience is a general user/admin mix mirroring 10/11's
+  approach; screenshot placeholders use the standard `<!-- screenshot: ... -->` HTML-comment
+  convention. Cross-linked from `03-managing-tenders.md` (new "Where to go next" entry) and
+  `08-administration.md` (a new paragraph under "Roles and rights" calling out
+  `Right::MANAGE_CERTIFICATES` by name alongside the existing bid-decision-right callout, plus a
+  "Where to go next" entry) as the milestone task specified; also added a short disambiguating
+  note in `09-tender-documents.md` (its existing `references`/`concepts` *document categories*
+  are easily confused with these new company-wide *libraries* — flagged inline rather than left
+  for a reader to trip over) since that page directly names both terms. All four touched pages'
+  `_Last updated` timestamps bumped to 02/09/2026 per [[docs]]'s sync rule.
 
-M7 is additive: three new top-level resources, one new right, one new scheduled command, three
-new tender-tender pivots/relation managers. It does not touch `Tender::changeStatusTo()` or any
-existing transition guard — idea.md's acceptance points for M7 are CRUD/reminders/versioning
-only, no status-gating requirement.
+M7 is now complete: three new top-level resources, one new right, one new scheduled command,
+three new tender-tender pivots/relation managers, and customer documentation. It does not touch
+`Tender::changeStatusTo()` or any existing transition guard — idea.md's acceptance points for M7
+are CRUD/reminders/versioning only, no status-gating requirement.

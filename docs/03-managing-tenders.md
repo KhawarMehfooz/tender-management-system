@@ -1,6 +1,6 @@
 # Managing Tenders
 
-_Last updated: 01/09/2026_
+_Last updated: 02/09/2026_
 
 ## Creating a tender
 
@@ -97,3 +97,4 @@ In rare cases, such as a tender created by mistake with no real data attached to
 - [Tender Documents](09-tender-documents.md), covering each tender's versioned document library.
 - [Calculations & Approvals](10-calculations-approvals.md), covering pricing calculations and the 6-step approval chain that gates final submission.
 - [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering the participation score and recording a decision to pursue a tender or not.
+- [References, Certificates & Concept Library](12-references-certificates-concepts.md), covering the tender's Reference Library tab, where company-wide references, certificates, and concept blocks are linked to a specific bid.

@@ -1,6 +1,6 @@
 # Administration
 
-_Last updated: 01/09/2026_
+_Last updated: 02/09/2026_
 
 This page covers the parts of TMS reserved for administrators: managing user accounts, adjusting roles and rights, maintaining the reference data the rest of the system runs on, and removing genuine junk entries.
 
@@ -27,6 +27,8 @@ The full role and rights matrix, covering which role has which rights by default
 
 ![The Roles & Permissions page, showing the role/right toggle grid](screenshots/roles-and-permissions.jpg)
 *The roles and rights matrix.*
+
+Two rights worth calling out individually because they gate a specific, self-contained area rather than everyday tender work: the right to make bid decisions, covered in [Bid / No-Bid Decision](11-bid-no-bid-decision.md), and the right to manage certificates, covered in [References, Certificates & Concept Library](12-references-certificates-concepts.md), which gates the entire certificate library including just viewing it, since a lapsed certificate can disqualify a bid outright. By default, super admins and department heads hold the certificates right; team leads, calculation, and staff roles don't, though this is adjustable per role like any other right.
 
 ## Reference data
 
@@ -59,3 +61,4 @@ This is reserved for true mistakes. A tender that's simply no longer active shou
 
 - [Tender Documents](09-tender-documents.md), covering each tender's own versioned document library, separate from the reference data covered above.
 - [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering the right to make bid decisions, one of the individually grantable rights managed on the roles and rights page above.
+- [References, Certificates & Concept Library](12-references-certificates-concepts.md), covering the right to manage certificates and the three company-wide libraries.
