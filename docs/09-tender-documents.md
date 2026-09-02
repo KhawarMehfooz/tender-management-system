@@ -53,3 +53,4 @@ Documents you add *after* the tender has already reached submission, for example
 
 - [Calculations & Approvals](10-calculations-approvals.md), covering pricing calculations and the 6-step approval chain that gates final submission. The **calculation** document category above is for supporting pricing documents, separate from the structured calculation covered there.
 - [Communication, Site Visits, Submission & Follow-up](13-communication-site-visits-submission.md), covering the structured communication log and document requests, separate from this page's **communication** and **site visit** document categories, which are for attaching actual files.
+- [Result & Lessons Learned](14-result-lessons-learned.md), covering the structured Result record and lessons-learned retrospective, separate from this page's **result** and **post-analysis** document categories, which are for attaching actual files.

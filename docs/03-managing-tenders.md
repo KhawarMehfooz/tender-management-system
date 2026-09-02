@@ -99,3 +99,4 @@ In rare cases, such as a tender created by mistake with no real data attached to
 - [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering the participation score and recording a decision to pursue a tender or not.
 - [References, Certificates & Concept Library](12-references-certificates-concepts.md), covering the tender's Reference Library tab, where company-wide references, certificates, and concept blocks are linked to a specific bid.
 - [Communication, Site Visits, Submission & Follow-up](13-communication-site-visits-submission.md), covering the tender's communication log, site visits, submission record, follow-up tracking, and document requests.
+- [Result & Lessons Learned](14-result-lessons-learned.md), covering recording the outcome and a retrospective once a tender reaches one of its terminal statuses.

@@ -2,7 +2,7 @@
 
 Full spec: [idea.md](../../../idea.md)'s M9 section. Index: [../milestones.md](../milestones.md).
 
-**M9 — Result & Lessons Learned is now in progress**, started 2026-09-02.
+**M9 — Result & Lessons Learned is complete**, started and finished 2026-09-02.
 
 Design decisions confirmed with the user before any code was written:
 - **Win/loss reasons are multi-select**, not a single primary reason — idea.md's 12-category
@@ -176,12 +176,17 @@ Planned tasks for M9:
   `record-rule`, glob `app/Filament/Resources/Tenders/TenderResource.php`) so a future tab
   addition groups instead of letting the top-level count grow unchecked again, and doesn't
   reintroduce icons on these tabs.
-- [ ] Docs: `docs/14-result-lessons-learned.md` (next slot after M8's `docs/13-...`, per
+- [x] Docs: `docs/14-result-lessons-learned.md` (next slot after M8's `docs/13-...`, per
   [[docs]]'s tracker) — covers the Result tab's fields including the `SEE_PRICES` gate on
   price fields and the auto-computed price gap, the multi-select win/loss categorization, the
   Lessons Learned tab's 3 fixed questions and its permanently-retained/no-delete framing, and
-  that both tabs only unlock once the tender reaches a terminal status. Ask the user
-  clarifying questions specific to this page (audience, screenshots) before drafting, per
-  [[docs]]'s standing rule. Cross-linked from `03-managing-tenders.md` (terminal statuses) and
-  `09-tender-documents.md` (distinguishing this structured record from the `RESULT`/
-  `POST_ANALYSIS` document categories). Update `.ai/rules/docs.md`'s tracker checkbox list.
+  that both tabs only unlock once the tender reaches a terminal status. Asked the user
+  clarifying questions per [[docs]]'s standing rule: audience is general/public ("any one,
+  docs are public"), placeholders (no screenshots ready yet), standard treatment (no extra
+  emphasis beyond the pattern set by docs 10/11/13). Cross-linked from `03-managing-tenders.md`
+  (terminal statuses) and `09-tender-documents.md` (distinguishing this structured record from
+  the `RESULT`/`POST_ANALYSIS` document categories) — both already carried today's
+  (02/09/2026) last-updated timestamp so no bump needed. Updated `.ai/rules/docs.md`'s tracker
+  checkbox list. This was the last outstanding M9 task; M9 is now complete — [[milestones]]'s
+  status row should be updated to "Complete" and M10 considered the next not-started
+  milestone.
