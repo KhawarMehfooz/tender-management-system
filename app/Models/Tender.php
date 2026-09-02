@@ -358,6 +358,14 @@ class Tender extends Model
     }
 
     /**
+     * @return HasMany<TenderCompetitor, $this>
+     */
+    public function tenderCompetitors(): HasMany
+    {
+        return $this->hasMany(TenderCompetitor::class);
+    }
+
+    /**
      * Not ofMany() — Postgres can't run MAX() against this app's UUID PKs ([[models]]).
      *
      * @return HasOne<TenderBidDecision, $this>

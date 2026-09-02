@@ -10,6 +10,7 @@ use App\Filament\Resources\Tenders\RelationManagers\BidDecisionRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CalculationsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CertificatesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CommunicationRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\CompetitorsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\ConceptBlocksRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentRequestsRelationManager;
@@ -98,6 +99,7 @@ class TenderResource extends Resource
                 CommunicationRelationManager::class,
                 SiteVisitsRelationManager::class,
                 DocumentRequestsRelationManager::class,
+                CompetitorsRelationManager::class,
             ]),
             RelationGroup::make(__('tenders.relation_groups.closure'), [
                 SubmissionRelationManager::class,

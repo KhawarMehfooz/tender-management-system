@@ -4,6 +4,7 @@ use App\Enums\BidDecision;
 use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
 use App\Enums\CommunicationType;
+use App\Enums\CompetitorOutcome;
 use App\Enums\CostDriverFieldType;
 use App\Enums\DeadlineType;
 use App\Enums\DocumentCategory;
@@ -21,6 +22,7 @@ use App\Filament\Resources\Tenders\RelationManagers\BidDecisionRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CalculationsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CertificatesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CommunicationRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\CompetitorsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\ConceptBlocksRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentRequestsRelationManager;
@@ -34,6 +36,7 @@ use App\Filament\Resources\Tenders\RelationManagers\SubmissionRelationManager;
 use App\Filament\Resources\Tenders\TenderResource;
 use App\Models\Certificate;
 use App\Models\Client;
+use App\Models\Competitor;
 use App\Models\ConceptBlock;
 use App\Models\ConceptBlockVersion;
 use App\Models\ProcurementProcedure;
@@ -46,6 +49,7 @@ use App\Models\Tender;
 use App\Models\TenderBidDecision;
 use App\Models\TenderCalculation;
 use App\Models\TenderCommunication;
+use App\Models\TenderCompetitor;
 use App\Models\TenderDeadline;
 use App\Models\TenderDocument;
 use App\Models\TenderDocumentRequest;
@@ -2237,6 +2241,64 @@ describe('reference library: certificates relation manager', function () {
             ->assertHasNoTableActionErrors();
 
         expect($tender->fresh()->certificates)->toBeEmpty();
+    });
+});
+
+describe('competitors relation manager', function () {
+    it('hides create/edit/delete from a user without the see-competitor-data right', function () {
+        $tender = Tender::factory()->create();
+        $sighting = TenderCompetitor::factory()->create(['tender_id' => $tender->id]);
+
+        Livewire::test(CompetitorsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create')
+            ->assertTableActionHidden('edit', record: $sighting)
+            ->assertTableActionHidden('delete', record: $sighting);
+    });
+
+    it('lets a see-competitor-data right holder record a competitor sighting', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::SEE_COMPETITOR_DATA->value);
+        $tender = Tender::factory()->create();
+        $competitor = Competitor::factory()->create();
+
+        Livewire::test(CompetitorsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('create', data: [
+                'competitor_id' => $competitor->id,
+                'outcome' => CompetitorOutcome::THEY_WON->value,
+                'known_price' => 125000,
+                'notes' => 'Undercut us by roughly 8%.',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $sighting = TenderCompetitor::where('tender_id', $tender->id)->first();
+        expect($sighting)->not->toBeNull();
+        expect($sighting->competitor_id)->toBe($competitor->id);
+        expect($sighting->outcome)->toBe(CompetitorOutcome::THEY_WON);
+    });
+
+    it('lets a see-competitor-data right holder edit and delete a sighting', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->givePermissionTo(Right::SEE_COMPETITOR_DATA->value);
+        $tender = Tender::factory()->create();
+        $sighting = TenderCompetitor::factory()->create([
+            'tender_id' => $tender->id,
+            'outcome' => CompetitorOutcome::UNKNOWN,
+        ]);
+
+        Livewire::test(CompetitorsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('edit', record: $sighting, data: [
+                'competitor_id' => $sighting->competitor_id,
+                'outcome' => CompetitorOutcome::WE_WON->value,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        expect($sighting->fresh()->outcome)->toBe(CompetitorOutcome::WE_WON);
+
+        Livewire::test(CompetitorsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('delete', record: $sighting)
+            ->assertHasNoTableActionErrors();
+
+        expect(TenderCompetitor::find($sighting->id))->toBeNull();
     });
 });
 

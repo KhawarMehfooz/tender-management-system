@@ -1,13 +1,17 @@
 <?php
 
+use App\Enums\CompetitorOutcome;
 use App\Enums\RoleName;
 use App\Filament\Resources\Competitors\Pages\CreateCompetitor;
 use App\Filament\Resources\Competitors\Pages\EditCompetitor;
 use App\Filament\Resources\Competitors\Pages\ListCompetitors;
 use App\Filament\Resources\Competitors\Pages\ViewCompetitor;
 use App\Filament\Resources\Competitors\RelationManagers\PriceEntriesRelationManager;
+use App\Filament\Resources\Competitors\RelationManagers\TendersFacedRelationManager;
 use App\Models\Competitor;
 use App\Models\CompetitorPriceEntry;
+use App\Models\Tender;
+use App\Models\TenderCompetitor;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
@@ -125,6 +129,27 @@ describe('price entries relation manager', function () {
 
         Livewire::test(PriceEntriesRelationManager::class, ['ownerRecord' => $competitor, 'pageClass' => ViewCompetitor::class])
             ->assertTableActionHidden('create');
+    });
+});
+
+describe('tenders faced relation manager', function () {
+    it('lists tenders this competitor was seen on, read-only', function () {
+        $admin = tap(User::factory()->create())->assignRole(RoleName::SUPER_ADMIN);
+        $competitor = Competitor::factory()->create();
+        $tender = Tender::factory()->create();
+        $sighting = TenderCompetitor::factory()->create([
+            'tender_id' => $tender->id,
+            'competitor_id' => $competitor->id,
+            'outcome' => CompetitorOutcome::WE_WON,
+        ]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(TendersFacedRelationManager::class, ['ownerRecord' => $competitor, 'pageClass' => ViewCompetitor::class])
+            ->assertCanSeeTableRecords([$sighting])
+            ->assertTableActionDoesNotExist('create')
+            ->assertTableActionDoesNotExist('edit', record: $sighting)
+            ->assertTableActionDoesNotExist('delete', record: $sighting);
     });
 });
 

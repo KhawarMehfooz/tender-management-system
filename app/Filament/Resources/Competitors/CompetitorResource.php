@@ -8,6 +8,7 @@ use App\Filament\Resources\Competitors\Pages\EditCompetitor;
 use App\Filament\Resources\Competitors\Pages\ListCompetitors;
 use App\Filament\Resources\Competitors\Pages\ViewCompetitor;
 use App\Filament\Resources\Competitors\RelationManagers\PriceEntriesRelationManager;
+use App\Filament\Resources\Competitors\RelationManagers\TendersFacedRelationManager;
 use App\Filament\Resources\Competitors\Schemas\CompetitorForm;
 use App\Filament\Resources\Competitors\Tables\CompetitorsTable;
 use App\Models\Competitor;
@@ -91,6 +92,7 @@ class CompetitorResource extends Resource
     {
         return [
             PriceEntriesRelationManager::class,
+            TendersFacedRelationManager::class,
         ];
     }
 

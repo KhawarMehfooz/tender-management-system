@@ -10,6 +10,7 @@ return [
     'infolist' => [
         'meta_heading' => 'Record history',
     ],
+    'tenders_faced_tab' => 'Tenders faced',
     'fields' => [
         'id' => 'ID',
         'name' => 'Name',
@@ -20,6 +21,7 @@ return [
         'weaknesses' => 'Weaknesses',
         'market_segments' => 'Market segments',
         'internal_notes' => 'Internal notes',
+        'tender' => 'Tender',
         'created_at' => 'Created at',
         'updated_at' => 'Updated at',
     ],

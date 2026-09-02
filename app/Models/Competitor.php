@@ -45,4 +45,12 @@ class Competitor extends Model
     {
         return $this->hasMany(CompetitorPriceEntry::class)->orderByDesc('observed_on');
     }
+
+    /**
+     * @return HasMany<TenderCompetitor, $this>
+     */
+    public function tenderCompetitors(): HasMany
+    {
+        return $this->hasMany(TenderCompetitor::class);
+    }
 }

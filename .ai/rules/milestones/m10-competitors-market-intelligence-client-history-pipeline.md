@@ -185,14 +185,45 @@ Planned tasks for M10:
   findings on `CompetitorResource.php` are the same finding class already present on
   `CertificateResource.php`, confirmed by running phpstan against that file directly; the
   pre-existing Pest-`$this`-typing false positives in the test files are unrelated).
-- [ ] **Task 3 — Tender ↔ Competitor linkage**: new `App\Enums\CompetitorOutcome` (`WE_WON`,
-  `THEY_WON`, `UNKNOWN`, `HasLabel`, SCREAMING_SNAKE_CASE per [[enums]]). Migration
+- [x] **Task 3 — Tender ↔ Competitor linkage**: `App\Enums\CompetitorOutcome` (`WE_WON`,
+  `THEY_WON`, `UNKNOWN`, `HasLabel`, SCREAMING_SNAKE_CASE per [[enums]]; `color()` too —
+  success/danger/gray — matching `DocumentRequestStatus`'s shape). Migration
   `tender_competitors` pivot (UUID PK, `tender_id` FK `cascadeOnDelete`, `competitor_id` FK
   `cascadeOnDelete`, `outcome` string cast to enum, `known_price` nullable decimal(12,2),
-  `notes` nullable text, timestamps). `CompetitorsRelationManager` on `TenderResource`
-  (grouped into the "Engagement" `RelationGroup` per [[filament-resources-tenders]]), gated
-  `Right::SEE_COMPETITOR_DATA`. Reverse read-only "Tenders faced" table on
-  `CompetitorResource`'s view page. Tests added to `TenderResourceTest`/`CompetitorResourceTest`.
+  `notes` nullable text, timestamps). Model `TenderCompetitor` (`tender()`/`competitor()`
+  `BelongsTo`, same "child model with `#[Fillable]`" shape as `TenderTeamMember`/
+  `CompetitorPriceEntry` — deliberately not a `BelongsToMany` pivot, so the extra `outcome`/
+  `known_price`/`notes` columns stay ordinary model attributes rather than pivot-attribute
+  wrangling). `Tender::tenderCompetitors(): HasMany` and `Competitor::tenderCompetitors():
+  HasMany` added (same relation name both sides, since both are just "this side's rows in the
+  linking table" — not a shared name collision, each model only exposes its own).
+
+  `CompetitorsRelationManager` on `TenderResource` (`relationship = 'tenderCompetitors'`,
+  `getTitle()` overridden to `tender_competitors.tab_label` so the tab reads "Competitors"
+  rather than the relation-name-derived default), grouped into the existing "Engagement"
+  `RelationGroup` per [[filament-resources-tenders]]. Gated end-to-end on
+  `Right::SEE_COMPETITOR_DATA` via a private `canManage()` (same shape as
+  `PriceEntriesRelationManager`) applied to create/edit/delete — full CRUD here, unlike
+  `PriceEntriesRelationManager`'s append-only shape, since a competitor sighting is a
+  correctable record with no compliance requirement forcing an audit trail. Reverse read-only
+  `TendersFacedRelationManager` registered on `CompetitorResource` (same `relationship =
+  'tenderCompetitors'`, `getTitle()` → "Tenders faced"): no `form()`, empty
+  `headerActions()`/`recordActions()` — the pivot row is only ever created/edited/deleted from
+  the Tender side, this is purely a mirrored view.
+
+  New lang files `tender_competitors.php` (tab label + field labels) and
+  `competitor_outcomes.php` (enum labels); `competitors.php` gained `tenders_faced_tab` and
+  `fields.tender` keys.
+
+  Tests: `TenderResourceTest`'s new "competitors relation manager" describe block (create/edit/
+  delete hidden without the right, a right-holder can record/edit/delete a sighting) and
+  `CompetitorResourceTest`'s new "tenders faced relation manager" describe block (lists a
+  sighting read-only, no create/edit/delete actions exist at all — `assertTableActionDoesNotExist`,
+  not `assertTableActionHidden`, since the actions aren't registered rather than just gated).
+  487 tests passing (up from 483 — 4 new). Pint clean; `phpstan --memory-limit=1G` clean on
+  every file this task created/edited (the 5 `staticClassAccess.privateMethod` findings on
+  `CompetitorResource.php` are the pre-existing task-2 baseline, unrelated to this task's
+  changes).
 - [ ] **Task 4 — Derived analyses page**: new Filament `Page` (`HasTable`), gated
   `Right::SEE_COMPETITOR_DATA` with explicit `canAccess()`/mount-time `abort_unless` per
   [[pages]]. Table over `Competitor::query()` with computed columns (encounter count from
