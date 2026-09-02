@@ -9,10 +9,15 @@ use App\Filament\Resources\Tenders\Pages\ViewTender;
 use App\Filament\Resources\Tenders\RelationManagers\BidDecisionRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CalculationsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CertificatesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\CommunicationRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\ConceptBlocksRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\DocumentRequestsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\FollowUpRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\ReferencesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\SiteVisitsRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\SubmissionRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\TasksRelationManager;
 use App\Filament\Resources\Tenders\Schemas\TenderForm;
 use App\Filament\Resources\Tenders\Schemas\TenderInfolist;
@@ -87,6 +92,11 @@ class TenderResource extends Resource
             DocumentsRelationManager::class,
             CalculationsRelationManager::class,
             BidDecisionRelationManager::class,
+            CommunicationRelationManager::class,
+            SiteVisitsRelationManager::class,
+            SubmissionRelationManager::class,
+            FollowUpRelationManager::class,
+            DocumentRequestsRelationManager::class,
             RelationGroup::make(__('reference_library.tab_label'), [
                 ReferencesRelationManager::class,
                 CertificatesRelationManager::class,

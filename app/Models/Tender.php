@@ -258,6 +258,46 @@ class Tender extends Model
     }
 
     /**
+     * @return HasMany<TenderCommunication, $this>
+     */
+    public function communications(): HasMany
+    {
+        return $this->hasMany(TenderCommunication::class)->orderByDesc('occurred_at');
+    }
+
+    /**
+     * @return HasMany<TenderSiteVisit, $this>
+     */
+    public function siteVisits(): HasMany
+    {
+        return $this->hasMany(TenderSiteVisit::class)->orderByDesc('visit_date');
+    }
+
+    /**
+     * @return HasOne<TenderSubmission, $this>
+     */
+    public function submission(): HasOne
+    {
+        return $this->hasOne(TenderSubmission::class);
+    }
+
+    /**
+     * @return HasOne<TenderFollowUp, $this>
+     */
+    public function followUp(): HasOne
+    {
+        return $this->hasOne(TenderFollowUp::class);
+    }
+
+    /**
+     * @return HasMany<TenderDocumentRequest, $this>
+     */
+    public function documentRequests(): HasMany
+    {
+        return $this->hasMany(TenderDocumentRequest::class)->orderByDesc('created_at');
+    }
+
+    /**
      * @return HasMany<TenderCalculation, $this>
      */
     public function calculations(): HasMany

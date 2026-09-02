@@ -6,9 +6,11 @@ use App\Enums\BidDecision;
 use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
 use App\Enums\CertificateType;
+use App\Enums\CommunicationType;
 use App\Enums\ConceptBlockCategory;
 use App\Enums\DeadlineType;
 use App\Enums\DocumentCategory;
+use App\Enums\DocumentRequestStatus;
 use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Enums\TaskStatus;
@@ -23,7 +25,10 @@ use App\Models\Tender;
 use App\Models\TenderBidDecision;
 use App\Models\TenderCalculation;
 use App\Models\TenderDocument;
+use App\Models\TenderDocumentRequest;
 use App\Models\TenderParticipationScore;
+use App\Models\TenderSiteVisit;
+use App\Models\TenderSubmission;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -264,10 +269,34 @@ class DemoDataSeeder extends Seeder
         // company-wide libraries seeded in run() to this tender's Reference Library tab.
         $this->attachLibraryRecords($tender);
 
+        // Communication log, site visits, and document requests are informational/independent
+        // of status too, same as the bid decision and library attachments above — a tender can
+        // accumulate these at any phase of its lifecycle. Document requests are created last so
+        // they can optionally link back to one of the communication entries just created.
+        $this->createCommunications($tender, $team);
+        $this->createSiteVisits($tender, $team);
+        $this->createDocumentRequests($tender, $team);
+
         $this->advanceTender($tender, $status, $owner, $variant);
 
         if ($reachesSubmission) {
             $this->createDocuments($tender, $team, [DocumentCategory::RESULT, DocumentCategory::POST_ANALYSIS]);
+
+            // Unlike documents/tasks, the submission record itself is only meaningful once the
+            // tender has actually reached SUBMISSION-or-later, so it's created after the status
+            // walk rather than before it (nothing upstream gates on its existence).
+            $this->createSubmission($tender, $team);
+        }
+
+        // Mirrors advanceTender()'s own branching: FOLLOW_UP is only reached directly (status ===
+        // FOLLOW_UP) or, for WON/LOST, when variant 2 walks through index 6 instead of 5 (see
+        // advanceTender()'s $afterSubmission branch) — every other WON/LOST tender skips FOLLOW_UP
+        // entirely, so it gets no follow-up record either.
+        $reachesFollowUp = $status === TenderStatus::FOLLOW_UP
+            || ($variant === 2 && in_array($status, [TenderStatus::WON, TenderStatus::LOST], true));
+
+        if ($reachesFollowUp) {
+            $this->createFollowUp($tender, $team);
         }
 
         // Edge cases for documentation screenshots: archive/invalidate a slice of the data.
@@ -577,6 +606,194 @@ class DemoDataSeeder extends Seeder
             'original_filename' => $filename,
             'mime_type' => 'text/plain',
             'size' => strlen($content),
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, User>  $team
+     */
+    private function createCommunications(Tender $tender, Collection $team): void
+    {
+        foreach (range(1, fake()->numberBetween(2, 4)) as $ignored) {
+            $tender->communications()->create([
+                'type' => fake()->randomElement(CommunicationType::cases()),
+                'subject' => fake()->sentence(4),
+                'content' => fake()->paragraph(),
+                'contact_person' => fake()->boolean(50) ? fake()->name() : null,
+                'occurred_at' => fake()->dateTimeBetween('-2 months', 'now'),
+                'logged_by' => $team->random()->id,
+            ]);
+        }
+    }
+
+    /**
+     * A minority of tenders get one or two site visits, each with a few photos, to demo both
+     * the empty-tab state and the gallery.
+     *
+     * @param  Collection<int, User>  $team
+     */
+    private function createSiteVisits(Tender $tender, Collection $team): void
+    {
+        foreach (range(1, fake()->numberBetween(0, 2)) as $ignored) {
+            $visit = $tender->siteVisits()->create([
+                'visit_date' => fake()->dateTimeBetween('-2 months', '+1 month'),
+                'attendees' => fake()->name().', '.fake()->name(),
+                'contact_person' => fake()->boolean(50) ? fake()->name() : null,
+                'access_routes' => fake()->boolean(50) ? fake()->sentence() : null,
+                'parking' => fake()->boolean(50) ? fake()->sentence() : null,
+                'areas' => fake()->boolean(50) ? fake()->sentence() : null,
+                'risks' => fake()->boolean(30) ? fake()->sentence() : null,
+                'technical_particularities' => fake()->boolean(30) ? fake()->sentence() : null,
+                'staffing_requirement' => fake()->boolean(30) ? fake()->sentence() : null,
+                'competitors_spotted' => fake()->boolean(30) ? fake()->sentence() : null,
+                'open_questions' => fake()->boolean(30) ? fake()->sentence() : null,
+                'notes' => fake()->boolean(40) ? fake()->paragraph() : null,
+                'created_by' => $team->random()->id,
+            ]);
+
+            foreach (range(1, fake()->numberBetween(0, 3)) as $ignored2) {
+                $this->createSiteVisitPhoto($visit, $team);
+            }
+        }
+    }
+
+    /**
+     * @param  Collection<int, User>  $team
+     */
+    private function createSiteVisitPhoto(TenderSiteVisit $visit, Collection $team): void
+    {
+        $filename = fake()->slug(3).'.txt';
+        $path = 'tender-site-visit-photos/'.fake()->uuid().'.txt';
+        $content = fake()->paragraphs(fake()->numberBetween(1, 2), true);
+
+        Storage::disk('local')->put($path, $content);
+
+        $visit->photos()->create([
+            'uploaded_by' => $team->random()->id,
+            'file_path' => $path,
+            'original_filename' => $filename,
+            'mime_type' => 'text/plain',
+            'size' => strlen($content),
+        ]);
+    }
+
+    /**
+     * A minority of tenders get one to three document requests, in a mix of statuses, to demo
+     * both the empty-tab state and the status-change audit trail. A request is sometimes linked
+     * back to one of the communication entries createCommunications() just created, and
+     * sometimes left standalone, to demo both states of that optional link.
+     *
+     * @param  Collection<int, User>  $team
+     */
+    private function createDocumentRequests(Tender $tender, Collection $team): void
+    {
+        foreach (range(1, fake()->numberBetween(0, 3)) as $ignored) {
+            $communication = fake()->boolean(40) ? $tender->communications()->inRandomOrder()->first() : null;
+
+            $request = $tender->documentRequests()->create([
+                'tender_communication_id' => $communication?->id,
+                'description' => fake()->sentence(8),
+                'owner_id' => $team->random()->id,
+                'deadline' => fake()->boolean(60) ? fake()->dateTimeBetween('now', '+1 month') : null,
+                'status' => DocumentRequestStatus::OPEN,
+                'created_by' => $team->random()->id,
+            ]);
+
+            $targetStatus = fake()->randomElement(DocumentRequestStatus::cases());
+
+            if ($targetStatus !== DocumentRequestStatus::OPEN) {
+                if ($targetStatus !== DocumentRequestStatus::IN_PROGRESS && fake()->boolean(50)) {
+                    $request->changeStatusTo(DocumentRequestStatus::IN_PROGRESS, $team->random());
+                }
+
+                if ($request->status !== $targetStatus) {
+                    $request->changeStatusTo($targetStatus, $team->random(), fake()->boolean(50) ? fake()->sentence() : null);
+                }
+            }
+
+            if ($targetStatus === DocumentRequestStatus::FULFILLED || fake()->boolean(30)) {
+                $this->createDocumentRequestFile($request, $team);
+            }
+        }
+    }
+
+    /**
+     * @param  Collection<int, User>  $team
+     */
+    private function createDocumentRequestFile(TenderDocumentRequest $request, Collection $team): void
+    {
+        $filename = fake()->slug(3).'.txt';
+        $path = 'tender-document-request-files/'.fake()->uuid().'.txt';
+        $content = fake()->paragraphs(fake()->numberBetween(1, 2), true);
+
+        Storage::disk('local')->put($path, $content);
+
+        $request->files()->create([
+            'uploaded_by' => $team->random()->id,
+            'file_path' => $path,
+            'original_filename' => $filename,
+            'mime_type' => 'text/plain',
+            'size' => strlen($content),
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, User>  $team
+     */
+    private function createSubmission(Tender $tender, Collection $team): void
+    {
+        $confirmed = fake()->boolean(70);
+
+        $submission = $tender->submission()->create([
+            'submission_date' => fake()->dateTimeBetween('-6 weeks', '-1 day'),
+            'submission_time' => fake()->time(),
+            'responsible_employee_id' => $team->random()->id,
+            'portal' => fake()->randomElement(['e-Vergabe', 'TED eTendering', 'Subreport', 'Vergabe24']),
+            'transmission_route' => fake()->randomElement(['Electronic portal upload', 'Email', 'Postal']),
+            'receipt_confirmed' => $confirmed,
+            'receipt_confirmed_at' => $confirmed ? fake()->dateTimeBetween('-6 weeks', 'now') : null,
+            'notes' => fake()->boolean(30) ? fake()->paragraph() : null,
+            'created_by' => $team->random()->id,
+        ]);
+
+        foreach (range(1, fake()->numberBetween(1, 2)) as $ignored) {
+            $this->createSubmissionFile($submission, $team);
+        }
+    }
+
+    /**
+     * @param  Collection<int, User>  $team
+     */
+    private function createSubmissionFile(TenderSubmission $submission, Collection $team): void
+    {
+        $filename = fake()->slug(3).'.txt';
+        $path = 'tender-submission-files/'.fake()->uuid().'.txt';
+        $content = fake()->paragraphs(fake()->numberBetween(1, 2), true);
+
+        Storage::disk('local')->put($path, $content);
+
+        $submission->files()->create([
+            'uploaded_by' => $team->random()->id,
+            'file_path' => $path,
+            'original_filename' => $filename,
+            'mime_type' => 'text/plain',
+            'size' => strlen($content),
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, User>  $team
+     */
+    private function createFollowUp(Tender $tender, Collection $team): void
+    {
+        $tender->followUp()->create([
+            'presentation_scheduled_at' => fake()->boolean(50) ? fake()->dateTimeBetween('now', '+3 weeks') : null,
+            'presentation_notes' => fake()->boolean(40) ? fake()->paragraph() : null,
+            'negotiation_notes' => fake()->boolean(40) ? fake()->paragraph() : null,
+            'bid_validity_until' => fake()->boolean(50) ? fake()->dateTimeBetween('now', '+3 months') : null,
+            'expected_result_date' => fake()->boolean(50) ? fake()->dateTimeBetween('now', '+2 months') : null,
+            'expected_result_notes' => fake()->boolean(40) ? fake()->paragraph() : null,
+            'created_by' => $team->random()->id,
         ]);
     }
 

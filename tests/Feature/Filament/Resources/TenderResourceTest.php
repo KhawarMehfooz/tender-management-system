@@ -3,9 +3,11 @@
 use App\Enums\BidDecision;
 use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
+use App\Enums\CommunicationType;
 use App\Enums\CostDriverFieldType;
 use App\Enums\DeadlineType;
 use App\Enums\DocumentCategory;
+use App\Enums\DocumentRequestStatus;
 use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Enums\TeamRole;
@@ -17,10 +19,15 @@ use App\Filament\Resources\Tenders\Pages\ViewTender;
 use App\Filament\Resources\Tenders\RelationManagers\BidDecisionRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CalculationsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\CertificatesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\CommunicationRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\ConceptBlocksRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\DocumentRequestsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\FollowUpRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\ReferencesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\SiteVisitsRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\SubmissionRelationManager;
 use App\Filament\Resources\Tenders\TenderResource;
 use App\Models\Certificate;
 use App\Models\ConceptBlock;
@@ -34,10 +41,18 @@ use App\Models\Source;
 use App\Models\Tender;
 use App\Models\TenderBidDecision;
 use App\Models\TenderCalculation;
+use App\Models\TenderCommunication;
 use App\Models\TenderDeadline;
 use App\Models\TenderDocument;
+use App\Models\TenderDocumentRequest;
+use App\Models\TenderDocumentRequestFile;
+use App\Models\TenderFollowUp;
 use App\Models\TenderHardDeletion;
 use App\Models\TenderParticipationScore;
+use App\Models\TenderSiteVisit;
+use App\Models\TenderSiteVisitPhoto;
+use App\Models\TenderSubmission;
+use App\Models\TenderSubmissionFile;
 use App\Models\TenderTeamMember;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -858,6 +873,663 @@ describe('documents relation manager', function () {
 
         Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
             ->assertTableActionVisible('download', $document);
+    });
+});
+
+describe('communication relation manager', function () {
+    it('lists only the tender\'s own communications', function () {
+        $tender = Tender::factory()->create();
+        $entry = TenderCommunication::factory()->for($tender)->create();
+        $foreignEntry = TenderCommunication::factory()->create();
+
+        Livewire::test(CommunicationRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$entry])
+            ->assertCanNotSeeTableRecords([$foreignEntry]);
+    });
+
+    it('hides the create action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(CommunicationRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner log a communication entry, stamping the acting user as logged_by', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(CommunicationRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'type' => CommunicationType::EMAIL->value,
+                'subject' => 'Clarification on delivery deadline',
+                'content' => 'Asked the client to confirm the delivery deadline.',
+                'contact_person' => 'Jane Doe',
+                'occurred_at' => now(),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $entry = $tender->communications()->firstOrFail();
+        expect($entry->logged_by)->toBe($owner->id);
+        expect($entry->type)->toBe(CommunicationType::EMAIL);
+    });
+
+    it('lets a tender manager log a communication entry even when unrelated to the tender', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create();
+
+        Livewire::test(CommunicationRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create');
+    });
+
+    it('lets the entry\'s own author edit it', function () {
+        $author = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $author->id]);
+        $entry = TenderCommunication::factory()->for($tender)->create(['logged_by' => $author->id]);
+        $this->actingAs($author);
+
+        Livewire::test(CommunicationRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('edit', $entry);
+    });
+
+    it('hides edit from a different linked user who did not log the entry', function () {
+        $owner = User::factory()->create();
+        $otherMember = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        TenderTeamMember::factory()->create([
+            'tender_id' => $tender->id,
+            'user_id' => $otherMember->id,
+            'functional_role' => TeamRole::EVIDENCE_DOCUMENTS,
+        ]);
+        $entry = TenderCommunication::factory()->for($tender)->create(['logged_by' => $owner->id]);
+        $this->actingAs($otherMember);
+
+        Livewire::test(CommunicationRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('edit', $entry);
+    });
+
+    it('lets a tender manager edit any entry', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create();
+        $entry = TenderCommunication::factory()->for($tender)->create();
+
+        Livewire::test(CommunicationRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('edit', $entry);
+    });
+
+    it('has no delete action, since the log is append-only', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $entry = TenderCommunication::factory()->for($tender)->create(['logged_by' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(CommunicationRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionDoesNotExist('delete', record: $entry);
+    });
+});
+
+describe('site visits relation manager', function () {
+    it('lists only the tender\'s own site visits', function () {
+        $tender = Tender::factory()->create();
+        $visit = TenderSiteVisit::factory()->for($tender)->create();
+        $foreignVisit = TenderSiteVisit::factory()->create();
+
+        Livewire::test(SiteVisitsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$visit])
+            ->assertCanNotSeeTableRecords([$foreignVisit]);
+    });
+
+    it('hides the create action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(SiteVisitsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner record a site visit, stamping the acting user as created_by', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(SiteVisitsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'visit_date' => now()->toDateString(),
+                'attendees' => 'Jane Doe, John Smith',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $visit = $tender->siteVisits()->firstOrFail();
+        expect($visit->created_by)->toBe($owner->id);
+    });
+
+    it('lets a tender manager record a site visit even when unrelated to the tender', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create();
+
+        Livewire::test(SiteVisitsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create');
+    });
+
+    it('lets a linked user upload a photo to a site visit', function () {
+        Storage::fake('local');
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $visit = TenderSiteVisit::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(SiteVisitsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('uploadPhoto', $visit)
+            ->callTableAction('uploadPhoto', record: $visit, data: [
+                'file' => UploadedFile::fake()->image('site.jpg'),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $photo = $visit->photos()->firstOrFail();
+        expect($photo->uploaded_by)->toBe($owner->id);
+        expect($photo->original_filename)->toBe('site.jpg');
+        expect(Storage::disk('local')->exists($photo->file_path))->toBeTrue();
+    });
+
+    it('hides the upload photo action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+        $visit = TenderSiteVisit::factory()->for($tender)->create();
+
+        Livewire::test(SiteVisitsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('uploadPhoto', $visit);
+    });
+
+    it('lets the visit creator delete it, removing its photo files', function () {
+        Storage::fake('local');
+        $creator = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $creator->id]);
+        $visit = TenderSiteVisit::factory()->for($tender)->create(['created_by' => $creator->id]);
+        Storage::disk('local')->put('tender-site-visit-photos/photo.jpg', 'contents');
+        $photo = TenderSiteVisitPhoto::factory()->for($visit, 'siteVisit')->create([
+            'file_path' => 'tender-site-visit-photos/photo.jpg',
+            'uploaded_by' => $creator->id,
+        ]);
+        $this->actingAs($creator);
+
+        Livewire::test(SiteVisitsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('delete', $visit)
+            ->callTableAction('delete', record: $visit)
+            ->assertHasNoTableActionErrors();
+
+        expect(TenderSiteVisit::find($visit->id))->toBeNull();
+        expect(TenderSiteVisitPhoto::find($photo->id))->toBeNull();
+        expect(Storage::disk('local')->exists('tender-site-visit-photos/photo.jpg'))->toBeFalse();
+    });
+
+    it('hides delete from a different linked user who did not create the visit', function () {
+        $owner = User::factory()->create();
+        $otherMember = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        TenderTeamMember::factory()->create([
+            'tender_id' => $tender->id,
+            'user_id' => $otherMember->id,
+            'functional_role' => TeamRole::EVIDENCE_DOCUMENTS,
+        ]);
+        $visit = TenderSiteVisit::factory()->for($tender)->create(['created_by' => $owner->id]);
+        $this->actingAs($otherMember);
+
+        Livewire::test(SiteVisitsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('delete', $visit);
+    });
+});
+
+describe('site visit photo download', function () {
+    it('streams the file for a user within the visit\'s tender category', function () {
+        Storage::fake('local');
+        $category = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $category->id]);
+        $visit = TenderSiteVisit::factory()->for($tender)->create();
+        $photo = TenderSiteVisitPhoto::factory()->for($visit, 'siteVisit')->create([
+            'file_path' => 'tender-site-visit-photos/site.jpg',
+        ]);
+        Storage::disk('local')->put($photo->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $category->id]))
+            ->get($photo->downloadUrl())
+            ->assertOk();
+    });
+
+    it('returns 404 for a user outside the visit\'s tender category', function () {
+        Storage::fake('local');
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $categoryA->id]);
+        $visit = TenderSiteVisit::factory()->for($tender)->create();
+        $photo = TenderSiteVisitPhoto::factory()->for($visit, 'siteVisit')->create([
+            'file_path' => 'tender-site-visit-photos/site.jpg',
+        ]);
+        Storage::disk('local')->put($photo->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $categoryB->id]))
+            ->get($photo->downloadUrl())
+            ->assertNotFound();
+    });
+
+    it('rejects an unsigned download link', function () {
+        Storage::fake('local');
+        $photo = TenderSiteVisitPhoto::factory()->create(['file_path' => 'tender-site-visit-photos/site.jpg']);
+        Storage::disk('local')->put($photo->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('tender-site-visit-photos.download', $photo))
+            ->assertForbidden();
+    });
+
+    it('rejects an expired download link', function () {
+        Storage::fake('local');
+        $photo = TenderSiteVisitPhoto::factory()->create(['file_path' => 'tender-site-visit-photos/site.jpg']);
+        Storage::disk('local')->put($photo->file_path, 'contents');
+        $expiredUrl = $photo->downloadUrl();
+
+        $this->travel(6)->minutes();
+
+        $this->actingAs(User::factory()->create())
+            ->get($expiredUrl)
+            ->assertForbidden();
+    });
+});
+
+describe('submission relation manager', function () {
+    it('hides the create action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(SubmissionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner record the submission, stamping created_by and the receipt-confirmed timestamp', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $employee = User::factory()->create();
+        $this->actingAs($owner);
+
+        Livewire::test(SubmissionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'submission_date' => now()->toDateString(),
+                'submission_time' => '14:30',
+                'responsible_employee_id' => $employee->id,
+                'portal' => 'e-Vergabe',
+                'transmission_route' => 'Electronic portal upload',
+                'receipt_confirmed' => true,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $submission = $tender->submission()->firstOrFail();
+        expect($submission->created_by)->toBe($owner->id);
+        expect($submission->receipt_confirmed)->toBeTrue();
+        expect($submission->receipt_confirmed_at)->not->toBeNull();
+    });
+
+    it('hides the create action once a submission already exists', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        TenderSubmission::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(SubmissionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets a tender manager edit the submission even when unrelated to the tender', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create();
+        $submission = TenderSubmission::factory()->for($tender)->create();
+
+        Livewire::test(SubmissionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('edit', $submission);
+    });
+
+    it('hides edit from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+        $submission = TenderSubmission::factory()->for($tender)->create();
+
+        Livewire::test(SubmissionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('edit', $submission);
+    });
+
+    it('lets a linked user upload a submission file', function () {
+        Storage::fake('local');
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $submission = TenderSubmission::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(SubmissionRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('uploadFile', $submission)
+            ->callTableAction('uploadFile', record: $submission, data: [
+                'file' => UploadedFile::fake()->create('bid.pdf', 100, 'application/pdf'),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $file = $submission->files()->firstOrFail();
+        expect($file->uploaded_by)->toBe($owner->id);
+        expect($file->original_filename)->toBe('bid.pdf');
+        expect(Storage::disk('local')->exists($file->file_path))->toBeTrue();
+    });
+});
+
+describe('follow-up relation manager', function () {
+    it('hides the create action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(FollowUpRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner record the follow-up, stamping created_by', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(FollowUpRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'presentation_scheduled_at' => now()->addWeek()->toDateTimeString(),
+                'bid_validity_until' => now()->addMonths(3)->toDateString(),
+                'expected_result_date' => now()->addMonths(2)->toDateString(),
+                'presentation_notes' => 'Presentation notes',
+                'negotiation_notes' => 'Negotiation notes',
+                'expected_result_notes' => 'Expected result notes',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $followUp = $tender->followUp()->firstOrFail();
+        expect($followUp->created_by)->toBe($owner->id);
+        expect($followUp->presentation_notes)->toBe('Presentation notes');
+    });
+
+    it('hides the create action once a follow-up record already exists', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        TenderFollowUp::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(FollowUpRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets a tender manager edit the follow-up even when unrelated to the tender', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create();
+        $followUp = TenderFollowUp::factory()->for($tender)->create();
+
+        Livewire::test(FollowUpRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('edit', $followUp);
+    });
+
+    it('hides edit from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+        $followUp = TenderFollowUp::factory()->for($tender)->create();
+
+        Livewire::test(FollowUpRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('edit', $followUp);
+    });
+});
+
+describe('submission file download', function () {
+    it('streams the file for a user within the submission\'s tender category', function () {
+        Storage::fake('local');
+        $category = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $category->id]);
+        $submission = TenderSubmission::factory()->for($tender)->create();
+        $file = TenderSubmissionFile::factory()->for($submission, 'submission')->create([
+            'file_path' => 'tender-submission-files/bid.pdf',
+        ]);
+        Storage::disk('local')->put($file->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $category->id]))
+            ->get($file->downloadUrl())
+            ->assertOk();
+    });
+
+    it('returns 404 for a user outside the submission\'s tender category', function () {
+        Storage::fake('local');
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $categoryA->id]);
+        $submission = TenderSubmission::factory()->for($tender)->create();
+        $file = TenderSubmissionFile::factory()->for($submission, 'submission')->create([
+            'file_path' => 'tender-submission-files/bid.pdf',
+        ]);
+        Storage::disk('local')->put($file->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $categoryB->id]))
+            ->get($file->downloadUrl())
+            ->assertNotFound();
+    });
+
+    it('rejects an unsigned download link', function () {
+        Storage::fake('local');
+        $file = TenderSubmissionFile::factory()->create(['file_path' => 'tender-submission-files/bid.pdf']);
+        Storage::disk('local')->put($file->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('tender-submission-files.download', $file))
+            ->assertForbidden();
+    });
+
+    it('rejects an expired download link', function () {
+        Storage::fake('local');
+        $file = TenderSubmissionFile::factory()->create(['file_path' => 'tender-submission-files/bid.pdf']);
+        Storage::disk('local')->put($file->file_path, 'contents');
+        $expiredUrl = $file->downloadUrl();
+
+        $this->travel(6)->minutes();
+
+        $this->actingAs(User::factory()->create())
+            ->get($expiredUrl)
+            ->assertForbidden();
+    });
+});
+
+describe('document requests relation manager', function () {
+    it('lists only the tender\'s own document requests', function () {
+        $tender = Tender::factory()->create();
+        $request = TenderDocumentRequest::factory()->for($tender)->create();
+        $foreignRequest = TenderDocumentRequest::factory()->create();
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
+            ->assertCanSeeTableRecords([$request])
+            ->assertCanNotSeeTableRecords([$foreignRequest]);
+    });
+
+    it('hides the create action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner create a document request, stamping created_by, with no communication link', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $this->actingAs($owner);
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'description' => 'Provide updated insurance certificate',
+                'owner_id' => $owner->id,
+                'deadline' => now()->addWeek()->toDateString(),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $request = $tender->documentRequests()->firstOrFail();
+        expect($request->created_by)->toBe($owner->id);
+        expect($request->tender_communication_id)->toBeNull();
+        expect($request->status)->toBe(DocumentRequestStatus::OPEN);
+    });
+
+    it('lets a document request be linked to a communication entry it arose from', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $communication = TenderCommunication::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('create', data: [
+                'description' => 'Follow up on bidder question',
+                'tender_communication_id' => $communication->id,
+                'owner_id' => $owner->id,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $request = $tender->documentRequests()->firstOrFail();
+        expect($request->tender_communication_id)->toBe($communication->id);
+    });
+
+    it('lets a tender manager edit a document request even when unrelated to the tender', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create();
+        $request = TenderDocumentRequest::factory()->for($tender)->create();
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('edit', $request);
+    });
+
+    it('hides edit from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+        $request = TenderDocumentRequest::factory()->for($tender)->create();
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('edit', $request);
+    });
+
+    it('lets a linked user upload a file to a document request', function () {
+        Storage::fake('local');
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $request = TenderDocumentRequest::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('uploadFile', $request)
+            ->callTableAction('uploadFile', record: $request, data: [
+                'file' => UploadedFile::fake()->create('certificate.pdf', 100, 'application/pdf'),
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $file = $request->files()->firstOrFail();
+        expect($file->uploaded_by)->toBe($owner->id);
+        expect($file->original_filename)->toBe('certificate.pdf');
+        expect(Storage::disk('local')->exists($file->file_path))->toBeTrue();
+    });
+
+    it('hides the upload file action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+        $request = TenderDocumentRequest::factory()->for($tender)->create();
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('uploadFile', $request);
+    });
+
+    it('lets a linked user change a document request\'s status, writing an audit row', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $request = TenderDocumentRequest::factory()->for($tender)->create(['status' => DocumentRequestStatus::OPEN]);
+        $this->actingAs($owner);
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('changeStatus', $request)
+            ->callTableAction('changeStatus', record: $request, data: [
+                'status' => DocumentRequestStatus::FULFILLED->value,
+                'reason' => 'Certificate received',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $request->refresh();
+        expect($request->status)->toBe(DocumentRequestStatus::FULFILLED);
+        $change = $request->statusChanges()->firstOrFail();
+        expect($change->from_status)->toBe(DocumentRequestStatus::OPEN);
+        expect($change->to_status)->toBe(DocumentRequestStatus::FULFILLED);
+        expect($change->reason)->toBe('Certificate received');
+    });
+
+    it('hides the change status action once a document request is terminal', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        $request = TenderDocumentRequest::factory()->for($tender)->create(['status' => DocumentRequestStatus::FULFILLED]);
+        $this->actingAs($owner);
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('changeStatus', $request);
+    });
+
+    it('hides the change status action from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create();
+        $request = TenderDocumentRequest::factory()->for($tender)->create(['status' => DocumentRequestStatus::OPEN]);
+
+        Livewire::test(DocumentRequestsRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('changeStatus', $request);
+    });
+});
+
+describe('document request file download', function () {
+    it('streams the file for a user within the document request\'s tender category', function () {
+        Storage::fake('local');
+        $category = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $category->id]);
+        $request = TenderDocumentRequest::factory()->for($tender)->create();
+        $file = TenderDocumentRequestFile::factory()->for($request, 'documentRequest')->create([
+            'file_path' => 'tender-document-request-files/certificate.pdf',
+        ]);
+        Storage::disk('local')->put($file->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $category->id]))
+            ->get($file->downloadUrl())
+            ->assertOk();
+    });
+
+    it('returns 404 for a user outside the document request\'s tender category', function () {
+        Storage::fake('local');
+        $categoryA = ServiceCategory::factory()->create();
+        $categoryB = ServiceCategory::factory()->create();
+        $tender = Tender::factory()->create(['service_category_id' => $categoryA->id]);
+        $request = TenderDocumentRequest::factory()->for($tender)->create();
+        $file = TenderDocumentRequestFile::factory()->for($request, 'documentRequest')->create([
+            'file_path' => 'tender-document-request-files/certificate.pdf',
+        ]);
+        Storage::disk('local')->put($file->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create(['service_category_id' => $categoryB->id]))
+            ->get($file->downloadUrl())
+            ->assertNotFound();
+    });
+
+    it('rejects an unsigned download link', function () {
+        Storage::fake('local');
+        $file = TenderDocumentRequestFile::factory()->create(['file_path' => 'tender-document-request-files/certificate.pdf']);
+        Storage::disk('local')->put($file->file_path, 'contents');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('tender-document-request-files.download', $file))
+            ->assertForbidden();
+    });
+
+    it('rejects an expired download link', function () {
+        Storage::fake('local');
+        $file = TenderDocumentRequestFile::factory()->create(['file_path' => 'tender-document-request-files/certificate.pdf']);
+        Storage::disk('local')->put($file->file_path, 'contents');
+        $expiredUrl = $file->downloadUrl();
+
+        $this->travel(6)->minutes();
+
+        $this->actingAs(User::factory()->create())
+            ->get($expiredUrl)
+            ->assertForbidden();
     });
 });
 
