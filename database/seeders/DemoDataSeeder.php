@@ -16,6 +16,7 @@ use App\Enums\RoleName;
 use App\Enums\TaskStatus;
 use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
+use App\Enums\WinLossReason;
 use App\Models\Certificate;
 use App\Models\ConceptBlock;
 use App\Models\Reference;
@@ -297,6 +298,14 @@ class DemoDataSeeder extends Seeder
 
         if ($reachesFollowUp) {
             $this->createFollowUp($tender, $team);
+        }
+
+        // Result + lessons learned only make sense once the tender has actually closed —
+        // gated on TenderStatus::isTerminal() per [[milestones]]'s m9 file, same
+        // after-the-status-walk placement as submission/follow-up above.
+        if ($status->isTerminal()) {
+            $this->createResult($tender, $team, $status);
+            $this->createLessonsLearned($tender, $team);
         }
 
         // Edge cases for documentation screenshots: archive/invalidate a slice of the data.
@@ -793,6 +802,61 @@ class DemoDataSeeder extends Seeder
             'bid_validity_until' => fake()->boolean(50) ? fake()->dateTimeBetween('now', '+3 months') : null,
             'expected_result_date' => fake()->boolean(50) ? fake()->dateTimeBetween('now', '+2 months') : null,
             'expected_result_notes' => fake()->boolean(40) ? fake()->paragraph() : null,
+            'created_by' => $team->random()->id,
+        ]);
+    }
+
+    /**
+     * Varies fields by outcome: winner/winning_price/win_loss_reasons only make sense once
+     * someone else won (LOST/EXCLUDED/NOT_EVALUATED) — left null/empty on WON (we're the
+     * winner, our_rank is 1) and CANCELLED (procedure never concluded, our_price left unknown
+     * too). price_gap mirrors ResultRelationManager::computePriceGap()'s own formula.
+     *
+     * @param  Collection<int, User>  $team
+     */
+    private function createResult(Tender $tender, Collection $team, TenderStatus $status): void
+    {
+        $isWon = $status === TenderStatus::WON;
+        $othersWon = in_array($status, [TenderStatus::LOST, TenderStatus::EXCLUDED, TenderStatus::NOT_EVALUATED], true);
+        $isCancelled = $status === TenderStatus::CANCELLED;
+
+        $ourPrice = $isCancelled ? null : fake()->randomFloat(2, 50000, 300000);
+        $winningPrice = match (true) {
+            $isWon => $ourPrice,
+            $othersWon => fake()->boolean(80) ? fake()->randomFloat(2, 50000, 300000) : null,
+            default => null,
+        };
+
+        $tender->result()->create([
+            'winner' => $othersWon ? fake()->company() : null,
+            'our_rank' => match (true) {
+                $isWon => 1,
+                $othersWon => fake()->numberBetween(2, 5),
+                default => null,
+            },
+            'winning_price' => $winningPrice,
+            'our_price' => $ourPrice,
+            'price_gap' => $winningPrice !== null && $ourPrice !== null ? round($winningPrice - $ourPrice, 2) : null,
+            'award_date' => $isCancelled ? null : fake()->dateTimeBetween('-4 weeks', 'now'),
+            'known_evaluation' => fake()->boolean(50) ? fake()->paragraph() : null,
+            'reasoning' => fake()->paragraph(),
+            'award_decision' => fake()->boolean(40) ? fake()->paragraph() : null,
+            'win_loss_reasons' => $othersWon
+                ? fake()->randomElements(array_column(WinLossReason::cases(), 'value'), fake()->numberBetween(1, 3))
+                : [],
+            'created_by' => $team->random()->id,
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, User>  $team
+     */
+    private function createLessonsLearned(Tender $tender, Collection $team): void
+    {
+        $tender->lessonsLearned()->create([
+            'went_well' => fake()->paragraph(),
+            'differently_next_time' => fake()->paragraph(),
+            'process_changes' => fake()->paragraph(),
             'created_by' => $team->random()->id,
         ]);
     }

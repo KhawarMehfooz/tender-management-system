@@ -298,6 +298,22 @@ class Tender extends Model
     }
 
     /**
+     * @return HasOne<TenderResult, $this>
+     */
+    public function result(): HasOne
+    {
+        return $this->hasOne(TenderResult::class);
+    }
+
+    /**
+     * @return HasOne<TenderLessonsLearned, $this>
+     */
+    public function lessonsLearned(): HasOne
+    {
+        return $this->hasOne(TenderLessonsLearned::class);
+    }
+
+    /**
      * @return HasMany<TenderCalculation, $this>
      */
     public function calculations(): HasMany

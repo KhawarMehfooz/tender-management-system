@@ -21,7 +21,7 @@ in-progress one) before planning or editing.
 | M6: Bid / No-Bid Decision | Complete | [milestones/m6-bid-no-bid-decision.md](milestones/m6-bid-no-bid-decision.md) |
 | M7: References, Certificates, Concept Library | Complete | [milestones/m7-references-certificates-concept-library.md](milestones/m7-references-certificates-concept-library.md) |
 | M8: Communication, Site Visits, Submission, Follow-up | Complete | [milestones/m8-communication-site-visits-submission-followup.md](milestones/m8-communication-site-visits-submission-followup.md) |
-| M9: Result & Lessons Learned | Not started | see idea.md |
+| M9: Result & Lessons Learned | In progress | [milestones/m9-result-lessons-learned.md](milestones/m9-result-lessons-learned.md) |
 | M10: Competitors, Market Intelligence, Client History, Pipeline | Not started | see idea.md |
 | M11: People, Teams, Cover | Not started | see idea.md |
 | M12: Dashboards, Search, Statistics, Archive, Reporting | Not started | see idea.md |

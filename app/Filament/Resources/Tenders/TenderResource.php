@@ -15,7 +15,9 @@ use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentRequestsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\FollowUpRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\LessonsLearnedRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\ReferencesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\ResultRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\SiteVisitsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\SubmissionRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\TasksRelationManager;
@@ -97,6 +99,8 @@ class TenderResource extends Resource
             SubmissionRelationManager::class,
             FollowUpRelationManager::class,
             DocumentRequestsRelationManager::class,
+            ResultRelationManager::class,
+            LessonsLearnedRelationManager::class,
             RelationGroup::make(__('reference_library.tab_label'), [
                 ReferencesRelationManager::class,
                 CertificatesRelationManager::class,

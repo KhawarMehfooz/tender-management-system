@@ -12,6 +12,7 @@ use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
+use App\Enums\WinLossReason;
 use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
@@ -25,7 +26,9 @@ use App\Filament\Resources\Tenders\RelationManagers\DeadlinesRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentRequestsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\DocumentsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\FollowUpRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\LessonsLearnedRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\ReferencesRelationManager;
+use App\Filament\Resources\Tenders\RelationManagers\ResultRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\SiteVisitsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\SubmissionRelationManager;
 use App\Filament\Resources\Tenders\TenderResource;
@@ -48,7 +51,9 @@ use App\Models\TenderDocumentRequest;
 use App\Models\TenderDocumentRequestFile;
 use App\Models\TenderFollowUp;
 use App\Models\TenderHardDeletion;
+use App\Models\TenderLessonsLearned;
 use App\Models\TenderParticipationScore;
+use App\Models\TenderResult;
 use App\Models\TenderSiteVisit;
 use App\Models\TenderSiteVisitPhoto;
 use App\Models\TenderSubmission;
@@ -1275,6 +1280,192 @@ describe('follow-up relation manager', function () {
 
         Livewire::test(FollowUpRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
             ->assertTableActionHidden('edit', $followUp);
+    });
+});
+
+describe('result relation manager', function () {
+    it('hides the create action for a non-terminal tender even for a manager', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create(['status' => TenderStatus::QUALITY]);
+
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('hides the create action from a user with no link to a terminal tender', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::WON]);
+
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner record the result on a terminal tender, stamping created_by', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::LOST]);
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $owner->givePermissionTo(Right::SEE_PRICES->value);
+        $this->actingAs($owner);
+
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'winner' => 'Acme Facility Services GmbH',
+                'our_rank' => 2,
+                'award_date' => now()->toDateString(),
+                'win_loss_reasons' => [WinLossReason::PRICE->value, WinLossReason::STAFFING->value],
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $result = $tender->result()->firstOrFail();
+        expect($result->created_by)->toBe($owner->id);
+        expect($result->winner)->toBe('Acme Facility Services GmbH');
+        expect($result->win_loss_reasons)->toBe([WinLossReason::PRICE->value, WinLossReason::STAFFING->value]);
+    });
+
+    it('hides the create action once a result already exists', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::WON]);
+        TenderResult::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('hides the price fields and columns from a user without the see-prices right', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::WON]);
+        TenderResult::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableColumnHidden('winning_price')
+            ->assertTableColumnHidden('our_price')
+            ->assertTableColumnHidden('price_gap');
+    });
+
+    it('computes the price gap server-side from winning and our price, and leaves it null when a price is missing', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::WON]);
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $owner->givePermissionTo(Right::SEE_PRICES->value);
+        $this->actingAs($owner);
+
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('create', data: [
+                'winning_price' => 90000,
+                'our_price' => 100000,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $result = $tender->result()->firstOrFail();
+        expect((float) $result->price_gap)->toBe(-10000.0);
+
+        $tenderTwo = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::WON]);
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tenderTwo, 'pageClass' => EditTender::class])
+            ->callTableAction('create', data: [
+                'winning_price' => 90000,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        expect($tenderTwo->result()->firstOrFail()->price_gap)->toBeNull();
+    });
+
+    it('lets a tender manager edit the result even when unrelated to the tender', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create(['status' => TenderStatus::WON]);
+        $result = TenderResult::factory()->for($tender)->create();
+
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('edit', $result);
+    });
+
+    it('hides edit from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::WON]);
+        $result = TenderResult::factory()->for($tender)->create();
+
+        Livewire::test(ResultRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('edit', $result);
+    });
+});
+
+describe('lessons learned relation manager', function () {
+    it('hides the create action for a non-terminal tender', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::QUALITY]);
+        $this->actingAs($owner);
+
+        Livewire::test(LessonsLearnedRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('hides the create action from a user with no link to a terminal tender', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::WON]);
+
+        Livewire::test(LessonsLearnedRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('lets the tender owner record lessons learned on a terminal tender, stamping created_by', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::LOST]);
+        $this->actingAs($owner);
+
+        Livewire::test(LessonsLearnedRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('create')
+            ->callTableAction('create', data: [
+                'went_well' => 'Team collaboration on the concept',
+                'differently_next_time' => 'Start pricing earlier',
+                'process_changes' => 'Involve calculation team from kickoff',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $lessonsLearned = $tender->lessonsLearned()->firstOrFail();
+        expect($lessonsLearned->created_by)->toBe($owner->id);
+        expect($lessonsLearned->went_well)->toBe('Team collaboration on the concept');
+    });
+
+    it('hides the create action once a lessons-learned record already exists', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::WON]);
+        TenderLessonsLearned::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(LessonsLearnedRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('create');
+    });
+
+    it('rejects blanking out an answer on edit via required-field validation', function () {
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id, 'status' => TenderStatus::WON]);
+        $lessonsLearned = TenderLessonsLearned::factory()->for($tender)->create();
+        $this->actingAs($owner);
+
+        Livewire::test(LessonsLearnedRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->callTableAction('edit', $lessonsLearned, data: [
+                'went_well' => '',
+            ])
+            ->assertHasTableActionErrors(['went_well' => 'required']);
+    });
+
+    it('lets a tender manager edit lessons learned even when unrelated to the tender', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+        $tender = Tender::factory()->create(['status' => TenderStatus::WON]);
+        $lessonsLearned = TenderLessonsLearned::factory()->for($tender)->create();
+
+        Livewire::test(LessonsLearnedRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionVisible('edit', $lessonsLearned);
+    });
+
+    it('hides edit from a user with no link to the tender', function () {
+        $tender = Tender::factory()->create(['status' => TenderStatus::WON]);
+        $lessonsLearned = TenderLessonsLearned::factory()->for($tender)->create();
+
+        Livewire::test(LessonsLearnedRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->assertTableActionHidden('edit', $lessonsLearned);
     });
 });
 
