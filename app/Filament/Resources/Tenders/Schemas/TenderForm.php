@@ -91,6 +91,12 @@ class TenderForm
                                     ->label(__('tenders.fields.contracting_authority'))
                                     ->prefixIcon(Heroicon::OutlinedBuildingLibrary)
                                     ->required(),
+                                Select::make('client_id')
+                                    ->label(__('tenders.fields.client_id'))
+                                    ->prefixIcon(Heroicon::OutlinedBuildingOffice2)
+                                    ->relationship('client', 'name', fn (Builder $query) => $query->where('active', true))
+                                    ->searchable()
+                                    ->preload(),
                                 TextInput::make('procurement_office')
                                     ->label(__('tenders.fields.procurement_office'))
                                     ->prefixIcon(Heroicon::OutlinedBuildingOffice2),

@@ -22,6 +22,7 @@ return [
         'title' => 'Title',
         'procurement_number' => 'Procurement number',
         'contracting_authority' => 'Contracting authority',
+        'client_id' => 'Client',
         'procurement_office' => 'Procurement office',
         'contact_person' => 'Contact person',
         'contact_email' => 'Contact email',

@@ -33,6 +33,7 @@ use App\Filament\Resources\Tenders\RelationManagers\SiteVisitsRelationManager;
 use App\Filament\Resources\Tenders\RelationManagers\SubmissionRelationManager;
 use App\Filament\Resources\Tenders\TenderResource;
 use App\Models\Certificate;
+use App\Models\Client;
 use App\Models\ConceptBlock;
 use App\Models\ConceptBlockVersion;
 use App\Models\ProcurementProcedure;
@@ -95,6 +96,31 @@ describe('creation', function () {
 
         $tender = Tender::where('title', 'Guarding services for city hall')->first();
         expect($tender->internal_id)->toBe('SEC-'.now()->format('Y').'-0001');
+    });
+
+    it('links an optional client alongside the free-text contracting authority', function () {
+        $category = ServiceCategory::factory()->create(['code' => 'SEC']);
+        $sector = Sector::factory()->create();
+        $procedure = ProcurementProcedure::factory()->create();
+        $source = Source::factory()->create();
+        $client = Client::factory()->create(['active' => true]);
+
+        Livewire::test(CreateTender::class)
+            ->fillForm([
+                'title' => 'Guarding services for city hall',
+                'contracting_authority' => 'City of Example',
+                'client_id' => $client->id,
+                'service_category_id' => $category->id,
+                'sector_id' => $sector->id,
+                'procurement_procedure_id' => $procedure->id,
+                'source_id' => $source->id,
+                'submission_deadline' => now()->addWeeks(2),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $tender = Tender::where('title', 'Guarding services for city hall')->first();
+        expect($tender->client_id)->toBe($client->id);
     });
 
     it('rejects a missing required field', function () {

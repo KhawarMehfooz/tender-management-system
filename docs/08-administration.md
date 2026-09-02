@@ -39,6 +39,7 @@ Several classification lists feed the dropdowns used elsewhere in TMS, such as w
 | **Service categories** | The line-of-business categories tenders and users are scoped to, described in [Getting started](02-getting-started.md). |
 | **Sources** | Where a tender was found, such as a specific tender portal or a direct enquiry. |
 | **Sectors** | The industry sector a tender falls under. |
+| **Clients** | The contracting authority a tender is issued by, tracked as its own record so client history can build up across multiple tenders. |
 | **Procurement procedures** | The formal procurement procedure type used for a tender. |
 | **CPV codes** | The EU's standard classification codes for the subject of a contract. |
 | **NUTS codes** | The EU's standard geographic classification codes, structured as a country/state/region/district hierarchy. |

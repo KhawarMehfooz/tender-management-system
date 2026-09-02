@@ -27,6 +27,7 @@ use RuntimeException;
  * @property string $title
  * @property string|null $procurement_number
  * @property string $contracting_authority
+ * @property string|null $client_id
  * @property string|null $procurement_office
  * @property string|null $contact_person
  * @property string|null $contact_email
@@ -63,6 +64,7 @@ use RuntimeException;
     'title',
     'procurement_number',
     'contracting_authority',
+    'client_id',
     'procurement_office',
     'contact_person',
     'contact_email',
@@ -167,6 +169,14 @@ class Tender extends Model
     public function serviceCategory(): BelongsTo
     {
         return $this->belongsTo(ServiceCategory::class);
+    }
+
+    /**
+     * @return BelongsTo<Client, $this>
+     */
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
     }
 
     /**
