@@ -42,6 +42,9 @@ use RuntimeException;
  * @property string|null $contract_term
  * @property Carbon|null $contract_start_date
  * @property Carbon|null $contract_end_date
+ * @property Carbon|null $reminder_12_months_sent_at
+ * @property Carbon|null $reminder_9_months_sent_at
+ * @property Carbon|null $reminder_6_months_sent_at
  * @property string|null $extension_options
  * @property int|null $bid_validity_days
  * @property Carbon|null $publication_date
@@ -91,6 +94,8 @@ use RuntimeException;
     // is_archived/archived_at/archived_by/invalidity_reason/invalidated_at/invalidated_by are
     // intentionally excluded: they're only ever written via archive()/unarchive()/markInvalid()/
     // clearInvalidFlag() below (using forceFill), never through form mass assignment.
+    // reminder_12_months_sent_at/reminder_9_months_sent_at/reminder_6_months_sent_at are
+    // likewise excluded — only CheckClientContractRenewals writes them, via forceFill().
 ])]
 class Tender extends Model
 {
@@ -155,6 +160,9 @@ class Tender extends Model
             'estimated_contract_volume_unknown' => 'boolean',
             'contract_start_date' => 'date',
             'contract_end_date' => 'date',
+            'reminder_12_months_sent_at' => 'datetime',
+            'reminder_9_months_sent_at' => 'datetime',
+            'reminder_6_months_sent_at' => 'datetime',
             'publication_date' => 'date',
             'status' => TenderStatus::class,
             'is_archived' => 'boolean',

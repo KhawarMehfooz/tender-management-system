@@ -20,4 +20,16 @@ return [
         'created_at' => 'Created at',
         'updated_at' => 'Updated at',
     ],
+    'tenders_tab' => 'Tenders',
+    'tenders' => [
+        'fields' => [
+            'internal_id' => 'ID',
+            'title' => 'Title',
+            'status' => 'Status',
+            'winner' => 'Winner',
+            'competitors' => 'Competitors seen',
+            'contract_start_date' => 'Contract start',
+            'contract_end_date' => 'Contract end',
+        ],
+    ],
 ];

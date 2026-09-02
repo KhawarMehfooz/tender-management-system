@@ -22,13 +22,13 @@ in-progress one) before planning or editing.
 | M7: References, Certificates, Concept Library | Complete | [milestones/m7-references-certificates-concept-library.md](milestones/m7-references-certificates-concept-library.md) |
 | M8: Communication, Site Visits, Submission, Follow-up | Complete | [milestones/m8-communication-site-visits-submission-followup.md](milestones/m8-communication-site-visits-submission-followup.md) |
 | M9: Result & Lessons Learned | Complete | [milestones/m9-result-lessons-learned.md](milestones/m9-result-lessons-learned.md) |
-| M10: Competitors, Market Intelligence, Client History, Pipeline | In progress | [milestones/m10-competitors-market-intelligence-client-history-pipeline.md](milestones/m10-competitors-market-intelligence-client-history-pipeline.md) |
+| M10: Competitors, Market Intelligence, Client History, Pipeline | Complete | [milestones/m10-competitors-market-intelligence-client-history-pipeline.md](milestones/m10-competitors-market-intelligence-client-history-pipeline.md) |
 | M11: People, Teams, Cover | Not started | see idea.md |
 | M12: Dashboards, Search, Statistics, Archive, Reporting | Not started | see idea.md |
 | M13: Later Expansion | Explicitly deferred | see idea.md |
 
-M1-M9 are complete. M10 is in progress (see its file above). Don't start the next
-not-started milestone (M11) without the user asking for it explicitly.
+M1-M10 are complete. Don't start the next not-started milestone (M11) without the user asking
+for it explicitly.
 
 When a not-started milestone kicks off, create its file under `.ai/rules/milestones/` (see
 [[general]]'s "Plan new milestones" rule for the exact workflow) and add its row above.

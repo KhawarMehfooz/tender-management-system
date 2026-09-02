@@ -19,6 +19,8 @@ The estimated contract volume is only visible if your account has the right to s
 
 The wizard has one more step after these five, called **Team**, where you assign an owner and team members to the tender. That step is covered in [Team assignment](04-team-assignment.md).
 
+The contracting authority can also be linked to a structured **Client** record, an optional field next to the required free-text contracting authority. See [Competitors, Market Intelligence, Client History & Pipeline](15-competitors-market-intelligence.md) for what that link is used for.
+
 ## The tender lifecycle
 
 Once created, a tender moves through a fixed sequence of stages:
@@ -100,3 +102,4 @@ In rare cases, such as a tender created by mistake with no real data attached to
 - [References, Certificates & Concept Library](12-references-certificates-concepts.md), covering the tender's Reference Library tab, where company-wide references, certificates, and concept blocks are linked to a specific bid.
 - [Communication, Site Visits, Submission & Follow-up](13-communication-site-visits-submission.md), covering the tender's communication log, site visits, submission record, follow-up tracking, and document requests.
 - [Result & Lessons Learned](14-result-lessons-learned.md), covering recording the outcome and a retrospective once a tender reaches one of its terminal statuses.
+- [Competitors, Market Intelligence, Client History & Pipeline](15-competitors-market-intelligence.md), covering the optional client link, recording competitors seen on a tender, and the market/pipeline reporting pages.

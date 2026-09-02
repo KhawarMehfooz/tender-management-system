@@ -16,6 +16,7 @@ return [
         'task-escalated-administrator' => 'Critical task nearing submission (administrator)',
         'tender-escalated-management' => 'Submission deadline critical (management)',
         'certificate-expiring' => 'Certificate expiring or expired',
+        'client-contract-renewal' => 'Client contract nearing renewal',
     ],
 
     'actions' => [
@@ -80,5 +81,12 @@ return [
         'mail_subject' => 'Certificate needs attention: :certificate',
         'mail_line_expiring' => 'Certificate ":certificate" expires in :days day(s).',
         'mail_line_expired' => 'Certificate ":certificate" has expired.',
+    ],
+
+    'client_contract_renewal' => [
+        'title' => 'Contract renewal approaching: :tender',
+        'body' => 'The contract for ":client" ends in about :months month(s).',
+        'mail_subject' => 'Contract renewal approaching: :tender',
+        'mail_line' => 'The contract on tender ":tender" for client ":client" ends around :date — about :months month(s) from now.',
     ],
 ];

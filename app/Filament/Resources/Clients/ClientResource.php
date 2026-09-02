@@ -5,7 +5,10 @@ namespace App\Filament\Resources\Clients;
 use App\Filament\Resources\Clients\Pages\CreateClient;
 use App\Filament\Resources\Clients\Pages\EditClient;
 use App\Filament\Resources\Clients\Pages\ListClients;
+use App\Filament\Resources\Clients\Pages\ViewClient;
+use App\Filament\Resources\Clients\RelationManagers\TendersRelationManager;
 use App\Filament\Resources\Clients\Schemas\ClientForm;
+use App\Filament\Resources\Clients\Schemas\ClientInfolist;
 use App\Filament\Resources\Clients\Tables\ClientsTable;
 use App\Models\Client;
 use BackedEnum;
@@ -60,6 +63,11 @@ class ClientResource extends Resource
         return ClientForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return ClientInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return ClientsTable::configure($table);
@@ -68,7 +76,7 @@ class ClientResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            TendersRelationManager::class,
         ];
     }
 
@@ -77,6 +85,7 @@ class ClientResource extends Resource
         return [
             'index' => ListClients::route('/'),
             'create' => CreateClient::route('/create'),
+            'view' => ViewClient::route('/{record}'),
             'edit' => EditClient::route('/{record}/edit'),
         ];
     }

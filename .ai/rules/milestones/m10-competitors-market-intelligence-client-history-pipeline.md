@@ -224,49 +224,272 @@ Planned tasks for M10:
   every file this task created/edited (the 5 `staticClassAccess.privateMethod` findings on
   `CompetitorResource.php` are the pre-existing task-2 baseline, unrelated to this task's
   changes).
-- [ ] **Task 4 — Derived analyses page**: new Filament `Page` (`HasTable`), gated
-  `Right::SEE_COMPETITOR_DATA` with explicit `canAccess()`/mount-time `abort_unless` per
-  [[pages]]. Table over `Competitor::query()` with computed columns (encounter count from
-  `tender_competitors`, wins-against-us, losses-to-us, most-common region/sector overlap).
-  Tests: a feature test asserting the table renders correct aggregate numbers for a known
-  fixture set.
-- [ ] **Task 5 — Market analysis page**: new Filament `Page` with several small `groupBy()`
-  breakdown tables (region, sector, service category, client, source, procurement procedure)
-  over `Tender::query()`, respecting the existing `ServiceCategoryScope` (category-scoped users
-  see only their own category's breakdown, matching every other tender-derived view in this
-  app). Tests for at least 2-3 of the breakdown queries against a known fixture set.
-- [ ] **Task 6 — Client history + auto follow-up reminders**: `ClientResource` gains a
-  `ViewClient` page (infolist + read-only tenders table scoped to `client_id`, showing status,
-  outcome via `TenderResult.winner`, competitors via `tender_competitors`). Migration adds the
-  3 `reminder_*_sent_at` nullable timestamp columns to `tenders`. New
-  `App\Enums\NotificationType::CLIENT_CONTRACT_RENEWAL` case +
-  `ClientContractRenewalReminderNotification` (dual-channel per [[notifications]]). New Artisan
-  command (`tenders:check-client-renewals` or similar), registered on the scheduler next to
-  `tenders:check-deadline-escalations`, scanning tenders with a `contract_end_date` 12/9/6
-  months out (any status, including lost per idea.md), notifying owner + category
-  TEAM_LEAD/DEPARTMENT_HEAD once per threshold, stamping the matching `reminder_*_sent_at`
-  column so it never re-fires. Tests: command test with time-travel fixtures for each of the 3
-  thresholds, a "doesn't re-notify once stamped" test, a "fires on a lost tender too" test.
-- [ ] **Task 7 — Pipeline & forecast page**: new Filament `Page` (`HasTable`) over
-  `Tender::query()->whereNotNull(...)->where('status', not terminal)`, columns for
-  `estimated_contract_volume` (SEE_PRICES-gated), normalized win probability (task 2's
-  helper), weighted value, `contract_start_date`, a best-effort resource-check flag, plus a
-  totals row for summed weighted pipeline value. Tests covering the weighted-value calculation
-  and the terminal-status exclusion.
-- [ ] **Task 8 — Demo seeding**: `DemoDataSeeder` gains client backfill/assignment, competitor +
-  price-entry + tender-competitor seeding (varied outcomes), and populates enough
-  `contract_end_date` values landing inside the 12/9/6-month windows to demo the reminder
-  command firing (verified via the standing throwaway-Pest-seeder-test pattern per
-  [[database-seeders]], never `migrate:fresh --seed` against the real dev DB for this check).
-- [ ] **Task 9 — Docs**: `docs/15-competitors-market-intelligence.md` (next slot per
-  [[docs]]'s tracker) covering Clients, Competitors + price entries, the tender-competitor
-  link, the derived analyses/market analysis pages, client history, the auto-renewal reminder
-  timing, and the pipeline/forecast page — ask the user the standard audience/screenshot
-  clarifying questions first per [[docs]]. Cross-link from `03-managing-tenders.md` (new
-  optional client field) and `08-administration.md` (new Client lookup table). Update
-  [[docs]]'s tracker checkbox list.
+- [x] **Task 4 — Derived analyses page**: new `App\Filament\Pages\CompetitorIntelligence`
+  (`HasTable` + `InteractsWithTable`, same shape as `RolesAndPermissions` per [[pages]]'s
+  permission-matrix pattern — `canAccess()` checks `Right::SEE_COMPETITOR_DATA`,
+  `shouldRegisterNavigation()` mirrors it, `mount()` has the explicit `abort_unless` since
+  `canAccess()` isn't auto-wired). Lives in the "Market Intelligence" nav group alongside
+  `CompetitorResource`. Table over `Competitor::query()->with(['tenderCompetitors.tender.sector',
+  'tenderCompetitors.tender.nutsCode'])` (eager-loaded to avoid N+1 across the computed columns)
+  with 5 computed `TextColumn`s driven by `->state()` closures reading the loaded
+  `tenderCompetitors` collection in memory: `encounters` (count), `wins_against_us`/
+  `losses_to_us` (filtered by `CompetitorOutcome`), and `common_sector`/`common_region` (a
+  private `self::mostCommon()` helper — `pluck` via closure, `filter`, `countBy`, `sortDesc`,
+  first key — reused for both since the only difference is which nested attribute it reads).
+  "Region" here means the linked tenders' `NutsCode.label`, not `Competitor.region` (a free-text
+  field never compared against — the two aren't the same kind of data, this column answers
+  "where have we encountered them," not "does their stated region match ours").
 
-Execute one task at a time, confirming with the user before moving to the next task (same
-rhythm as M2–M9). Once all 9 tasks are checked, add a completion line here and flip M10's
-status to "Complete" in [[milestones]]'s index table — don't build ahead into M11 without the
-user asking explicitly.
+  Trap avoided: calling the private `mostCommon()` helper via `static::` (matching this file's
+  other `static::` calls) trips PHPStan's `staticClassAccess.privateMethod` — switched to
+  `self::` for that one call since the method is deliberately non-overridable, avoiding the
+  finding instead of baselining it.
+
+  New `lang/en/competitor_intelligence.php` (nav label, title, description, column labels);
+  `competitors.php`'s existing `fields.name` key reused for the name column.
+
+  Tests: `CompetitorIntelligencePageTest` (server-side rejection without the right; a fixture
+  with 3 tender-competitor sightings across 2 sectors/regions asserting `encounters`/
+  `wins_against_us`/`losses_to_us`/`common_sector`/`common_region` all resolve correctly via
+  `assertTableColumnStateSet`, plus a zero-encounter competitor showing all-zero counts). 489
+  tests passing (up from 487 — 2 new). Pint clean; `phpstan --memory-limit=1G` clean with zero
+  findings on `CompetitorIntelligence.php`.
+- [x] **Task 5 — Market analysis page**: new `App\Filament\Pages\MarketAnalysis`, plain
+  (non-`HasTable`) `Page` in the "Market Intelligence" nav group — unlike task 4, this page
+  isn't gated behind `Right::SEE_COMPETITOR_DATA` (it's pure tender aggregate data, no
+  competitor/price fields), matching `TenderCalendar`'s precedent of no explicit `canAccess()`
+  gate beyond normal panel auth. Data-level restriction still applies automatically:
+  `Tender::query()` carries the `ServiceCategoryScope` global scope per [[scopes-models]], so a
+  category-scoped user's breakdowns are silently limited to their own category's tenders with
+  no extra code needed.
+
+  Six breakdowns (region via `nuts_codes.label`, sector, service category, client, source,
+  procurement procedure — the exact list task 5 scoped down to, trimming idea.md's fuller
+  "contract size/city/duration/competitor/price level" list since those either need `SEE_PRICES`
+  gating or overlap task 4/7) computed via `getViewData()` calling a private `breakdown(Closure
+  $configure)` helper: each call site passes a closure doing a `join`/`leftJoin` (nullable FKs —
+  `nuts_code_id`, `client_id` — use `leftJoin` so unset values still get a row) + `selectRaw('...
+  as label, count(*) as total')` + `groupBy`, run against a fresh `Tender::query()`. Rendered by
+  a plain Blade view (`market-analysis.blade.php`, not `HasTable`, since these are read-only
+  grouped counts with no sort/search/pagination need) — one card per breakdown in a responsive
+  grid, styled with the same literal Tailwind classes already proven safe under
+  [[css-filament]]'s theme-scan requirement (`participation-score-summary.blade.php`'s
+  established pattern). Ran `npm run build` (host machine) after adding the view, since some of
+  its classes (`grid-cols-*`, `border-b`, `last:border-0`, etc.) weren't already compiled in from
+  prior views.
+
+  Trap avoided: PHPStan's `selectRaw()` literal-string requirement rejects a single generic
+  helper that interpolates table/column names into the SQL string — the initial one-function,
+  4-parameter version failed with `argument.type` (non-literal-string) and `property.notFound`
+  (accessing `->total`/`->label` on the hydrated `Tender` model directly). Fixed by moving the
+  literal SQL into 6 separate closures (one per call site, so each `selectRaw()` argument is a
+  true string literal PHPStan can see) and reading values via `$row->getAttribute('label')`/
+  `getAttribute('total')` instead of magic property access, which PHPStan's Larastan extension
+  doesn't model for ad-hoc `selectRaw()` aliases.
+
+  New `lang/en/market_analysis.php` (nav label, title, description, `unknown_label` for
+  null-FK rows, `total_column`, one key per breakdown).
+
+  Tests: `MarketAnalysisPageTest` (reachable by a plain STAFF user with no special right; a
+  2-sector fixture asserting the sector breakdown's counts; a client-vs-no-client fixture
+  asserting the unassigned tender groups under `unknown_label` rather than being dropped). 492
+  tests passing (up from 489 — 3 new). Pint clean; `phpstan --memory-limit=1G` clean with zero
+  findings on `MarketAnalysis.php`.
+
+  Follow-up polish (2026-09-02, after user feedback that the plain table looked flat, then that a
+  CSS-only redesign still didn't read well): went through 3 non-chart iterations (horizontal
+  bar-list, KPI tiles, CSS donut+legend) before the user explicitly asked for real interactive
+  charts with hover tooltips. This revisits the milestone's own "no chart widgets, reserved for
+  M12" design note above — reconfirmed with the user before proceeding: M12's 3 dashboards are
+  separate purpose-built pages (employee/team-lead/management cuts, global search, PDF/Excel
+  export), not a redo of this breakdown page, so charting here doesn't create M12 rework.
+
+  Implementation uses Filament's own `ChartWidget` (Chart.js, already bundled with
+  `filament/widgets` — no new npm dependency). New abstract
+  `App\Filament\Widgets\TenderBreakdownChartWidget` holds the shared shape: each concrete subclass
+  supplies a `dimensionKey()` (for the `market_analysis.breakdowns.*` heading) and a
+  `configureQuery(Builder $query): Builder` closure-equivalent (the same
+  join/leftJoin+`selectRaw`+`groupBy` shape the old `MarketAnalysis::breakdown()` used); the base
+  class runs it, takes the top 5 rows by count, folds anything past that into a single gray
+  "Other" `market_analysis.other_label` slice (so a many-valued dimension like client doesn't
+  render dozens of slivers), and returns Chart.js `doughnut` `datasets`/`labels` data with an
+  8-color literal palette cycled by index. `getOptions()` returns a `RawJs` block wiring a
+  Chart.js tooltip callback that computes `value` + `percentage-of-total` on hover, satisfying the
+  "analytics showing on hover" ask beyond Chart.js's plain-value default. 6 concrete widgets
+  (`TendersByRegionChartWidget`, `...BySectorChartWidget`, `...ByServiceCategoryChartWidget`,
+  `...ByClientChartWidget`, `...BySourceChartWidget`, `...ByProcurementProcedureChartWidget`), one
+  per dimension, each just the `dimensionKey()`/`configureQuery()` pair.
+
+  `MarketAnalysis` page no longer builds `$breakdowns` itself — `getViewData()`/`breakdown()`
+  were deleted, and the 6 widgets are wired via `getFooterWidgets()` (returned array of
+  class-strings; Filament's base `Page::content()` schema renders these automatically inside
+  `<x-filament-panels::page>`'s existing `$this->footerWidgets` slot below the page body, no
+  custom Blade loop needed) with `getFooterWidgetsColumns(): int|array` returning `2` for "2 per
+  row, bit big" per the user's ask — `market-analysis.blade.php` is now just the intro paragraph.
+  `protected ?string $maxHeight = '300px'` on the base widget gives each chart real size at that
+  2-per-row width.
+
+  Trap avoided: `ChartWidget::getData()`/`getCachedData()` are `protected` and the chart payload
+  never reaches the rendered HTML as inspectable plain text (it's JSON inside an Alpine
+  `x-data` attribute via `@js()`), so `assertSee()`-style assertions on rendered output are
+  fragile. Used `spatie/invade` (already a project dependency) —
+  `invade(Livewire::test(Widget::class)->instance())->getData()` — to call the protected method
+  directly and assert on the returned `labels`/`data` arrays, rather than screen-scraping HTML.
+
+  Tests: rewrote `MarketAnalysisPageTest` — the page-reachability test is unchanged; the sector
+  and client-breakdown tests now hit `TendersBySectorChartWidget`/`TendersByClientChartWidget`
+  directly via `invade()->getData()` instead of the old `viewData('breakdowns')` access; added one
+  new test asserting the top-5-plus-"Other" folding behavior (7 sectors with counts 1..7 fold the
+  two smallest into a single `other_label` slice totalling 3). `phpstan --memory-limit=1G` clean
+  on every new/edited file; Pint clean. Ran `npm run build` for the (unchanged) surrounding layout
+  classes.
+- [x] **Task 6 — Client history + auto follow-up reminders**: migration
+  `add_client_reminder_columns_to_tenders_table` adds 3 nullable
+  `reminder_{12,9,6}_months_sent_at` timestamp columns to `tenders` — excluded from
+  `Tender`'s `#[Fillable(...)]` (forceFill-only, same as `is_archived`/`archived_at`/etc.),
+  cast `datetime`.
+
+  New `App\Enums\NotificationType::CLIENT_CONTRACT_RENEWAL` case +
+  `ClientContractRenewalReminderNotification` (dual-channel per [[notifications]], same shape as
+  `TenderEscalatedToManagementNotification` — `wantsEmailFor()`-gated mail, always-on database
+  channel, links to the tender's view page).
+
+  New `App\Console\Commands\CheckClientContractRenewals`
+  (`tenders:check-client-renewals`), registered on the scheduler daily next to
+  `certificates:check-expiry` (a 12/9/6-month cadence needs nothing hourly). Scans every
+  `Tender::whereNotNull('contract_end_date')` regardless of status — explicitly not excluding
+  `LOST`, per idea.md's client-history spec. Unlike `CheckCertificateExpiry`'s single
+  ratchet-column threshold model, this checks the 3 reminder columns independently (each
+  `null` + `monthsUntilEnd <= threshold` fires that one), since the milestone's task 1 already
+  locked in 3 separate columns rather than one descending value — multiple thresholds can still
+  fire together in one run after downtime (a tender first seen at 9 months out fires both the
+  12- and 9-month reminders in the same run), matching the existing catch-up semantics from
+  [[deadlines]]. Recipients: the tender's `owner` plus every `TEAM_LEAD`/`DEPARTMENT_HEAD` whose
+  `service_category_id` matches the tender's, guarded the same way as
+  `CheckDeadlineEscalations`/`CheckCertificateExpiry` against the roles not being seeded yet.
+
+  `ClientResource` gains a `view` page (`ViewClient` + `ClientInfolist`, same
+  section-plus-collapsed-meta shape as `ServiceCategoryInfolist`) and a read-only
+  `TendersRelationManager` (relationship `tenders`, no header/record/toolbar actions — a
+  tender's `client_id` is only ever set from `TenderResource`'s own form). Columns: internal ID,
+  title, status (badge), `result.winner` (the past winner/outcome), a computed `competitors`
+  column joining `tenderCompetitors.competitor.name` via `->state()` (mirrors task 4's
+  in-collection approach), and contract start/end dates — eager-loads `result` and
+  `tenderCompetitors.competitor` via `modifyQueryUsing()` to avoid N+1. `ClientsTable` gained a
+  `ViewAction` alongside the existing `EditAction` (previously edit-only, since it had no
+  relation manager until now).
+
+  New `clients.php` keys (`tenders_tab`, `tenders.fields.*`); `notifications.php` gained the
+  `client-contract-renewal` type label plus `client_contract_renewal.*` message keys.
+
+  Tests: `CheckClientContractRenewalsTest` (12-month reminder fires once and not twice on a
+  second run; nothing sent beyond 12 months out; 9-month reminder fires at that threshold; fires
+  on a `LOST` tender; notifies the category's team lead/department head but not a different
+  category's team lead or a same-category user without either role) and `ClientResourceTest`'s
+  new "client history" describe block (a linked tender appears with its winner/competitor,
+  fully read-only; a tender linked to a different client doesn't appear; the view page renders).
+  500 tests passing (up from 492 — 8 new). Pint clean; `phpstan --memory-limit=1G` clean on
+  every file this task created/edited.
+- [x] **Task 7 — Pipeline & forecast page**: new `App\Filament\Pages\PipelineForecast`
+  (`HasTable`, same shape as task 4's `CompetitorIntelligence` — no explicit `canAccess()` gate
+  on the page itself, since visibility of the price-bearing columns is handled per-column
+  instead, matching how `TenderForm`/`TenderInfolist` already gate `estimated_contract_volume`
+  behind `Right::SEE_PRICES` rather than hiding the whole page). Query: `Tender::query()
+  ->whereNotIn('status', <every TenderStatus::isTerminal() value>)->with(['participationScore',
+  'teamMembers'])` (computed via a private `pipelineQuery()` reused both by `table()` and by the
+  totals calculation below, rather than duplicating the terminal-status filter).
+
+  Columns: `internal_id`/`title`/`status` (as elsewhere), `contract_start_date`,
+  `estimated_contract_volume` (same "unknown" formatting as `TenderInfolist`, `->visible()`
+  gated on `Right::SEE_PRICES`), `win_probability` (from task 2's
+  `TenderParticipationScore::winProbability()`, rendered as a percentage or an "Incomplete"
+  placeholder when the score isn't fully rated yet), `weighted_value` (volume × probability,
+  null — not zero — whenever either input is unavailable; same `SEE_PRICES` gate as volume,
+  since it leaks the same information), and `resource_check` (a badge counting how many of the
+  5 `TeamRole` functions have at least one `TenderTeamMember` assigned — explicitly a
+  best-effort staffing *signal*, not a real capacity/recruitment system, since idea.md doesn't
+  specify one and none exists elsewhere in the app; green once all 5 are covered).
+
+  Totals row: rendered in the page's own Blade view below `$this->table` (same
+  custom-view-with-Tailwind-card approach as task 5's `market-analysis.blade.php`) rather than
+  Filament's column-level `->summarize()`, since the total needs the same `SEE_PRICES` gate as
+  the column it sums and is computed off the in-PHP `weightedValue()` helper rather than a raw
+  DB aggregate. `totalWeightedPipelineValue()` re-runs `pipelineQuery()->get()->sum(...)` and
+  returns `null` (hiding the card entirely) for a user without the right.
+
+  New `lang/en/pipeline_forecast.php` (nav label, title, description, column labels, the
+  "Incomplete" win-probability placeholder, the resource-check coverage string, the totals-row
+  label) — reuses `tenders.fields.*` and `tenders.infolist.money_eur` for shared field labels/
+  money formatting rather than duplicating them.
+
+  Trap avoided: same PHPStan `staticClassAccess.privateMethod` issue as task 4 — the private
+  `formatVolume()`/`weightedValue()`/`resourceCheckLabel()` helpers must be called via `self::`,
+  not `static::`, from inside column closures.
+
+  Tests: `PipelineForecastPageTest` (a `WON`/`LOST` tender is excluded from the table while a
+  `PROCESSING` one is included; weighted value equals volume × the score's own
+  `winProbability()` — computed from the fixture rather than hand-derived, since
+  `contractValueRating()`'s bucketing depends on the volume used; weighted value is `null` when
+  no participation score exists yet; the volume/weighted-value columns are hidden for a STAFF
+  user without `SEE_PRICES` and visible for a `SEE_PRICES` holder; full 5/5 `TeamRole` coverage
+  renders the expected coverage string). 506 tests passing (up from 500 — 6 new). Pint clean;
+  `phpstan --memory-limit=1G` clean on every file this task created/edited. Ran `npm run build`
+  after adding the totals-row view (its classes were already compiled in from prior M10 views,
+  so this was a no-op rebuild, done for safety per [[css-filament]]).
+- [x] **Task 8 — Demo seeding**: `DemoDataSeeder` gained 2 company-wide M10 libraries, seeded
+  once in `run()` right after the existing M7 libraries (references/certificates/concept
+  blocks) and before the tender loop, same one-seed-up-front pattern: `createClientLibrary()`
+  (10 `Client` rows via the factory) and `createCompetitorLibrary()` (8 `Competitor` rows, each
+  with 1-3 `CompetitorPriceEntry` rows attributed to a random library author, to demo
+  `CompetitorResource`'s price-history tab and give the derived-analyses pages real data to
+  aggregate).
+
+  `createTender()` gained 3 things: (1) `client_id` set on ~75% of tenders (`fake()->boolean(75)`
+  picking a random seeded `Client`, the remainder left `null` — deliberately, to demo
+  `MarketAnalysis`'s "Unknown" grouping for the client breakdown); (2) a new
+  `attachCompetitors()` call linking 0-3 random competitors per tender via
+  `TenderCompetitor::factory()` with a random `CompetitorOutcome`, feeding
+  `CompetitorIntelligence`'s encounter/win/loss counts and `ClientResource`'s client-history
+  competitors column; (3) a new `demoClientRenewalDate()` helper that pins `contract_end_date`
+  to exactly 3 tenders — one each at +11, +9, and +6 months from now — instead of the factory's
+  own wide random range, spread across `(INTAKE, variant 0)`, `(PROCESSING, variant 1)`, and
+  `(LOST, variant 2)` so `tenders:check-client-renewals` has real rows to fire on right after
+  seeding, including one `LOST` tender per idea.md's "reminders fire on lost tenders too"
+  requirement. Every other tender's `contract_end_date` is left alone (the helper returns `null`,
+  meaning "don't override" — `contract_end_date` is only added to the factory's `create()` array
+  when non-null, so the factory's own random range isn't clobbered for the other ~33 tenders).
+
+  Verified via the standing throwaway-Pest-seeder-test pattern per [[database-seeders]] (written,
+  run against sqlite, then deleted — never `migrate:fresh --seed` against the real dev Postgres
+  DB for this kind of check): seeding `DatabaseSeeder` end-to-end produces exactly 10 clients, 8
+  competitors, at least one price entry and one tender-competitor row, at least one tender with
+  and one without a `client_id`, and running `tenders:check-client-renewals` immediately
+  afterward fires the reminder on exactly the 3 pinned tenders (confirmed via the 3 stamped
+  `reminder_*_sent_at` columns) — no errors anywhere in the full seed run. Pint clean; PHPStan
+  shows the same pre-existing 21-finding baseline on `DemoDataSeeder.php` as before this task
+  (confirmed via `git stash`/`git stash pop` diffing the finding count) — none of the added
+  lines introduced a new finding.
+- [x] **Task 9 — Docs**: `docs/15-competitors-market-intelligence.md` drafted, covering
+  Clients (the optional `client_id` link on the tender form, kept alongside the required
+  free-text contracting authority), client history (the read-only linked-tenders table on
+  `ViewClient`) and the 12/9/6-month auto contract-renewal reminders (explicitly firing on lost
+  tenders too), `Right::SEE_COMPETITOR_DATA`-gated Competitor profiles with their price-entry
+  log and tender sightings, the two derived-reporting pages (Competitor Intelligence, gated;
+  Market Analysis, open to all users per its category-scope-only restriction), and the Pipeline
+  & Forecast page's win-probability/weighted-value/resource-check columns with their
+  `Right::SEE_PRICES` gating. Audience confirmed general/public with the user (mirrors page
+  14's precedent), screenshots left as placeholder comments, all sections covered evenly per
+  the user's answers. Cross-linked from `03-managing-tenders.md` (new optional client field, plus
+  a new "Where to go next" entry) and `08-administration.md` (new "Where to go next" entry
+  pointing at the Clients row/`SEE_COMPETITOR_DATA` right covered in more depth here). Updated
+  [[docs]]'s tracker checkbox list with page 15's entry.
+
+M10 complete as of 2026-09-02. All 9 tasks shipped: Client lookup model, Competitor + price
+entries, tender-competitor linkage, the Competitor Intelligence and Market Analysis derived
+pages, client history + auto contract-renewal reminders, the Pipeline & Forecast page, demo
+seeding, and this docs page. 507 tests passing across the milestone's own added coverage after
+task 5's post-completion chart rework above (see each task's entry for the running count; the
+full suite couldn't be re-run end-to-end in this environment due to a PHP memory limit
+unconnected to this milestone's code — every scoped/affected test file was re-run and passes).
+Flip M10's status to "Complete" in [[milestones]]'s index table. Don't build ahead into M11
+without the user asking explicitly.

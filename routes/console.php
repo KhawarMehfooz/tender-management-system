@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\CheckCertificateExpiry;
+use App\Console\Commands\CheckClientContractRenewals;
 use App\Console\Commands\CheckDeadlineEscalations;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -12,3 +13,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command(CheckDeadlineEscalations::class)->hourly();
 Schedule::command(CheckCertificateExpiry::class)->daily();
+Schedule::command(CheckClientContractRenewals::class)->daily();

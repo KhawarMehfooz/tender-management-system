@@ -7,6 +7,7 @@ use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
 use App\Enums\CertificateType;
 use App\Enums\CommunicationType;
+use App\Enums\CompetitorOutcome;
 use App\Enums\ConceptBlockCategory;
 use App\Enums\DeadlineType;
 use App\Enums\DocumentCategory;
@@ -18,6 +19,9 @@ use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
 use App\Enums\WinLossReason;
 use App\Models\Certificate;
+use App\Models\Client;
+use App\Models\Competitor;
+use App\Models\CompetitorPriceEntry;
 use App\Models\ConceptBlock;
 use App\Models\Reference;
 use App\Models\ServiceCategory;
@@ -25,6 +29,7 @@ use App\Models\Task;
 use App\Models\Tender;
 use App\Models\TenderBidDecision;
 use App\Models\TenderCalculation;
+use App\Models\TenderCompetitor;
 use App\Models\TenderDocument;
 use App\Models\TenderDocumentRequest;
 use App\Models\TenderParticipationScore;
@@ -83,6 +88,12 @@ class DemoDataSeeder extends Seeder
     /** @var Collection<int, ConceptBlock> the company-wide concept library, seeded once before any tender */
     private Collection $conceptBlocks;
 
+    /** @var Collection<int, Client> the company-wide client list (M10), seeded once before any tender */
+    private Collection $clients;
+
+    /** @var Collection<int, Competitor> the company-wide competitor list (M10), seeded once before any tender */
+    private Collection $competitors;
+
     public function run(): void
     {
         // DatabaseSeeder wraps every seeder call in Model::withoutEvents(), which mutes
@@ -102,6 +113,11 @@ class DemoDataSeeder extends Seeder
         $this->references = $this->createReferenceLibrary();
         $this->certificates = $this->createCertificateLibrary();
         $this->conceptBlocks = $this->createConceptLibrary();
+
+        // M10 libraries: company-wide, same one-seed-up-front pattern as the M7 libraries
+        // above — a slice of each is linked to individual tenders below.
+        $this->clients = $this->createClientLibrary();
+        $this->competitors = $this->createCompetitorLibrary();
 
         foreach (TenderStatus::cases() as $status) {
             for ($i = 0; $i < 3; $i++) {
@@ -189,15 +205,29 @@ class DemoDataSeeder extends Seeder
         $team = $reachesSubmission ? $this->pickTeam($category, 6, 7) : $this->pickTeam($category);
         $owner = $team->first();
 
+        // M10: most tenders link to a company client (a minority stay unlinked, to demo the
+        // "Unknown" grouping in MarketAnalysis's client breakdown). A handful get their
+        // contract_end_date pinned into the 12/9/6-month reminder windows instead of the
+        // factory's own wide random range, so tenders:check-client-renewals has something to
+        // fire on once seeding is done — including one LOST tender, per idea.md's "reminders
+        // fire on lost tenders too" requirement.
+        $demoContractEndDate = $this->demoClientRenewalDate($status, $variant);
+
         $tender = Tender::factory()->create([
             'service_category_id' => $category->id,
             'owner_id' => $owner->id,
             'title' => fake()->catchPhrase().' — '.$category->name,
+            'client_id' => fake()->boolean(75) ? $this->clients->random()->id : null,
+            ...($demoContractEndDate !== null ? ['contract_end_date' => $demoContractEndDate] : []),
         ]);
 
         // Overrides the factory's own default SUBMISSION deadline with a wider realistic
         // range for screenshot variety.
         $tender->upsertDeadline(DeadlineType::SUBMISSION, fake()->dateTimeBetween('+1 week', '+4 months'));
+
+        // M10: a minority of tenders get 0-3 competitor sightings, in a mix of outcomes, to
+        // demo CompetitorIntelligence's derived counts and ClientResource's client-history tab.
+        $this->attachCompetitors($tender);
 
         // Functional-role team members must exist before the calculation approval chain below
         // (and before the status walk further down), which both depend on tender_team_members
@@ -968,6 +998,68 @@ class DemoDataSeeder extends Seeder
 
             return $block;
         });
+    }
+
+    /**
+     * @return Collection<int, Client>
+     */
+    private function createClientLibrary(): Collection
+    {
+        return Client::factory()->count(10)->create();
+    }
+
+    /**
+     * Each competitor gets 1-3 sourced price entries, to demo CompetitorResource's price
+     * history tab and give the derived analyses something non-trivial to aggregate.
+     *
+     * @return Collection<int, Competitor>
+     */
+    private function createCompetitorLibrary(): Collection
+    {
+        return Competitor::factory()->count(8)->create()->each(function (Competitor $competitor): void {
+            foreach (range(1, fake()->numberBetween(1, 3)) as $ignored) {
+                CompetitorPriceEntry::factory()->create([
+                    'competitor_id' => $competitor->id,
+                    'created_by' => $this->randomLibraryAuthor()->id,
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Links 0-3 of the company-wide competitors to this tender, in a mix of outcomes.
+     */
+    private function attachCompetitors(Tender $tender): void
+    {
+        $count = min(fake()->numberBetween(0, 3), $this->competitors->count());
+
+        if ($count === 0) {
+            return;
+        }
+
+        $this->competitors->random($count)->each(fn (Competitor $competitor) => TenderCompetitor::factory()->create([
+            'tender_id' => $tender->id,
+            'competitor_id' => $competitor->id,
+            'outcome' => fake()->randomElement(CompetitorOutcome::cases()),
+        ]));
+    }
+
+    /**
+     * Pins contract_end_date into the 12/9/6-month reminder windows for exactly 3 tenders
+     * (one per threshold, spread across different statuses — including one LOST tender, since
+     * idea.md's client-history reminders explicitly fire for lost tenders too), so
+     * tenders:check-client-renewals has real rows to notify on right after seeding. Every other
+     * tender keeps the factory's own wide random contract_end_date range (null here means "don't
+     * override").
+     */
+    private function demoClientRenewalDate(TenderStatus $status, int $variant): ?\DateTimeInterface
+    {
+        return match (true) {
+            $status === TenderStatus::INTAKE && $variant === 0 => now()->addMonths(11),
+            $status === TenderStatus::PROCESSING && $variant === 1 => now()->addMonths(9),
+            $status === TenderStatus::LOST && $variant === 2 => now()->addMonths(6),
+            default => null,
+        };
     }
 
     /**

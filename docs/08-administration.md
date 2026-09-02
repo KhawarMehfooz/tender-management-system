@@ -63,3 +63,4 @@ This is reserved for true mistakes. A tender that's simply no longer active shou
 - [Tender Documents](09-tender-documents.md), covering each tender's own versioned document library, separate from the reference data covered above.
 - [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering the right to make bid decisions, one of the individually grantable rights managed on the roles and rights page above.
 - [References, Certificates & Concept Library](12-references-certificates-concepts.md), covering the right to manage certificates and the three company-wide libraries.
+- [Competitors, Market Intelligence, Client History & Pipeline](15-competitors-market-intelligence.md), covering the Clients reference-data table in more depth and the "see competitor data" right.
