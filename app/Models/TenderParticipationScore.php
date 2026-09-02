@@ -106,6 +106,19 @@ class TenderParticipationScore extends Model
     }
 
     /**
+     * Normalizes score() to a 0.0-1.0 win-probability figure for M10's pipeline/forecast
+     * weighting (value x probability) — reused rather than a second, independently-set
+     * probability field, so the bid/no-bid score and the pipeline forecast never disagree
+     * about how likely a tender is to be won. Null (incomplete score) propagates as null.
+     */
+    public function winProbability(): ?float
+    {
+        $score = $this->score();
+
+        return $score === null ? null : round($score / 100, 2);
+    }
+
+    /**
      * Past win rate is always unknown until M9/M10 exist; exposed so the UI can render the
      * same "unknown" note next to the fixed rating used in score().
      */

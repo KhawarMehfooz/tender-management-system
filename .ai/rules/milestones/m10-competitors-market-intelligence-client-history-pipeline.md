@@ -129,19 +129,62 @@ Planned tasks for M10:
   file this task created/edited (the pre-existing `TenderForm.php` `scopedUserOptions()`
   findings at lines 256-268 and the pre-existing Pest-`$this`-typing false positives are
   unrelated, confirmed by checking this task's added lines specifically).
-- [ ] **Task 2 — Competitor model + price entries**: migration `competitors` (UUID PK, `name`
+- [x] **Task 2 — Competitor model + price entries**: migration `competitors` (UUID PK, `name`
   string, `region`/`service_areas`/`known_clients`/`strengths`/`weaknesses`/`market_segments`/
-  `internal_notes` nullable text/string per field list above, timestamps). Model `Competitor`.
-  `CompetitorResource` gated `Right::SEE_COMPETITOR_DATA`. Migration `competitor_price_entries`
-  (UUID PK, `competitor_id` FK `cascadeOnDelete`, `price` decimal(12,2), `source` string NOT
-  NULL, `observed_on` date nullable, `context` nullable text, `created_by` FK users
-  `restrictOnDelete`, timestamps). Model `CompetitorPriceEntry`.
-  `PriceEntriesRelationManager` on `CompetitorResource` (append-only, no delete, same pattern
-  as M8/M9's audit-trail relation managers). Helper on `TenderParticipationScore` (or a new
-  small service) to normalize the existing score into a 0-1 win-probability figure for task 7
-  to reuse. New lang files `competitors.php`, `competitor_price_entries.php`. Tests:
-  `CompetitorResourceTest` (CRUD, `SEE_COMPETITOR_DATA` gating on nav + price fields), price
-  entry required-source validation.
+  `internal_notes` nullable text/string per field list above, timestamps). Model `Competitor`
+  with a `priceEntries(): HasMany` (ordered newest-`observed_on`-first) — deliberately no
+  `tenders()`/pivot relation yet, since `tender_competitors` doesn't exist until task 3.
+  `CompetitorResource` gated end-to-end behind `Right::SEE_COMPETITOR_DATA` via a private
+  `canManage()` consulted from `canViewAny()`/`canCreate()`/`canEdit()`/`canDelete()`/
+  `canDeleteAny()` — exact same single-right, whole-resource shape as
+  `CertificateResource`/`MANAGE_CERTIFICATES` (including the same pre-existing
+  `staticClassAccess.privateMethod` PHPStan finding class that `CertificateResource` already
+  carries — confirmed identical baseline, not a new regression). New "Market Intelligence" nav
+  group (`lang/en/navigation.php`) since M7's "Reference Library"/M1's "Master Data" don't fit
+  this domain; houses `CompetitorResource` now and every later M10 page (tasks 4/5/7).
+  `OutlinedFlag` icon. `ViewCompetitor` page added (list/create/edit alone aren't enough once a
+  relation manager exists — mirrors `TenderResource`'s view+edit split, not `ClientResource`'s
+  edit-only shape which has no relation manager).
+
+  Migration `competitor_price_entries` (UUID PK, `competitor_id` FK `cascadeOnDelete`, `price`
+  decimal(12,2), `source` string NOT NULL, `observed_on` date nullable, `context` nullable
+  text, `created_by` FK users `restrictOnDelete`, timestamps). Model `CompetitorPriceEntry`
+  (`created_by` included in `#[Fillable]` despite never being form input — same
+  server-stamped-via-`mutateDataUsing` pattern as `TenderResult.created_by`; caught by a
+  failing test when first omitted, since silently-dropped mass-assignment doesn't error until
+  the NOT NULL constraint fires). `PriceEntriesRelationManager` (append-only: `EditAction`
+  exists, no `DeleteAction` at all, same shape as `CommunicationRelationManager`) gated
+  per-action on the same `Right::SEE_COMPETITOR_DATA` check (technically redundant given the
+  page-level gate already implies it, kept anyway as explicit self-documentation, unlike
+  `EditCompetitor`'s bare `DeleteAction` which relies on the implication directly — see that
+  file's docblock for the reasoning). `source` is `->required()` on the form, enforcing idea.md's
+  compliance requirement that every competitor price be traceable.
+
+  Added `TenderParticipationScore::winProbability(): ?float` — `score()` normalized to 0.0-1.0,
+  null when the score itself is incomplete — so task 7's pipeline weighting reuses this instead
+  of a second, independently-settable probability field (per the confirmed design decision
+  above).
+
+  New lang files `competitors.php`, `competitor_price_entries.php`; new
+  `navigation.groups.market_intelligence` key.
+
+  Trap avoided: `fake()->state()` isn't PHPStan-resolvable (see task 1's note) — `region` in
+  both `ClientFactory` and `CompetitorFactory` now share the same German-states
+  `randomElement()` fixture list.
+
+  Tests: `CompetitorResourceTest` (list/create/edit access allowed for a
+  `SEE_COMPETITOR_DATA`-holding super admin and rejected server-side for staff, create with
+  valid data, unique-name rejection, price-entry required-source validation, price-entry
+  creation stamping `created_by`, no delete action on a price entry while edit stays visible,
+  create action hidden on the relation manager for a user without the right, delete action
+  present on the competitor edit page for a user with the right) and 2 new
+  `TenderParticipationScoreTest` cases for `winProbability()` (null when incomplete, correct
+  0.0-1.0 normalization on a known fixture). 483 tests passing (up from 472 — 11 new). Pint
+  clean; `phpstan --memory-limit=1G` clean on every file this task created/edited relative to
+  the established `CertificateResource`-class baseline (the 5 `staticClassAccess.privateMethod`
+  findings on `CompetitorResource.php` are the same finding class already present on
+  `CertificateResource.php`, confirmed by running phpstan against that file directly; the
+  pre-existing Pest-`$this`-typing false positives in the test files are unrelated).
 - [ ] **Task 3 — Tender ↔ Competitor linkage**: new `App\Enums\CompetitorOutcome` (`WE_WON`,
   `THEY_WON`, `UNKNOWN`, `HasLabel`, SCREAMING_SNAKE_CASE per [[enums]]). Migration
   `tender_competitors` pivot (UUID PK, `tender_id` FK `cascadeOnDelete`, `competitor_id` FK

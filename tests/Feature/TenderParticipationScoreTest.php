@@ -120,6 +120,25 @@ describe('marginRating', function () {
     });
 });
 
+describe('winProbability', function () {
+    it('is null until the score is computable', function () {
+        $score = TenderParticipationScore::factory()->create([
+            'distance_rating' => 3,
+            'staffing_requirement_rating' => 3,
+        ]);
+
+        expect($score->winProbability())->toBeNull();
+    });
+
+    it('normalizes the 0-100 score to a 0.0-1.0 figure', function () {
+        $tender = Tender::factory()->create(['estimated_contract_volume' => null]);
+        $score = TenderParticipationScore::factory()->rated(3)->create(['tender_id' => $tender->id]);
+
+        // score() is 52 for this fixture (see the 'score' describe block above).
+        expect($score->winProbability())->toBe(0.52);
+    });
+});
+
 describe('pastWinRateRating', function () {
     it('is always fixed at the neutral rating', function () {
         $score = TenderParticipationScore::factory()->create();

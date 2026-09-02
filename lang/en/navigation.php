@@ -6,5 +6,6 @@ return [
         'administration' => 'Administration',
         'system_settings' => 'System Settings',
         'reference_library' => 'Reference Library',
+        'market_intelligence' => 'Market Intelligence',
     ],
 ];
