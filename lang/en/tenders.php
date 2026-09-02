@@ -3,6 +3,10 @@
 return [
     'label' => 'Tender',
     'plural_label' => 'Tenders',
+    'relation_groups' => [
+        'engagement' => 'Engagement',
+        'closure' => 'Closure',
+    ],
     'form' => [
         'steps' => [
             'basic_info' => 'Basic info',

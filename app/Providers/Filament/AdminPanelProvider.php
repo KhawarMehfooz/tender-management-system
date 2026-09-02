@@ -32,6 +32,7 @@ class AdminPanelProvider extends PanelProvider
             ->maxContentWidth(Width::Full)
             ->sidebarCollapsibleOnDesktop()
             ->databaseNotifications()
+            ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->colors([
                 'primary' => Color::Blue,
             ])

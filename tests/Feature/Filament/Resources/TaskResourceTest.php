@@ -575,11 +575,11 @@ describe('tasks relation manager on a tender', function () {
         expect($task->refresh()->owner_id)->toBe($originalOwner->id);
     });
 
-    it('is read-only on the tender\'s view page', function () {
+    it('allows create from the tender\'s view page, same as edit', function () {
         $tender = Tender::factory()->create();
 
         Livewire::test(TasksRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => ViewTender::class])
-            ->assertTableActionHidden('create');
+            ->assertTableActionVisible('create');
     });
 
     it('shows a task\'s comments in the view action modal', function () {

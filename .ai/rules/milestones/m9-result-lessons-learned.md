@@ -157,6 +157,25 @@ Planned tasks for M9:
   regressions — seeding logic only, no schema/test changes in this task). Pint clean;
   `phpstan --memory-limit=1G` clean relative to the file's existing baseline (confirmed the 21
   pre-existing findings in `DemoDataSeeder.php` all sit outside the lines this task added).
+- [x] Follow-up user report: the tender detail page's relation-manager tab bar had grown to
+  13 top-level tabs (5 core + Communication/Site Visits/Submission/Follow-up/Document
+  Requests/Result/Lessons Learned + the 3-tab Reference Library group) and was overflowing.
+  Fixed by clustering the M8/M9 tabs into two new `RelationGroup`s in
+  `TenderResource::getRelations()`, the same mechanism already used for "Reference Library":
+  "Engagement" (Communication, Site Visits, Document Requests) and "Closure" (Submission,
+  Follow-up, Result, Lessons Learned). No `->icon()` on either — a first pass added one to
+  just these 2 new groups, which the user flagged as inconsistent since no other tab/group on
+  this resource carries one; removed per their explicit "don't use next time" direction. Core
+  workflow tabs (Tasks, Deadlines, Documents, Calculations, Bid Decision) stay top-level. New
+  lang keys `tenders.relation_groups.engagement`/`.closure` in `lang/en/tenders.php`. Top-level
+  tab count drops from 13 to 8. No test changes needed — every relation-manager test
+  instantiates the component directly via `Livewire::test(SomeRelationManager::class, [...])`,
+  not through `getRelations()`'s tab structure, so grouping doesn't affect them; full suite
+  464/464 still passing. Pint and `phpstan --memory-limit=1G` clean. Recorded as a durable
+  pattern (including the no-icon stance) in `.ai/rules/filament-resources-tenders.md` (via
+  `record-rule`, glob `app/Filament/Resources/Tenders/TenderResource.php`) so a future tab
+  addition groups instead of letting the top-level count grow unchecked again, and doesn't
+  reintroduce icons on these tabs.
 - [ ] Docs: `docs/14-result-lessons-learned.md` (next slot after M8's `docs/13-...`, per
   [[docs]]'s tracker) — covers the Result tab's fields including the `SEE_PRICES` gate on
   price fields and the auto-computed price gap, the multi-select win/loss categorization, the

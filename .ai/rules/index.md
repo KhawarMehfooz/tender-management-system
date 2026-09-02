@@ -14,11 +14,13 @@ Before planning or editing, find the row whose globs match the file's path and r
 | docs/** | .ai/rules/docs.md |
 | app/Enums/** | .ai/rules/enums.md |
 | app/Models/Task.php,database/factories/TaskFactory.php,database/seeders/** | .ai/rules/factories-seeders.md |
+| app/Filament/Resources/Tenders/TenderResource.php | .ai/rules/filament-resources-tenders.md |
 | **/* | .ai/rules/general.md |
 | app/Models/Task.php,database/migrations/*task_participants* | .ai/rules/migrations.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
 | app/Notifications/** | .ai/rules/notifications.md |
 | app/Filament/Pages/** | .ai/rules/pages.md |
+| app/Providers/Filament/AdminPanelProvider.php | .ai/rules/providers-filament.md |
 | app/Filament/Resources/Tasks/RelationManagers/* | .ai/rules/relation-managers.md |
 | app/Filament/Resources/**/Pages/*.php | .ai/rules/resources-pages.md |
 | app/Filament/Resources/**/Tables/*.php,app/Filament/Resources/**/RelationManagers/*.php | .ai/rules/resources-relation-managers.md |

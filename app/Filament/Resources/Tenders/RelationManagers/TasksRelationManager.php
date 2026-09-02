@@ -16,11 +16,12 @@ use Filament\Support\Enums\Width;
 use Filament\Tables\Table;
 
 /**
- * Filament v4 makes relation managers read-only by default on a resource's ViewRecord page
- * (Panel::hasReadOnlyRelationManagersOnResourceViewPagesByDefault(), true by default) — so
- * on ViewTender this only lists tasks, while on EditTender create/edit are live. That split
- * matches the rest of the app's view-vs-edit surface, so it's left as the framework default
- * rather than overridden.
+ * Create/edit are live on both ViewTender and EditTender — AdminPanelProvider disables
+ * Filament's read-only-relation-managers-on-View default panel-wide (see
+ * .ai/rules/filament-resources-tenders.md), since TaskResource itself has no canCreate()/
+ * canEdit() restriction (any authenticated category-scoped user can already create/edit tasks
+ * via the standalone resource), so gating this relation manager's actions to Edit-only added
+ * friction without adding any real protection.
  */
 class TasksRelationManager extends RelationManager
 {
