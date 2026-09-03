@@ -10,6 +10,7 @@ use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Models\Tender;
 use App\Models\User;
+use App\Models\UserAbsence;
 use App\Notifications\TaskEscalatedToAdministratorNotification;
 use App\Notifications\TaskEscalatedToAssigneeNotification;
 use App\Notifications\TaskEscalatedToTeamLeadNotification;
@@ -17,6 +18,7 @@ use App\Notifications\TenderEscalatedToManagementNotification;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Notifications\Notification as NotificationMessage;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Permission\Models\Role;
 
@@ -57,7 +59,7 @@ class CheckDeadlineEscalations extends Command
                 $currentLevel = $task->escalation_level?->level() ?? 0;
 
                 if ($currentLevel < EscalationLevel::ASSIGNEE->level()) {
-                    $task->owner->notify(new TaskEscalatedToAssigneeNotification($task));
+                    $this->notifyWithCover($task->owner, new TaskEscalatedToAssigneeNotification($task));
                     $task->forceFill([
                         'escalation_level' => EscalationLevel::ASSIGNEE,
                         'last_escalated_at' => now(),
@@ -66,13 +68,30 @@ class CheckDeadlineEscalations extends Command
                 }
 
                 if ($hoursOverdue >= 24 && $currentLevel < EscalationLevel::TEAM_LEAD->level()) {
-                    $task->tender->owner->notify(new TaskEscalatedToTeamLeadNotification($task));
+                    $this->notifyWithCover($task->tender->owner, new TaskEscalatedToTeamLeadNotification($task));
                     $task->forceFill([
                         'escalation_level' => EscalationLevel::TEAM_LEAD,
                         'last_escalated_at' => now(),
                     ])->save();
                 }
             });
+    }
+
+    /**
+     * Notifies $recipient as normal, then additionally notifies their absence cover when
+     * $recipient has an active UserAbsence (covering "now") with a cover_user_id set — the
+     * original recipient is always notified too, an absent owner is never silently skipped.
+     */
+    private function notifyWithCover(User $recipient, NotificationMessage $notification): void
+    {
+        $recipient->notify($notification);
+
+        $cover = $recipient->absences()
+            ->get()
+            ->first(fn (UserAbsence $absence): bool => $absence->covers(now()))
+            ?->coverUser;
+
+        $cover?->notify($notification);
     }
 
     /**

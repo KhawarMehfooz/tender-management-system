@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\DeadlineType;
 use App\Filament\Widgets\TenderDeadlineCalendarWidget;
+use App\Filament\Widgets\UserAbsenceCalendarWidget;
 use App\Models\Tender;
 use App\Models\User;
 use BackedEnum;
@@ -92,6 +93,7 @@ class TenderCalendar extends Page
     {
         return [
             TenderDeadlineCalendarWidget::class,
+            UserAbsenceCalendarWidget::class,
         ];
     }
 }

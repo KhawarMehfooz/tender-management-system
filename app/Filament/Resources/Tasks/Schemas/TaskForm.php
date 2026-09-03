@@ -4,8 +4,11 @@ namespace App\Filament\Resources\Tasks\Schemas;
 
 use App\Enums\RoleName;
 use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
+use App\Enums\TeamRole;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\UserAbsence;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
@@ -16,6 +19,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class TaskForm
 {
@@ -43,8 +47,49 @@ class TaskForm
     private static function scopedUserOptions(): array
     {
         return static::scopedUserQuery(User::query())
-            ->pluck('name', 'id')
+            ->get()
+            ->mapWithKeys(fn (User $user): array => [$user->id => static::workloadLabel($user)])
             ->all();
+    }
+
+    /**
+     * Surfaces a candidate's current capacity before they're piled on with another task, per
+     * idea.md's "surfaced before every new assignment" acceptance point.
+     */
+    private static function workloadLabel(User $user): string
+    {
+        $openTaskCount = Task::query()
+            ->where('owner_id', $user->id)
+            ->where('status', '!=', TaskStatus::DONE)
+            ->count();
+
+        return __('tasks.fields.owner_workload_suffix', [
+            'name' => $user->name,
+            'count' => $openTaskCount,
+        ]);
+    }
+
+    /**
+     * Non-blocking warning shown under the due-date field when the selected owner has a known
+     * UserAbsence covering that date — surfaces the risk without stopping the save, per idea.md
+     * (which says "warns," not "prevents").
+     */
+    private static function dueDateAbsenceWarning(?string $ownerId, mixed $dueDate): ?string
+    {
+        if ($ownerId === null || $dueDate === null || $dueDate === '') {
+            return null;
+        }
+
+        $owner = User::query()->find($ownerId);
+        $moment = Carbon::parse($dueDate);
+
+        $absence = $owner?->absences()
+            ->get()
+            ->first(fn (UserAbsence $absence): bool => $absence->covers($moment));
+
+        return $absence === null ? null : (string) __('tasks.fields.due_date_absence_warning', [
+            'type' => $absence->type->getLabel(),
+        ]);
     }
 
     /**
@@ -96,6 +141,10 @@ class TaskForm
                             ->options(TaskPriority::class)
                             ->default(TaskPriority::MEDIUM)
                             ->required(),
+                        Select::make('functional_role')
+                            ->label(__('tasks.fields.functional_role'))
+                            ->prefixIcon(Heroicon::OutlinedTag)
+                            ->options(TeamRole::class),
                         TextInput::make('title')
                             ->label(__('tasks.fields.title'))
                             ->prefixIcon(Heroicon::OutlinedPencil)
@@ -117,6 +166,7 @@ class TaskForm
                             ->default(fn (): ?string => static::canManageTask() ? null : auth()->id())
                             ->required()
                             ->searchable()
+                            ->live()
                             ->disabled(fn (): bool => ! static::canManageTask())
                             ->dehydrated(),
                         Select::make('reviewer_id')
@@ -130,6 +180,7 @@ class TaskForm
                             ->label(__('tasks.fields.participants'))
                             ->prefixIcon(Heroicon::OutlinedUserGroup)
                             ->relationship('participants', 'name', fn (Builder $query) => static::scopedUserQuery($query))
+                            ->getOptionLabelFromRecordUsing(fn (User $record): string => static::workloadLabel($record))
                             ->multiple()
                             ->searchable()
                             ->columnSpanFull()
@@ -175,7 +226,9 @@ class TaskForm
                             ->prefixIcon(Heroicon::OutlinedCalendarDays),
                         DatePicker::make('due_date')
                             ->label(__('tasks.fields.due_date'))
-                            ->prefixIcon(Heroicon::OutlinedCalendarDays),
+                            ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                            ->live()
+                            ->helperText(fn (Get $get): ?string => static::dueDateAbsenceWarning($get('owner_id'), $get('due_date'))),
                     ])
                     ->columns(2),
 

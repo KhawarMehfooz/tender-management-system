@@ -2,11 +2,16 @@
 
 namespace App\Filament\Resources\Users;
 
+use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Filament\Resources\Users\Pages\CreateUser;
 use App\Filament\Resources\Users\Pages\EditUser;
 use App\Filament\Resources\Users\Pages\ListUsers;
+use App\Filament\Resources\Users\Pages\ViewUser;
+use App\Filament\Resources\Users\RelationManagers\AbsencesRelationManager;
+use App\Filament\Resources\Users\RelationManagers\SkillsRelationManager;
 use App\Filament\Resources\Users\Schemas\UserForm;
+use App\Filament\Resources\Users\Schemas\UserInfolist;
 use App\Filament\Resources\Users\Tables\UsersTable;
 use App\Models\User;
 use BackedEnum;
@@ -46,9 +51,20 @@ class UserResource extends Resource
         return auth()->user()?->hasRole(RoleName::SUPER_ADMIN->value) ?? false;
     }
 
+    /**
+     * Whether the acting user may see other employees' full statistics — the same right gates
+     * this resource's list page (so a manager has somewhere to browse to a profile from) and
+     * viewing any individual profile besides one's own. See canView() below for the self-view
+     * exception.
+     */
+    private static function canViewStatistics(): bool
+    {
+        return auth()->user()?->can(Right::VIEW_EMPLOYEE_STATISTICS->value) ?? false;
+    }
+
     public static function canViewAny(): bool
     {
-        return static::canManage();
+        return static::canManage() || static::canViewStatistics();
     }
 
     public static function canCreate(): bool
@@ -59,6 +75,22 @@ class UserResource extends Resource
     public static function canEdit(Model $record): bool
     {
         return static::canManage();
+    }
+
+    /**
+     * The employee profile page (ViewUser) is reachable by the user themselves regardless of
+     * rights — it's self-service transparency, not a ranking — or by anyone who can otherwise
+     * manage/browse users (super admin, or a Right::VIEW_EMPLOYEE_STATISTICS holder).
+     */
+    public static function canView(Model $record): bool
+    {
+        $user = auth()->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->is($record) || static::canManage() || static::canViewStatistics();
     }
 
     /**
@@ -81,6 +113,11 @@ class UserResource extends Resource
         return UserForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return UserInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return UsersTable::configure($table);
@@ -89,7 +126,8 @@ class UserResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            SkillsRelationManager::class,
+            AbsencesRelationManager::class,
         ];
     }
 
@@ -98,6 +136,7 @@ class UserResource extends Resource
         return [
             'index' => ListUsers::route('/'),
             'create' => CreateUser::route('/create'),
+            'view' => ViewUser::route('/{record}'),
             'edit' => EditUser::route('/{record}/edit'),
         ];
     }

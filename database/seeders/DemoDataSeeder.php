@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AbsenceType;
 use App\Enums\BidDecision;
 use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
@@ -14,6 +15,8 @@ use App\Enums\DocumentCategory;
 use App\Enums\DocumentRequestStatus;
 use App\Enums\Right;
 use App\Enums\RoleName;
+use App\Enums\SkillCategory;
+use App\Enums\SkillProficiency;
 use App\Enums\TaskStatus;
 use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
@@ -25,6 +28,7 @@ use App\Models\CompetitorPriceEntry;
 use App\Models\ConceptBlock;
 use App\Models\Reference;
 use App\Models\ServiceCategory;
+use App\Models\Skill;
 use App\Models\Task;
 use App\Models\Tender;
 use App\Models\TenderBidDecision;
@@ -36,6 +40,7 @@ use App\Models\TenderParticipationScore;
 use App\Models\TenderSiteVisit;
 use App\Models\TenderSubmission;
 use App\Models\User;
+use App\Models\UserAbsence;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
@@ -119,11 +124,20 @@ class DemoDataSeeder extends Seeder
         $this->clients = $this->createClientLibrary();
         $this->competitors = $this->createCompetitorLibrary();
 
+        // M11: company-wide skill library, same one-seed-up-front pattern — assigned to every
+        // seeded user immediately (skills aren't per-tender, so there's nothing to link later).
+        $this->assignSkillsToUsers($this->createSkillLibrary());
+
         foreach (TenderStatus::cases() as $status) {
             for ($i = 0; $i < 3; $i++) {
                 $this->createTender($status, $i);
             }
         }
+
+        // M11: absences are user-level, not per-tender, so they're seeded once at the end —
+        // one is deliberately pinned onto an existing task's due date so the absence-aware
+        // warning/escalation logic has real overlapping data to demonstrate.
+        $this->createAbsenceLibrary();
     }
 
     private function createUsers(): void
@@ -521,6 +535,9 @@ class DemoDataSeeder extends Seeder
             // bare create() doesn't pick up from the DB default without a refresh.
             'status' => TaskStatus::OPEN,
             'due_date' => $overdue ? fake()->dateTimeBetween('-3 weeks', '-1 day') : fake()->dateTimeBetween('+1 week', '+6 weeks'),
+            // A majority get a functional_role tag; the remainder stay null to demo that not
+            // every task is tagged to a specific contribution area (M11).
+            'functional_role' => fake()->boolean(70) ? fake()->randomElement(TeamRole::cases()) : null,
         ]);
 
         if ($team->count() > 2) {
@@ -969,6 +986,89 @@ class DemoDataSeeder extends Seeder
 
             return $factory->create();
         });
+    }
+
+    /**
+     * Company-wide skill library (M11), same one-seed-up-front pattern as the M7/M10 libraries
+     * above — assignSkillsToUsers() below links a slice of it to every seeded user.
+     *
+     * @return Collection<int, Skill>
+     */
+    private function createSkillLibrary(): Collection
+    {
+        $skills = [
+            ['name' => 'Contract Law', 'category' => SkillCategory::COMPLIANCE],
+            ['name' => 'Public Procurement Law', 'category' => SkillCategory::COMPLIANCE],
+            ['name' => 'ISO 9001 Auditing', 'category' => SkillCategory::COMPLIANCE],
+            ['name' => 'Technical Writing', 'category' => SkillCategory::LANGUAGE],
+            ['name' => 'German (Native)', 'category' => SkillCategory::LANGUAGE],
+            ['name' => 'English (Business)', 'category' => SkillCategory::LANGUAGE],
+            ['name' => 'Cost Calculation', 'category' => SkillCategory::TECHNICAL],
+            ['name' => 'Quality Management', 'category' => SkillCategory::TECHNICAL],
+            ['name' => 'Project Management', 'category' => SkillCategory::TECHNICAL],
+            ['name' => 'Negotiation', 'category' => SkillCategory::SOFT_SKILLS],
+        ];
+
+        return collect($skills)->map(fn (array $skill): Skill => Skill::factory()->create($skill));
+    }
+
+    /**
+     * Assigns 2-4 random skills (with a random proficiency each) to every seeded user. Plain
+     * BelongsToMany::attach() is safe here — unlike task_participants, user_skills has a
+     * composite [user_id, skill_id] primary key with no own uuid `id` column (see [[migrations]]/
+     * [[models]] on the pivot-uuid trap), so there's no HasUuids-event workaround needed.
+     *
+     * @param  Collection<int, Skill>  $skills
+     */
+    private function assignSkillsToUsers(Collection $skills): void
+    {
+        collect($this->usersByRole)->flatten()->each(function (User $user) use ($skills): void {
+            $skills->random(fake()->numberBetween(2, 4))->each(
+                fn (Skill $skill) => $user->skills()->attach($skill->id, [
+                    'proficiency_level' => fake()->randomElement(SkillProficiency::cases())->value,
+                ])
+            );
+        });
+    }
+
+    /**
+     * User-level absences (M11), seeded once after every tender exists — 2-3 users each get a
+     * past-or-upcoming absence (a majority with a cover assigned), plus one absence deliberately
+     * pinned onto an existing open task's due date so TaskForm's/DeadlinesRelationManager's
+     * absence-aware warning and CheckDeadlineEscalations' cover-notification logic both have
+     * real overlapping data to demonstrate.
+     */
+    private function createAbsenceLibrary(): void
+    {
+        $users = collect($this->usersByRole)->flatten()->values();
+        $absentees = $users->random(min(3, $users->count()));
+        $cover = $users->reject(fn (User $user): bool => $absentees->contains(fn (User $a): bool => $a->is($user)))->random();
+
+        $absentees->values()->each(function (User $user, int $index) use ($cover): void {
+            UserAbsence::factory()->create([
+                'user_id' => $user->id,
+                'type' => fake()->randomElement([AbsenceType::HOLIDAY, AbsenceType::SICKNESS]),
+                'starts_at' => fake()->dateTimeBetween('-2 weeks', '+1 week'),
+                'ends_at' => fake()->dateTimeBetween('+1 week', '+3 weeks'),
+                'cover_user_id' => $index < 2 ? $cover->id : null,
+            ]);
+        });
+
+        $overlapTask = Task::query()
+            ->whereNotNull('due_date')
+            ->where('due_date', '>=', now())
+            ->inRandomOrder()
+            ->first();
+
+        if ($overlapTask !== null) {
+            UserAbsence::factory()->create([
+                'user_id' => $overlapTask->owner_id,
+                'type' => AbsenceType::HOLIDAY,
+                'starts_at' => $overlapTask->due_date->copy()->subDay(),
+                'ends_at' => $overlapTask->due_date->copy()->addDay(),
+                'cover_user_id' => $cover->id,
+            ]);
+        }
     }
 
     /**

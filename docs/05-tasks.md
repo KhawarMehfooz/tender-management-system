@@ -1,6 +1,6 @@
 # Tasks
 
-_Last updated: 28/08/2026_
+_Last updated: 03/09/2026_
 
 ## Breaking a tender down into work
 
@@ -26,6 +26,10 @@ Setting or changing the owner, reviewer, and participants is restricted to team 
 
 ![The task edit form, Assignment section, showing owner, reviewer, and participants fields](screenshots/tender-task-edit.png)
 *Assigning a task's owner, reviewer, and participants.*
+
+Each candidate's name in the owner, reviewer, and participants dropdowns also shows their current number of open tasks, for example "Jane Doe (4 open tasks)", so you can see who's already stretched thin before assigning more work. See [People, Teams & Cover](16-people-teams-cover.md) for more on this and the rest of what TMS tracks about the people doing the work.
+
+If the selected owner has a recorded absence covering the task's due date, an inline warning appears under the due date field, described further in [People, Teams & Cover](16-people-teams-cover.md#absences--cover). This is only a warning and doesn't block saving the task.
 
 ## Task status
 
@@ -61,3 +65,4 @@ A task can depend on one or more other tasks in the same tender. A task with unf
 
 - [Collaboration](06-collaboration.md), covering comments and attachments on tasks.
 - [Notifications](07-notifications.md), covering the notification centre and email preferences.
+- [People, Teams & Cover](16-people-teams-cover.md), covering the workload indicator, employee profiles, and absence-aware due date warnings.

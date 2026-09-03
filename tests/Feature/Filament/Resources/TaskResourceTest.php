@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\AbsenceType;
 use App\Enums\RoleName;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Enums\TeamRole;
 use App\Filament\Resources\Tasks\Pages\CreateTask;
 use App\Filament\Resources\Tasks\Pages\EditTask;
 use App\Filament\Resources\Tasks\Pages\ListTasks;
@@ -19,6 +21,7 @@ use App\Models\TaskAttachment;
 use App\Models\TaskComment;
 use App\Models\Tender;
 use App\Models\User;
+use App\Models\UserAbsence;
 use App\Notifications\TaskAttachmentAddedNotification;
 use App\Notifications\TaskCommentAddedNotification;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -47,6 +50,30 @@ describe('creation', function () {
             ->assertHasNoFormErrors();
 
         expect(Task::where('title', 'Prepare cost calculation')->exists())->toBeTrue();
+    });
+
+    it('round-trips a functional_role selection through create and edit', function () {
+        $tender = Tender::factory()->create();
+
+        Livewire::test(CreateTask::class)
+            ->fillForm([
+                'tender_id' => $tender->id,
+                'title' => 'Draft the concept text',
+                'priority' => TaskPriority::HIGH->value,
+                'functional_role' => TeamRole::CONCEPT->value,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $task = Task::where('title', 'Draft the concept text')->firstOrFail();
+        expect($task->functional_role)->toBe(TeamRole::CONCEPT);
+
+        Livewire::test(EditTask::class, ['record' => $task->getRouteKey()])
+            ->fillForm(['functional_role' => TeamRole::COORDINATION->value])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        expect($task->refresh()->functional_role)->toBe(TeamRole::COORDINATION);
     });
 
     it('rejects a missing required field', function () {
@@ -239,6 +266,59 @@ describe('assignment', function () {
             ->assertHasNoFormErrors();
 
         expect($task->refresh()->owner_id)->toBe($newOwner->id);
+    });
+
+    it('shows each candidate owner\'s open task count in the owner select', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $candidate = User::factory()->create(['name' => 'Jane Doe']);
+        Task::factory()->count(2)->create(['owner_id' => $candidate->id, 'status' => TaskStatus::OPEN]);
+        Task::factory()->create(['owner_id' => $candidate->id, 'status' => TaskStatus::DONE]);
+
+        Livewire::test(CreateTask::class)
+            ->assertSee('Jane Doe (2 open tasks)');
+    });
+});
+
+describe('due date absence warning', function () {
+    it('shows a warning when the due date falls inside the owner\'s absence window', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $owner = User::factory()->create();
+        UserAbsence::factory()->create([
+            'user_id' => $owner->id,
+            'type' => AbsenceType::HOLIDAY,
+            'starts_at' => now()->addWeek(),
+            'ends_at' => now()->addWeek()->addDays(3),
+        ]);
+
+        Livewire::test(CreateTask::class)
+            ->fillForm([
+                'owner_id' => $owner->id,
+                'due_date' => now()->addWeek()->addDay()->toDateString(),
+            ])
+            ->assertSee(__('tasks.fields.due_date_absence_warning', ['type' => AbsenceType::HOLIDAY->getLabel()]));
+    });
+
+    it('shows no warning when the due date does not overlap the owner\'s absence', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $owner = User::factory()->create();
+        UserAbsence::factory()->create([
+            'user_id' => $owner->id,
+            'starts_at' => now()->addMonth(),
+            'ends_at' => now()->addMonth()->addDays(3),
+        ]);
+
+        Livewire::test(CreateTask::class)
+            ->fillForm([
+                'owner_id' => $owner->id,
+                'due_date' => now()->addWeek()->toDateString(),
+            ])
+            ->assertDontSee('absence covering this date');
     });
 });
 

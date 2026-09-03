@@ -4,15 +4,29 @@ use App\Enums\DeadlineType;
 use App\Enums\TeamRole;
 use App\Filament\Pages\TenderCalendar;
 use App\Filament\Widgets\TenderDeadlineCalendarWidget;
+use App\Filament\Widgets\UserAbsenceCalendarWidget;
 use App\Models\ServiceCategory;
 use App\Models\Tender;
 use App\Models\TenderDeadline;
 use App\Models\TenderTeamMember;
 use App\Models\User;
+use App\Models\UserAbsence;
 use Guava\Calendar\ValueObjects\FetchInfo;
 use Livewire\Livewire;
 
 function fetchAllDeadlines(TenderDeadlineCalendarWidget $widget): array
+{
+    $info = new FetchInfo([
+        'startStr' => now()->subYear()->toIso8601String(),
+        'endStr' => now()->addYear()->toIso8601String(),
+    ]);
+
+    $method = new ReflectionMethod($widget, 'getEvents');
+
+    return $method->invoke($widget, $info)->pluck('id')->all();
+}
+
+function fetchAllAbsences(UserAbsenceCalendarWidget $widget): array
 {
     $info = new FetchInfo([
         'startStr' => now()->subYear()->toIso8601String(),
@@ -140,4 +154,56 @@ it('scopes calendar events to the acting user\'s service category', function () 
     $widget = new TenderDeadlineCalendarWidget;
 
     expect(fetchAllDeadlines($widget))->toBe([$visible->id]);
+});
+
+it('returns absences overlapping the requested date range only', function () {
+    $this->actingAs(User::factory()->create());
+
+    $inRange = UserAbsence::factory()->create([
+        'starts_at' => now()->addMonth(),
+        'ends_at' => now()->addMonth()->addDays(2),
+    ]);
+    UserAbsence::factory()->create([
+        'starts_at' => now()->addYears(5),
+        'ends_at' => now()->addYears(5)->addDays(2),
+    ]);
+
+    $widget = new UserAbsenceCalendarWidget;
+
+    expect(fetchAllAbsences($widget))->toBe([$inRange->id]);
+});
+
+it('filters absences by employee', function () {
+    $employee = User::factory()->create();
+    $this->actingAs(User::factory()->create());
+
+    $matching = UserAbsence::factory()->create([
+        'user_id' => $employee->id,
+        'starts_at' => now()->addWeek(),
+        'ends_at' => now()->addWeek()->addDays(2),
+    ]);
+    UserAbsence::factory()->create([
+        'starts_at' => now()->addWeek(),
+        'ends_at' => now()->addWeek()->addDays(2),
+    ]);
+
+    $widget = new UserAbsenceCalendarWidget;
+    $widget->pageFilters = ['employee_id' => $employee->id];
+
+    expect(fetchAllAbsences($widget))->toBe([$matching->id]);
+});
+
+it('shows an absence event alongside a deadline event on the same calendar range', function () {
+    $this->actingAs(User::factory()->create());
+
+    $tender = Tender::factory()->create();
+    $tender->deadlines()->delete();
+    $deadline = TenderDeadline::factory()->for($tender)->create(['due_at' => now()->addWeek()]);
+    $absence = UserAbsence::factory()->create([
+        'starts_at' => now()->addWeek(),
+        'ends_at' => now()->addWeek()->addDays(2),
+    ]);
+
+    expect(fetchAllDeadlines(new TenderDeadlineCalendarWidget))->toContain($deadline->id);
+    expect(fetchAllAbsences(new UserAbsenceCalendarWidget))->toContain($absence->id);
 });

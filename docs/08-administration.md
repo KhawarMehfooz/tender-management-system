@@ -1,6 +1,6 @@
 # Administration
 
-_Last updated: 02/09/2026_
+_Last updated: 03/09/2026_
 
 This page covers the parts of TMS reserved for administrators: managing user accounts, adjusting roles and rights, maintaining the reference data the rest of the system runs on, and removing genuine junk entries.
 
@@ -43,6 +43,7 @@ Several classification lists feed the dropdowns used elsewhere in TMS, such as w
 | **Procurement procedures** | The formal procurement procedure type used for a tender. |
 | **CPV codes** | The EU's standard classification codes for the subject of a contract. |
 | **NUTS codes** | The EU's standard geographic classification codes, structured as a country/state/region/district hierarchy. |
+| **Skills** | Capabilities that can be assigned to employees on their profile, such as "Contract Law" or a specific certification, covered in [People, Teams & Cover](16-people-teams-cover.md). |
 
 ![The Service categories list, showing the active flag and add/edit actions](screenshots/data-service-categories.jpg)
 *Managing a reference data list.*
@@ -64,3 +65,4 @@ This is reserved for true mistakes. A tender that's simply no longer active shou
 - [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering the right to make bid decisions, one of the individually grantable rights managed on the roles and rights page above.
 - [References, Certificates & Concept Library](12-references-certificates-concepts.md), covering the right to manage certificates and the three company-wide libraries.
 - [Competitors, Market Intelligence, Client History & Pipeline](15-competitors-market-intelligence.md), covering the Clients reference-data table in more depth and the "see competitor data" right.
+- [People, Teams & Cover](16-people-teams-cover.md), covering the Skills reference-data table in more depth, employee profiles, team performance, and the "view employee statistics" right.

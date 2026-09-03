@@ -11,6 +11,8 @@ enum TeamRole: string implements HasLabel
     case EVIDENCE_DOCUMENTS = 'evidence-documents';
     case QUALITY_CONTROL = 'quality-control';
     case FINAL_APPROVAL = 'final-approval';
+    case COMMUNICATION = 'communication';
+    case COORDINATION = 'coordination';
 
     public function getLabel(): string
     {

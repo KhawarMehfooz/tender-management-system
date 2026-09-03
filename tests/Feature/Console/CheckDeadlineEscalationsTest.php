@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\CheckDeadlineEscalations;
+use App\Enums\AbsenceType;
 use App\Enums\DeadlineType;
 use App\Enums\EscalationLevel;
 use App\Enums\RoleName;
@@ -9,6 +10,7 @@ use App\Enums\TaskStatus;
 use App\Models\Task;
 use App\Models\Tender;
 use App\Models\User;
+use App\Models\UserAbsence;
 use App\Notifications\TaskEscalatedToAdministratorNotification;
 use App\Notifications\TaskEscalatedToAssigneeNotification;
 use App\Notifications\TaskEscalatedToTeamLeadNotification;
@@ -82,6 +84,84 @@ describe('task overdue escalation (levels 1-2)', function () {
         $this->artisan(CheckDeadlineEscalations::class)->assertSuccessful();
 
         Notification::assertSentToTimes($owner, TaskEscalatedToAssigneeNotification::class, 1);
+    });
+
+    it('also notifies the owner\'s absence cover at level 1', function () {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $cover = User::factory()->create();
+        UserAbsence::factory()->create([
+            'user_id' => $owner->id,
+            'type' => AbsenceType::HOLIDAY,
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addDay(),
+            'cover_user_id' => $cover->id,
+        ]);
+        $task = Task::factory()->create(['owner_id' => $owner->id, 'due_date' => now()->startOfDay(), 'status' => TaskStatus::IN_PROGRESS]);
+
+        $this->artisan(CheckDeadlineEscalations::class)->assertSuccessful();
+
+        Notification::assertSentTo($owner, TaskEscalatedToAssigneeNotification::class);
+        Notification::assertSentTo($cover, TaskEscalatedToAssigneeNotification::class);
+    });
+
+    it('also notifies the tender owner\'s absence cover at level 2', function () {
+        Notification::fake();
+
+        $tenderOwner = User::factory()->create();
+        $cover = User::factory()->create();
+        UserAbsence::factory()->create([
+            'user_id' => $tenderOwner->id,
+            'type' => AbsenceType::SICKNESS,
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addDay(),
+            'cover_user_id' => $cover->id,
+        ]);
+        $tender = Tender::factory()->create(['owner_id' => $tenderOwner->id]);
+        $taskOwner = User::factory()->create();
+        Task::factory()->create([
+            'tender_id' => $tender->id,
+            'owner_id' => $taskOwner->id,
+            'due_date' => now()->subDay()->startOfDay(),
+            'status' => TaskStatus::IN_PROGRESS,
+        ]);
+
+        $this->artisan(CheckDeadlineEscalations::class)->assertSuccessful();
+
+        Notification::assertSentTo($tenderOwner, TaskEscalatedToTeamLeadNotification::class);
+        Notification::assertSentTo($cover, TaskEscalatedToTeamLeadNotification::class);
+    });
+
+    it('does not change recipients when the owner has no absence', function () {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        $task = Task::factory()->create(['owner_id' => $owner->id, 'due_date' => now()->startOfDay(), 'status' => TaskStatus::IN_PROGRESS]);
+
+        $this->artisan(CheckDeadlineEscalations::class)->assertSuccessful();
+
+        Notification::assertSentToTimes($owner, TaskEscalatedToAssigneeNotification::class, 1);
+        Notification::assertCount(1);
+    });
+
+    it('does not error when the absent owner has no cover assigned', function () {
+        Notification::fake();
+
+        $owner = User::factory()->create();
+        UserAbsence::factory()->create([
+            'user_id' => $owner->id,
+            'type' => AbsenceType::OTHER,
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->addDay(),
+            'cover_user_id' => null,
+        ]);
+        $task = Task::factory()->create(['owner_id' => $owner->id, 'due_date' => now()->startOfDay(), 'status' => TaskStatus::IN_PROGRESS]);
+
+        $this->artisan(CheckDeadlineEscalations::class)->assertSuccessful();
+
+        Notification::assertSentToTimes($owner, TaskEscalatedToAssigneeNotification::class, 1);
+        Notification::assertCount(1);
     });
 });
 

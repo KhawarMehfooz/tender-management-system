@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AbsenceType;
 use App\Enums\BidDecision;
 use App\Enums\CalculationApprovalStep;
 use App\Enums\CalculationModel;
@@ -65,6 +66,7 @@ use App\Models\TenderSubmission;
 use App\Models\TenderSubmissionFile;
 use App\Models\TenderTeamMember;
 use App\Models\User;
+use App\Models\UserAbsence;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -666,6 +668,43 @@ describe('deadlines relation manager', function () {
                 'due_at' => now()->addWeeks(3),
             ])
             ->assertHasTableActionErrors(['type']);
+    });
+
+    it('warns when the due-at date falls inside the tender owner\'s absence window', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        UserAbsence::factory()->create([
+            'user_id' => $owner->id,
+            'type' => AbsenceType::HOLIDAY,
+            'starts_at' => now()->addWeek(),
+            'ends_at' => now()->addWeek()->addDays(3),
+        ]);
+
+        Livewire::test(DeadlinesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->mountTableAction('create')
+            ->setTableActionData(['due_at' => now()->addWeek()->addDay()->toDateTimeString()])
+            ->assertMountedActionModalSee(__('tender_deadlines.fields.due_at_absence_warning', ['type' => AbsenceType::HOLIDAY->getLabel()]));
+    });
+
+    it('shows no warning when the due-at date does not overlap the tender owner\'s absence', function () {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        auth()->user()->assignRole(RoleName::TEAM_LEAD);
+
+        $owner = User::factory()->create();
+        $tender = Tender::factory()->create(['owner_id' => $owner->id]);
+        UserAbsence::factory()->create([
+            'user_id' => $owner->id,
+            'starts_at' => now()->addMonth(),
+            'ends_at' => now()->addMonth()->addDays(3),
+        ]);
+
+        Livewire::test(DeadlinesRelationManager::class, ['ownerRecord' => $tender, 'pageClass' => EditTender::class])
+            ->mountTableAction('create')
+            ->setTableActionData(['due_at' => now()->addWeek()->toDateTimeString()])
+            ->assertMountedActionModalDontSee('absence covering this date');
     });
 
     it('lets a team lead delete a deadline', function () {

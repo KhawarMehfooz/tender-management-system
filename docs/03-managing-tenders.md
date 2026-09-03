@@ -1,6 +1,6 @@
 # Managing Tenders
 
-_Last updated: 02/09/2026_
+_Last updated: 03/09/2026_
 
 ## Creating a tender
 
@@ -61,9 +61,11 @@ Adding, editing, and removing deadlines is restricted to the tender's team lead,
 
 One deadline type, **bid validity**, is calculated automatically from the submission deadline plus the bid validity period you set in the create wizard, and can't be edited directly — it updates whenever either of those two inputs changes.
 
+If the tender's owner has a recorded absence covering a deadline's due date, an inline warning appears when setting it. This is only a warning and doesn't block saving the deadline, described further in [People, Teams & Cover](16-people-teams-cover.md#absences--cover).
+
 ### The tender calendar
 
-Every deadline across every tender you can see also appears on the **Tender calendar**, reachable from the main navigation. It shows only tenders within your own category scope, same as everywhere else in the system. Use the filters at the top to narrow the calendar down to a specific employee, tender, contracting authority, or deadline type. Clicking an event takes you straight to that tender's detail page.
+Every deadline across every tender you can see also appears on the **Tender calendar**, reachable from the main navigation, alongside every recorded employee absence, described in [People, Teams & Cover](16-people-teams-cover.md#absences--cover), so upcoming deadlines and upcoming time off can be checked side by side. It shows only tenders within your own category scope, same as everywhere else in the system. Use the filters at the top to narrow the calendar down to a specific employee, tender, contracting authority, or deadline type. Clicking a deadline event takes you straight to that tender's detail page; clicking an absence event takes you to that absence's edit page.
 
 ![The tender calendar, showing deadlines across multiple tenders with the filter bar visible](screenshots/tender-calendar.jpg)
 *The tender calendar with its employee, tender, contracting authority, and deadline type filters.*
@@ -74,6 +76,8 @@ If a task or a submission deadline is at risk of being missed, the system escala
 
 - An overdue task first notifies its **owner**. If it's still open 24 hours later, its **tender's owner** is notified too.
 - As a submission deadline approaches, if the tender still has an urgent-priority task open, **administrators** are notified once 48 hours remain, and a **management** alert follows once only 24 hours remain.
+
+If the task owner or tender owner being notified is currently on a recorded absence with a cover assigned, the cover is notified as well, alongside the original recipient, described further in [People, Teams & Cover](16-people-teams-cover.md#escalation-and-cover).
 
 Each of these notifications only fires once per task or tender, so you won't be notified repeatedly for the same overdue item. Escalation notifications appear in the notification centre like any other, and follow the same email preferences described in [Notifications](07-notifications.md).
 
@@ -103,3 +107,4 @@ In rare cases, such as a tender created by mistake with no real data attached to
 - [Communication, Site Visits, Submission & Follow-up](13-communication-site-visits-submission.md), covering the tender's communication log, site visits, submission record, follow-up tracking, and document requests.
 - [Result & Lessons Learned](14-result-lessons-learned.md), covering recording the outcome and a retrospective once a tender reaches one of its terminal statuses.
 - [Competitors, Market Intelligence, Client History & Pipeline](15-competitors-market-intelligence.md), covering the optional client link, recording competitors seen on a tender, and the market/pipeline reporting pages.
+- [People, Teams & Cover](16-people-teams-cover.md), covering the absences that appear alongside deadlines on the tender calendar and the cover-notification behavior on escalation.

@@ -4,6 +4,8 @@ namespace App\Filament\Resources\Tenders\RelationManagers;
 
 use App\Enums\DeadlineType;
 use App\Filament\Resources\Tenders\Schemas\TenderForm;
+use App\Models\Tender;
+use App\Models\UserAbsence;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -15,6 +17,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Carbon;
 
 /**
  * Gated by TenderForm::canManageTeam() (team lead/department head/super admin) — the same
@@ -42,6 +45,31 @@ class DeadlinesRelationManager extends RelationManager
         ));
     }
 
+    /**
+     * Non-blocking warning shown under the due-at field when the tender's owner has a known
+     * UserAbsence covering the selected date — same rationale as
+     * TaskForm::dueDateAbsenceWarning(), applied to the tender's owner since a deadline has no
+     * per-row assignee of its own.
+     */
+    private function dueAtAbsenceWarning(mixed $dueAt): ?string
+    {
+        if ($dueAt === null || $dueAt === '') {
+            return null;
+        }
+
+        /** @var Tender $tender */
+        $tender = $this->getOwnerRecord();
+        $moment = Carbon::parse($dueAt);
+
+        $absence = $tender->owner?->absences()
+            ->get()
+            ->first(fn (UserAbsence $absence): bool => $absence->covers($moment));
+
+        return $absence === null ? null : (string) __('tender_deadlines.fields.due_at_absence_warning', [
+            'type' => $absence->type->getLabel(),
+        ]);
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -57,6 +85,8 @@ class DeadlinesRelationManager extends RelationManager
                 DateTimePicker::make('due_at')
                     ->label(__('tender_deadlines.fields.due_at'))
                     ->required()
+                    ->live()
+                    ->helperText(fn (mixed $state): ?string => $this->dueAtAbsenceWarning($state))
                     ->disabled(fn (): bool => ! TenderForm::canManageTeam())
                     ->dehydrated(),
             ]);

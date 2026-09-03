@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\EscalationLevel;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Enums\TeamRole;
 use App\Exceptions\InvalidTaskStatusTransitionException;
 use App\Exceptions\TaskDependenciesNotCompleteException;
 use App\Models\Scopes\TaskTenderCategoryScope;
@@ -31,6 +32,7 @@ use Illuminate\Support\Facades\Notification;
  * @property string $creator_id
  * @property string|null $reviewer_id
  * @property TaskPriority $priority
+ * @property TeamRole|null $functional_role
  * @property TaskStatus $status
  * @property Carbon|null $start_date
  * @property Carbon|null $due_date
@@ -42,7 +44,7 @@ use Illuminate\Support\Facades\Notification;
  */
 #[Fillable([
     'tender_id', 'title', 'description', 'owner_id', 'creator_id', 'reviewer_id', 'priority',
-    'status', 'start_date', 'due_date', 'completion_date',
+    'functional_role', 'status', 'start_date', 'due_date', 'completion_date',
     // escalation_level/last_escalated_at are intentionally excluded: they're only ever written
     // by the M3 escalation scheduler (not yet built), never through form mass assignment —
     // same pattern as Tender's archive/invalid fields.
@@ -64,6 +66,7 @@ class Task extends Model
     {
         return [
             'priority' => TaskPriority::class,
+            'functional_role' => TeamRole::class,
             'status' => TaskStatus::class,
             'start_date' => 'date',
             'due_date' => 'date',
