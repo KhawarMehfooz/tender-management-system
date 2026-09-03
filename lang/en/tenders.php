@@ -98,4 +98,9 @@ return [
         'not-evaluated' => 'Not evaluated',
         'excluded' => 'Excluded',
     ],
+    'archive' => [
+        'title' => 'Archive',
+        'view_archive' => 'View archive',
+        'archived_at' => 'Archived at',
+    ],
 ];

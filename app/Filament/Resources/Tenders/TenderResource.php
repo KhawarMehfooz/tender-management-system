@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Tenders;
 
+use App\Filament\Resources\Tenders\Pages\ArchivedTenders;
 use App\Filament\Resources\Tenders\Pages\CreateTender;
 use App\Filament\Resources\Tenders\Pages\EditTender;
 use App\Filament\Resources\Tenders\Pages\ListTenders;
@@ -55,6 +56,46 @@ class TenderResource extends Resource
     public static function getNavigationSort(): ?int
     {
         return -1;
+    }
+
+    /**
+     * Covers idea.md's M12 global-search field list: tender ID, procurement number, client,
+     * procurement office, city, employee, competitor, winner, document, title, service type.
+     * Dot-notation attributes run as whereHas() constraints against the named relation, so
+     * category/right scoping on those related resources doesn't need to be re-checked here —
+     * results are still constrained by this resource's own getEloquentQuery() (the
+     * ServiceCategoryScope global scope).
+     *
+     * @return array<string>
+     */
+    public static function getGloballySearchableAttributes(): array
+    {
+        return [
+            'internal_id',
+            'procurement_number',
+            'title',
+            'city',
+            'procurement_office',
+            'client.name',
+            'serviceCategory.name',
+            'owner.name',
+            'documents.title',
+            'result.winner',
+            'tenderCompetitors.competitor.name',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function getGlobalSearchResultDetails(Model $record): array
+    {
+        /** @var Tender $record */
+        return [
+            __('tenders.fields.internal_id') => $record->internal_id,
+            __('tenders.fields.service_category_id') => $record->serviceCategory->name,
+            __('tenders.fields.status') => $record->status->getLabel(),
+        ];
     }
 
     /**
@@ -120,6 +161,7 @@ class TenderResource extends Resource
         return [
             'index' => ListTenders::route('/'),
             'create' => CreateTender::route('/create'),
+            'archive' => ArchivedTenders::route('/archive'),
             'view' => ViewTender::route('/{record}'),
             'edit' => EditTender::route('/{record}/edit'),
         ];

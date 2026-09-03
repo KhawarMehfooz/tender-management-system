@@ -7,12 +7,14 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "barryvdh/laravel-dompdf": "^3.1",
         "filament/filament": "^5.0",
         "guava/calendar": "^3.0",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
         "livewire/blaze": "^1.0",
         "livewire/livewire": "^4.1",
+        "maatwebsite/excel": "^4.0",
         "spatie/laravel-permission": "^8.3"
     },
     "require-dev": {

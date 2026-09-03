@@ -19,6 +19,11 @@ class TenderDeadlineCalendarWidget extends CalendarWidget
 
     protected bool $eventClickEnabled = true;
 
+    public function getHeading(): ?string
+    {
+        return __('tender_calendar.deadlines_heading');
+    }
+
     protected function getEvents(FetchInfo $info): Collection|array|Builder
     {
         return TenderDeadline::query()

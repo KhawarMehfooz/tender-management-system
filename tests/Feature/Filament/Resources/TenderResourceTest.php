@@ -305,6 +305,63 @@ describe('view page', function () {
     });
 });
 
+describe('combinable filters', function () {
+    it('narrows results by contract volume range', function () {
+        $small = Tender::factory()->create(['estimated_contract_volume' => 5000, 'estimated_contract_volume_unknown' => false]);
+        $large = Tender::factory()->create(['estimated_contract_volume' => 500000, 'estimated_contract_volume_unknown' => false]);
+
+        Livewire::test(ListTenders::class)
+            ->filterTable('estimated_contract_volume', ['min' => 100000])
+            ->assertCanSeeTableRecords([$large])
+            ->assertCanNotSeeTableRecords([$small]);
+    });
+
+    it('narrows results by a period date range', function () {
+        $old = Tender::factory()->create();
+        $old->forceFill(['created_at' => now()->subYear()])->saveQuietly();
+        $recent = Tender::factory()->create();
+        $recent->forceFill(['created_at' => now()])->saveQuietly();
+
+        Livewire::test(ListTenders::class)
+            ->filterTable('period', ['from' => now()->subMonth()->toDateString()])
+            ->assertCanSeeTableRecords([$recent])
+            ->assertCanNotSeeTableRecords([$old]);
+    });
+
+    it('narrows results by competitor', function () {
+        $competitor = Competitor::factory()->create();
+        $withCompetitor = Tender::factory()->create();
+        $withCompetitor->tenderCompetitors()->create(['competitor_id' => $competitor->id, 'outcome' => CompetitorOutcome::WE_WON]);
+        $withoutCompetitor = Tender::factory()->create();
+
+        Livewire::test(ListTenders::class)
+            ->filterTable('competitor', ['competitor_id' => $competitor->id])
+            ->assertCanSeeTableRecords([$withCompetitor])
+            ->assertCanNotSeeTableRecords([$withoutCompetitor]);
+    });
+
+    it('combines multiple filters with AND logic', function () {
+        $category = ServiceCategory::factory()->create();
+        $matches = Tender::factory()->create([
+            'service_category_id' => $category->id,
+            'status' => TenderStatus::WON,
+        ]);
+        $wrongStatus = Tender::factory()->create([
+            'service_category_id' => $category->id,
+            'status' => TenderStatus::LOST,
+        ]);
+        $wrongCategory = Tender::factory()->create([
+            'status' => TenderStatus::WON,
+        ]);
+
+        Livewire::test(ListTenders::class)
+            ->filterTable('service_category_id', $category->id)
+            ->filterTable('status', TenderStatus::WON->value)
+            ->assertCanSeeTableRecords([$matches])
+            ->assertCanNotSeeTableRecords([$wrongStatus, $wrongCategory]);
+    });
+});
+
 describe('category-scoped views', function () {
     it('shows a management user (no assigned category) tenders from every category', function () {
         $categoryA = ServiceCategory::factory()->create();

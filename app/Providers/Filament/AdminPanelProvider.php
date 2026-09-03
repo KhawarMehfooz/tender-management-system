@@ -2,6 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Widgets\ActivityFeedWidget;
+use App\Filament\Widgets\DeadlineRadarWidget;
+use App\Filament\Widgets\EmployeeOpenTasksWidget;
+use App\Filament\Widgets\ManagementKpiWidget;
+use App\Filament\Widgets\TeamLeadDepartmentOverviewWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -46,7 +51,13 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
+            ->widgets([
+                EmployeeOpenTasksWidget::class,
+                DeadlineRadarWidget::class,
+                ActivityFeedWidget::class,
+                TeamLeadDepartmentOverviewWidget::class,
+                ManagementKpiWidget::class,
+            ])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

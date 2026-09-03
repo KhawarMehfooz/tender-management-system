@@ -18,6 +18,11 @@ class UserAbsenceCalendarWidget extends CalendarWidget
 
     protected bool $eventClickEnabled = true;
 
+    public function getHeading(): ?string
+    {
+        return __('absences.calendar_heading');
+    }
+
     protected function getEvents(FetchInfo $info): Collection|array|Builder
     {
         return UserAbsence::query()

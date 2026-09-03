@@ -27,6 +27,8 @@ class UserResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
+    protected static ?string $recordTitleAttribute = 'name';
+
     public static function getModelLabel(): string
     {
         return __('users.label');
@@ -40,6 +42,20 @@ class UserResource extends Resource
     public static function getNavigationGroup(): ?string
     {
         return __('navigation.groups.administration');
+    }
+
+    /**
+     * $recordTitleAttribute ('name', set above) already makes global search work by default —
+     * this override adds 'email' on top, covering idea.md's M12 "employee" global-search field
+     * more completely (name or email). Results are naturally restricted to the same audience as
+     * this resource's own list page, since canGloballySearch() also checks canAccess() (->
+     * canViewAny() -> canManage() || canViewStatistics()) — no separate gating needed here.
+     *
+     * @return array<string>
+     */
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'email'];
     }
 
     /**

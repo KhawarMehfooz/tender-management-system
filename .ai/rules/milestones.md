@@ -24,11 +24,11 @@ in-progress one) before planning or editing.
 | M9: Result & Lessons Learned | Complete | [milestones/m9-result-lessons-learned.md](milestones/m9-result-lessons-learned.md) |
 | M10: Competitors, Market Intelligence, Client History, Pipeline | Complete | [milestones/m10-competitors-market-intelligence-client-history-pipeline.md](milestones/m10-competitors-market-intelligence-client-history-pipeline.md) |
 | M11: People, Teams, Cover | Complete | [milestones/m11-people-teams-cover.md](milestones/m11-people-teams-cover.md) |
-| M12: Dashboards, Search, Statistics, Archive, Reporting | Not started | see idea.md |
+| M12: Dashboards, Search, Statistics, Archive, Reporting | In progress | [milestones/m12-dashboards-search-statistics-archive-reporting.md](milestones/m12-dashboards-search-statistics-archive-reporting.md) |
 | M13: Later Expansion | Explicitly deferred | see idea.md |
 
-M1-M11 are complete. Don't start the next not-started milestone (M12) without
-the user asking for it explicitly.
+M1-M11 are complete. M12 is in progress — read its file before touching anything covered
+by it.
 
 When a not-started milestone kicks off, create its file under `.ai/rules/milestones/` (see
 [[general]]'s "Plan new milestones" rule for the exact workflow) and add its row above.

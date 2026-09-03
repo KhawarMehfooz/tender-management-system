@@ -24,6 +24,8 @@ class ClientResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
+    protected static ?string $recordTitleAttribute = 'name';
+
     public static function getModelLabel(): string
     {
         return __('clients.label');

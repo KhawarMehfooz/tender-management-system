@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Tenders\Tables;
 use App\Enums\DeadlineType;
 use App\Enums\RoleName;
 use App\Enums\TenderStatus;
+use App\Filament\Concerns\HasTenderReportFilters;
 use App\Models\Tender;
 use App\Models\TenderDeadline;
 use Filament\Actions\Action;
@@ -18,13 +19,14 @@ use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 class TendersTable
 {
+    use HasTenderReportFilters;
+
     public static function configure(Table $table): Table
     {
         return $table
@@ -80,15 +82,7 @@ class TendersTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('service_category_id')
-                    ->label(__('tenders.fields.service_category_id'))
-                    ->relationship('serviceCategory', 'name'),
-                SelectFilter::make('status')
-                    ->label(__('tenders.fields.status'))
-                    ->options(TenderStatus::class),
-                SelectFilter::make('source_id')
-                    ->label(__('tenders.fields.source_id'))
-                    ->relationship('source', 'name'),
+                ...static::tenderReportFilters(),
                 TernaryFilter::make('is_archived')
                     ->label(__('tenders.fields.is_archived')),
                 TernaryFilter::make('is_invalid')

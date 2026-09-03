@@ -4,6 +4,7 @@ return [
     'label' => 'Absence',
     'plural_label' => 'Absences',
     'navigation_label' => 'Absences',
+    'calendar_heading' => 'Absences',
     'fields' => [
         'user_id' => 'Employee',
         'type' => 'Type',

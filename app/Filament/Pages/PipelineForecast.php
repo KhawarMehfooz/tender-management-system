@@ -41,7 +41,7 @@ class PipelineForecast extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query($this->pipelineQuery())
+            ->query(static::pipelineQuery())
             ->columns([
                 TextColumn::make('internal_id')
                     ->label(__('tenders.fields.internal_id'))
@@ -87,7 +87,7 @@ class PipelineForecast extends Page implements HasTable
     /**
      * @return Builder<Tender>
      */
-    private function pipelineQuery(): Builder
+    public static function pipelineQuery(): Builder
     {
         $terminalStatuses = collect(TenderStatus::cases())
             ->filter(fn (TenderStatus $status): bool => $status->isTerminal())
@@ -108,7 +108,7 @@ class PipelineForecast extends Page implements HasTable
             return null;
         }
 
-        return $this->pipelineQuery()
+        return static::pipelineQuery()
             ->get()
             ->sum(fn (Tender $tender): float => self::weightedValue($tender) ?? 0.0);
     }

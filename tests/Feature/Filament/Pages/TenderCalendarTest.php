@@ -44,6 +44,15 @@ it('allows any authenticated user to view the calendar page', function () {
     Livewire::test(TenderCalendar::class)->assertSuccessful();
 });
 
+it('gives the deadlines and absences calendar widgets distinct headings', function () {
+    $deadlineHeading = (new TenderDeadlineCalendarWidget)->getHeading();
+    $absenceHeading = (new UserAbsenceCalendarWidget)->getHeading();
+
+    expect($deadlineHeading)->toBe(__('tender_calendar.deadlines_heading'));
+    expect($absenceHeading)->toBe(__('absences.calendar_heading'));
+    expect($deadlineHeading)->not->toBe($absenceHeading);
+});
+
 it('returns deadlines within the requested date range only', function () {
     $this->actingAs(User::factory()->create());
 

@@ -1,0 +1,1 @@
+@include('reports.partials.table')

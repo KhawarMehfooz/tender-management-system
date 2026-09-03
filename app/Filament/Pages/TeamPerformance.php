@@ -69,7 +69,7 @@ class TeamPerformance extends Page
      *
      * @return array<int, array{name: string, department: string, score: float, winRate: ?float}>
      */
-    private static function rankings(): array
+    public static function rankings(): array
     {
         return User::query()
             ->with('serviceCategory')
@@ -93,7 +93,7 @@ class TeamPerformance extends Page
      *
      * @return array<int, array{label: string, statusCounts: array<string, int>, total: int, onTimeRate: ?float, correctionLoopRate: ?float}>
      */
-    private static function departmentBreakdown(): array
+    public static function departmentBreakdown(): array
     {
         $rows = ServiceCategory::query()
             ->orderBy('name')

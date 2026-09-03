@@ -8,5 +8,6 @@ return [
         'reference_library' => 'Reference Library',
         'market_intelligence' => 'Market Intelligence',
         'people' => 'People',
+        'reporting' => 'Reporting',
     ],
 ];
