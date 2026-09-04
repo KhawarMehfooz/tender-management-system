@@ -1,0 +1,285 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\EscalationLevel;
+use App\Enums\TaskPriority;
+use App\Enums\TaskStatus;
+use App\Enums\TeamRole;
+use App\Exceptions\InvalidTaskStatusTransitionException;
+use App\Exceptions\TaskDependenciesNotCompleteException;
+use App\Models\Scopes\TaskTenderCategoryScope;
+use App\Notifications\TaskStatusChangedNotification;
+use Database\Factories\TaskFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+
+/**
+ * @property string $id
+ * @property string $tender_id
+ * @property string $title
+ * @property string|null $description
+ * @property string $owner_id
+ * @property string $creator_id
+ * @property string|null $reviewer_id
+ * @property TaskPriority $priority
+ * @property TeamRole|null $functional_role
+ * @property TaskStatus $status
+ * @property Carbon|null $start_date
+ * @property Carbon|null $due_date
+ * @property Carbon|null $completion_date
+ * @property EscalationLevel|null $escalation_level
+ * @property Carbon|null $last_escalated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
+#[Fillable([
+    'tender_id', 'title', 'description', 'owner_id', 'creator_id', 'reviewer_id', 'priority',
+    'functional_role', 'status', 'start_date', 'due_date', 'completion_date',
+    // escalation_level/last_escalated_at are intentionally excluded: they're only ever written
+    // by the M3 escalation scheduler (not yet built), never through form mass assignment —
+    // same pattern as Tender's archive/invalid fields.
+])]
+class Task extends Model
+{
+    /** @use HasFactory<TaskFactory> */
+    use HasFactory, HasUuids;
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new TaskTenderCategoryScope);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'priority' => TaskPriority::class,
+            'functional_role' => TeamRole::class,
+            'status' => TaskStatus::class,
+            'start_date' => 'date',
+            'due_date' => 'date',
+            'completion_date' => 'datetime',
+            'escalation_level' => EscalationLevel::class,
+            'last_escalated_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * @return BelongsTo<Tender, $this>
+     */
+    public function tender(): BelongsTo
+    {
+        return $this->belongsTo(Tender::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'creator_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewer_id');
+    }
+
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function participants(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'task_participants')->withTimestamps();
+    }
+
+    /**
+     * Tasks this task depends on — it cannot be marked done until each of these is done.
+     *
+     * @return BelongsToMany<Task, $this>
+     */
+    public function dependencies(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'task_dependencies', 'task_id', 'depends_on_task_id')->withTimestamps();
+    }
+
+    /**
+     * Tasks that depend on this task.
+     *
+     * @return BelongsToMany<Task, $this>
+     */
+    public function dependents(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'task_dependencies', 'depends_on_task_id', 'task_id')->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<TaskChecklistItem, $this>
+     */
+    public function checklistItems(): HasMany
+    {
+        return $this->hasMany(TaskChecklistItem::class)->orderBy('position');
+    }
+
+    /**
+     * @return HasMany<TaskStatusChange, $this>
+     */
+    public function statusChanges(): HasMany
+    {
+        return $this->hasMany(TaskStatusChange::class)->latest('changed_at');
+    }
+
+    /**
+     * @return HasMany<TaskAttachment, $this>
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TaskAttachment::class)->latest();
+    }
+
+    /**
+     * @return HasMany<TaskComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(TaskComment::class)->latest();
+    }
+
+    /**
+     * The task's assigned people (owner, creator, reviewer, and participants, deduplicated) —
+     * the set allowed to add attachments/comments, and who get notified about task activity.
+     * Distinct from TaskForm::canManageTask()'s narrower management-only set for
+     * owner/reviewer/participant assignment itself.
+     *
+     * @return Collection<int, User>
+     */
+    public function linkedUsers(): Collection
+    {
+        return collect([$this->owner, $this->creator, $this->reviewer])
+            ->filter()
+            ->merge($this->participants)
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * Whether the given user is one of the task's linkedUsers().
+     */
+    public function isLinkedTo(User $user): bool
+    {
+        return $this->linkedUsers()->contains('id', $user->id);
+    }
+
+    /**
+     * A task is overdue if its due date has passed and it hasn't been completed. This is
+     * deliberately computed, not stored: storing it would need a background job to keep in
+     * sync with wall-clock time (see [[resources-tenders]]'s archived/invalid axis for the
+     * same "separate from the transition map" reasoning).
+     */
+    public function isOverdue(): bool
+    {
+        return $this->due_date !== null
+            && $this->due_date->isPast()
+            && $this->status !== TaskStatus::DONE;
+    }
+
+    /**
+     * All tasks that directly or transitively depend on this one, found by walking the
+     * `dependents` relation breadth-first. Used to keep the dependency graph acyclic: none of
+     * these may be added as one of this task's own dependencies, since that would create a
+     * cycle back to this task.
+     *
+     * @return array<int, string>
+     */
+    public function transitiveDependentIds(): array
+    {
+        $visited = [];
+        $queue = [$this->id];
+
+        while ($queue !== []) {
+            $currentId = array_shift($queue);
+            $childIds = static::query()->whereKey($currentId)->first()?->dependents()->pluck('tasks.id')->all() ?? [];
+
+            foreach ($childIds as $childId) {
+                if (! in_array($childId, $visited, true)) {
+                    $visited[] = $childId;
+                    $queue[] = $childId;
+                }
+            }
+        }
+
+        return $visited;
+    }
+
+    /**
+     * Whether every dependency of this task is done — gates the DONE transition in
+     * changeStatusTo().
+     */
+    public function dependenciesComplete(): bool
+    {
+        return ! $this->dependencies()->where('status', '!=', TaskStatus::DONE->value)->exists();
+    }
+
+    /**
+     * Move the task to a new status, enforcing the allowed-transitions map in TaskStatus and
+     * recording an audit entry (who, when, from/to), mirroring Tender::changeStatusTo(). Also
+     * stamps completion_date when the task reaches DONE.
+     */
+    public function changeStatusTo(TaskStatus $newStatus, User $actor, ?string $reason = null): void
+    {
+        if (! $this->status->canTransitionTo($newStatus)) {
+            throw InvalidTaskStatusTransitionException::make($this->status, $newStatus);
+        }
+
+        if ($newStatus === TaskStatus::DONE && ! $this->dependenciesComplete()) {
+            throw TaskDependenciesNotCompleteException::make($this);
+        }
+
+        $fromStatus = $this->status;
+
+        DB::transaction(function () use ($newStatus, $actor, $reason, $fromStatus): void {
+            $changedAt = now();
+
+            $this->update([
+                'status' => $newStatus,
+                'completion_date' => $newStatus === TaskStatus::DONE ? $changedAt : null,
+            ]);
+
+            $this->statusChanges()->create([
+                'from_status' => $fromStatus,
+                'to_status' => $newStatus,
+                'changed_by' => $actor->id,
+                'reason' => $reason,
+                'changed_at' => $changedAt,
+            ]);
+        });
+
+        Notification::send(
+            $this->linkedUsers()->reject(fn (User $user): bool => $user->is($actor)),
+            new TaskStatusChangedNotification($this, $fromStatus, $newStatus, $actor),
+        );
+    }
+}

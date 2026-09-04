@@ -12,6 +12,9 @@ The brief caught my attention, so I decided to build it myself as a learning and
 project, not tied to the original client's specific service categories, but generalized into
 a configurable-service-category tender management system anyone could adapt.
 
+The original job posting, generalized and broken down into the milestone specs this project
+is being built against, is kept at [idea.md](idea.md).
+
 ## What this is
 
 A single-company tender management system meant to be the system of record for the entire
@@ -22,6 +25,10 @@ intelligence that accumulates from them over time.
 ## Status
 
 Early: foundation stage. Not yet usable end to end.
+
+## Documentation
+
+User-facing documentation, with screenshots, starts at [docs/01-overview.md](docs/01-overview.md).
 
 ## Tech stack
 

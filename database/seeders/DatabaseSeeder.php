@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,11 +14,19 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(RolesAndPermissionsSeeder::class);
+        $this->call(ServiceCategorySeeder::class);
+        $this->call(SourceSeeder::class);
+        $this->call(SectorSeeder::class);
+        $this->call(ProcurementProcedureSeeder::class);
+        $this->call(CpvCodeSeeder::class);
+        $this->call(NutsCodeSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Demo users (admin@example.com and one known-credential account per role) plus a full
+        // set of realistic tenders/tasks/teams — local/testing only, never production, since
+        // every demo account uses the well-known password "password".
+        if (app()->environment(['local', 'testing'])) {
+            $this->call(DemoDataSeeder::class);
+        }
     }
 }

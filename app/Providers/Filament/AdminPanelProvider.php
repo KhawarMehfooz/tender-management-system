@@ -2,6 +2,11 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Widgets\ActivityFeedWidget;
+use App\Filament\Widgets\DeadlineRadarWidget;
+use App\Filament\Widgets\EmployeeOpenTasksWidget;
+use App\Filament\Widgets\ManagementKpiWidget;
+use App\Filament\Widgets\TeamLeadDepartmentOverviewWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -10,8 +15,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
+use Filament\Support\Enums\Width;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -27,19 +31,32 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
+            ->spa()
+            ->maxContentWidth(Width::Full)
+            ->sidebarCollapsibleOnDesktop()
+            ->databaseNotifications()
+            ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Blue,
+            ])
+            ->navigationGroups([
+                __('navigation.groups.master_data'),
+                __('navigation.groups.administration'),
+                __('navigation.groups.system_settings'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
-                AccountWidget::class,
-                FilamentInfoWidget::class,
+                EmployeeOpenTasksWidget::class,
+                DeadlineRadarWidget::class,
+                ActivityFeedWidget::class,
+                TeamLeadDepartmentOverviewWidget::class,
+                ManagementKpiWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

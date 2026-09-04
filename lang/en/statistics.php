@@ -1,0 +1,45 @@
+<?php
+
+return [
+    'navigation_label' => 'Statistics',
+    'title' => 'Statistics',
+    'description' => 'Portfolio-wide figures across every tender: win rate, participation, volume, handling time, deadline reliability, and win/loss analysis. Category-scoped users see only their own category\'s numbers; management sees the whole portfolio.',
+    'no_rate' => '—',
+    'kpi' => [
+        'formal_exclusions' => 'Formal exclusions',
+        'formal_exclusions_hint' => 'Target: zero. A bid thrown out on a technicality is pure wasted effort.',
+        'win_rate' => 'Win rate',
+        'participation_rate' => 'Participation rate',
+        'bid_volume' => 'Bid volume',
+        'won_volume' => 'Won volume',
+        'lost_volume' => 'Lost volume',
+        'average_contract_value' => 'Average contract value',
+        'average_margin' => 'Average margin',
+        'average_handling_time' => 'Average handling time',
+        'days' => ':count days',
+    ],
+    'deadline_reliability' => [
+        'heading' => 'Deadline reliability',
+        'description' => 'Based on recorded submissions compared against each tender\'s submission deadline.',
+        'on_time_rate' => 'Submitted on time',
+        'average_days_ahead' => 'Average days ahead of deadline',
+        'no_data' => 'No submissions recorded yet.',
+    ],
+    'loss_reasons' => [
+        'heading' => 'Win/loss reasons',
+        'description' => 'How often each reason was recorded across closed tenders (a result can carry more than one reason).',
+        'no_data' => 'No results recorded yet.',
+        'reason' => 'Reason',
+        'count' => 'Count',
+    ],
+    'development' => [
+        'heading' => 'Price & competitor development',
+        'description' => 'Quarterly trend over the last 4 quarters.',
+        'no_data' => 'Not enough data yet.',
+        'quarter' => 'Quarter',
+        'average_bid_price' => 'Average bid price',
+        'we_won' => 'We won',
+        'they_won' => 'They won',
+    ],
+    'price_hidden' => 'Hidden (requires the "see prices" right)',
+];

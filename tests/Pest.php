@@ -1,5 +1,10 @@
 <?php
 
+use App\Enums\CalculationApprovalStep;
+use App\Models\Tender;
+use App\Models\TenderCalculation;
+use App\Models\TenderCalculationApproval;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +49,25 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Fully approves a fresh calculation for the given tender by directly creating approved
+ * TenderCalculationApproval rows for all 6 CalculationApprovalStep cases, bypassing
+ * TenderCalculation::approve()'s rights/order enforcement — those are covered separately in
+ * TenderCalculationApprovalTest.php, so tests that only need "a tender ready for submission"
+ * (the SUBMISSION gate, document locking, etc.) don't need to re-derive team memberships.
+ */
+function fullyApprovedCalculationFor(Tender $tender): TenderCalculation
 {
-    // ..
+    $calculation = TenderCalculation::factory()->create(['tender_id' => $tender->id]);
+
+    foreach (CalculationApprovalStep::cases() as $step) {
+        TenderCalculationApproval::factory()->create([
+            'tender_calculation_id' => $calculation->id,
+            'step' => $step,
+            'approved_by' => User::factory(),
+            'approved_at' => now(),
+        ]);
+    }
+
+    return $calculation;
 }

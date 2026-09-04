@@ -29,3 +29,7 @@ matching role can still hold one of these rights if explicitly granted.
 - When writing a Feature test for a gated action, include a test that a user *without* the
   right gets rejected server-side (403/redirect), not only a test that a user with the right
   succeeds.
+
+## Docs
+Roles and rights are documented for end users in `docs/02-getting-started.md`. If this file's
+role list, rights list, or enforcement behavior changes, update that page too — see [[docs]].
