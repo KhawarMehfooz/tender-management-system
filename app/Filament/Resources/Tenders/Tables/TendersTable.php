@@ -68,7 +68,7 @@ class TendersTable
                             ->where('type', DeadlineType::SUBMISSION->value)
                             ->latest('due_at')
                             ->limit(1),
-                        $direction,
+                        $direction === 'desc' ? 'desc' : 'asc',
                     )),
                 TextColumn::make('created_at')
                     ->label(__('tenders.fields.created_at'))

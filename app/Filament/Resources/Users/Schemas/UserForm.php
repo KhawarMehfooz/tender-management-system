@@ -24,11 +24,10 @@ class UserForm
      */
     public static function selectedRights(array $data): array
     {
-        return collect(Right::cases())
+        return array_values(collect(Right::cases())
             ->filter(fn (Right $right): bool => (bool) ($data[$right->value] ?? false))
             ->map(fn (Right $right): string => $right->value)
-            ->values()
-            ->all();
+            ->all());
     }
 
     /**
@@ -79,7 +78,7 @@ class UserForm
                             ->label(__('users.fields.role'))
                             ->prefixIcon(Heroicon::OutlinedIdentification)
                             ->helperText(fn (?User $record): ?string => self::isOnlyRemainingSuperAdmin($record)
-                                ? __('users.fields.role_last_super_admin_helper')
+                                ? (string) __('users.fields.role_last_super_admin_helper')
                                 : null)
                             ->options(collect(RoleName::cases())->mapWithKeys(
                                 fn (RoleName $role): array => [$role->value => $role->getLabel()],

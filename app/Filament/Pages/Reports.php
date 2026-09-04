@@ -55,7 +55,7 @@ class Reports extends Page implements HasTable
     protected function getViewData(): array
     {
         return [
-            'reports' => static::reportDefinitions(),
+            'reports' => self::reportDefinitions(),
         ];
     }
 
@@ -133,11 +133,11 @@ class Reports extends Page implements HasTable
             ->action(function (array $arguments): StreamedResponse {
                 $key = (string) $arguments['report'];
 
-                abort_unless(static::canExport($key), 403);
+                abort_unless(self::canExport($key), 403);
 
                 $pdf = Pdf::loadView('reports.'.str($key)->replace('_', '-'), [
-                    'headings' => static::headingsFor($key),
-                    'rows' => static::rowsFor($key),
+                    'headings' => self::headingsFor($key),
+                    'rows' => self::rowsFor($key),
                     'title' => __('reports.types.'.$key.'.label'),
                 ]);
 
@@ -162,10 +162,10 @@ class Reports extends Page implements HasTable
             ->action(function (array $arguments): BinaryFileResponse {
                 $key = (string) $arguments['report'];
 
-                abort_unless(static::canExport($key), 403);
+                abort_unless(self::canExport($key), 403);
 
                 return Excel::download(
-                    new ArrayExport(static::rowsFor($key), static::headingsFor($key)),
+                    new ArrayExport(self::rowsFor($key), self::headingsFor($key)),
                     $key.'-report.xlsx',
                 );
             });
@@ -221,11 +221,11 @@ class Reports extends Page implements HasTable
     private static function rowsFor(string $key): array
     {
         return match ($key) {
-            'pipeline' => static::pipelineRows(),
-            'win_loss' => static::winLossRows(),
-            'competitors' => static::competitorRows(),
-            'performance' => static::performanceRows(),
-            'deadlines' => static::deadlineRows(),
+            'pipeline' => self::pipelineRows(),
+            'win_loss' => self::winLossRows(),
+            'competitors' => self::competitorRows(),
+            'performance' => self::performanceRows(),
+            'deadlines' => self::deadlineRows(),
             'management' => static::managementRows(),
             default => [],
         };
@@ -301,8 +301,8 @@ class Reports extends Page implements HasTable
                 $competitor->tenderCompetitors->count(),
                 $competitor->tenderCompetitors->where('outcome', CompetitorOutcome::THEY_WON)->count(),
                 $competitor->tenderCompetitors->where('outcome', CompetitorOutcome::WE_WON)->count(),
-                static::mostCommon($competitor->tenderCompetitors, fn (TenderCompetitor $tc): ?string => $tc->tender?->sector?->name),
-                static::mostCommon($competitor->tenderCompetitors, fn (TenderCompetitor $tc): ?string => $tc->tender?->nutsCode?->label),
+                self::mostCommon($competitor->tenderCompetitors, fn (TenderCompetitor $tc): ?string => $tc->tender?->sector?->name),
+                self::mostCommon($competitor->tenderCompetitors, fn (TenderCompetitor $tc): ?string => $tc->tender?->nutsCode?->label),
             ])->all();
     }
 
@@ -365,18 +365,18 @@ class Reports extends Page implements HasTable
 
         $rows = [
             ['Formal exclusions', $formalExclusions['count']],
-            ['Win rate (%)', static::percent(Statistics::winRate($from, $to))],
-            ['Participation rate (%)', static::percent(Statistics::participationRate($from, $to))],
-            ['Average handling time (days)', static::round1(Statistics::averageHandlingTimeDays($from, $to))],
+            ['Win rate (%)', self::percent(Statistics::winRate($from, $to))],
+            ['Participation rate (%)', self::percent(Statistics::participationRate($from, $to))],
+            ['Average handling time (days)', self::round1(Statistics::averageHandlingTimeDays($from, $to))],
         ];
 
         if ($includePrices) {
             $wonLostVolume = Statistics::wonLostVolume($from, $to, true);
 
-            $rows[] = ['Average contract value (EUR)', static::round2(Statistics::averageContractValue($from, $to))];
-            $rows[] = ['Average margin (%)', static::round1(Statistics::averageMargin($from, $to))];
-            $rows[] = ['Won volume (EUR)', static::round2($wonLostVolume['wonVolume'])];
-            $rows[] = ['Lost volume (EUR)', static::round2($wonLostVolume['lostVolume'])];
+            $rows[] = ['Average contract value (EUR)', self::round2(Statistics::averageContractValue($from, $to))];
+            $rows[] = ['Average margin (%)', self::round1(Statistics::averageMargin($from, $to))];
+            $rows[] = ['Won volume (EUR)', self::round2($wonLostVolume['wonVolume'])];
+            $rows[] = ['Lost volume (EUR)', self::round2($wonLostVolume['lostVolume'])];
         }
 
         return $rows;

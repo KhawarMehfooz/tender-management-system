@@ -24,6 +24,9 @@ class TenderDeadlineCalendarWidget extends CalendarWidget
         return __('tender_calendar.deadlines_heading');
     }
 
+    /**
+     * @return Collection<int, TenderDeadline>|array<int, TenderDeadline>|Builder<TenderDeadline>
+     */
     protected function getEvents(FetchInfo $info): Collection|array|Builder
     {
         return TenderDeadline::query()

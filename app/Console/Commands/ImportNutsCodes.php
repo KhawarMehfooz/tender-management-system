@@ -35,7 +35,7 @@ class ImportNutsCodes extends Command
         }
 
         $header = array_map(
-            static fn (string $column): string => strtolower(trim($column)),
+            static fn (?string $column): string => strtolower(trim($column ?? '')),
             fgetcsv($handle) ?: [],
         );
 

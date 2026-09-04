@@ -76,7 +76,7 @@ class DeadlinesRelationManager extends RelationManager
             ->components([
                 Select::make('type')
                     ->label(__('tender_deadlines.fields.type'))
-                    ->options(collect(static::manageableTypes())->mapWithKeys(
+                    ->options(collect(self::manageableTypes())->mapWithKeys(
                         fn (DeadlineType $type): array => [$type->value => $type->getLabel()],
                     ))
                     ->required()

@@ -32,6 +32,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read ServiceCategory|null $serviceCategory
  */
 #[Fillable(['name', 'email', 'password', 'service_category_id'])]
 #[Hidden(['password', 'remember_token'])]

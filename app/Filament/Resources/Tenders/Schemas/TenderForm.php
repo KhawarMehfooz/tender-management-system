@@ -253,8 +253,8 @@ class TenderForm
                             Select::make('owner_id')
                                 ->label(__('tenders.fields.owner_id'))
                                 ->prefixIcon(Heroicon::OutlinedUser)
-                                ->options(fn (): array => static::scopedUserOptions())
-                                ->default(fn (): ?string => static::canManageTeam() ? null : auth()->id())
+                                ->options(fn (): array => self::scopedUserOptions())
+                                ->default(fn (): ?string => static::canManageTeam() ? null : (auth()->id() === null ? null : (string) auth()->id()))
                                 ->required()
                                 ->searchable()
                                 ->disabled(fn (): bool => ! static::canManageTeam())
@@ -265,7 +265,7 @@ class TenderForm
                                 ->schema([
                                     Select::make('user_id')
                                         ->label(__('tenders.fields.team_member_user'))
-                                        ->options(fn (): array => static::scopedUserOptions())
+                                        ->options(fn (): array => self::scopedUserOptions())
                                         ->required()
                                         ->searchable(),
                                     Select::make('functional_role')

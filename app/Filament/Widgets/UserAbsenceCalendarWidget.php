@@ -23,6 +23,9 @@ class UserAbsenceCalendarWidget extends CalendarWidget
         return __('absences.calendar_heading');
     }
 
+    /**
+     * @return Collection<int, UserAbsence>|array<int, UserAbsence>|Builder<UserAbsence>
+     */
     protected function getEvents(FetchInfo $info): Collection|array|Builder
     {
         return UserAbsence::query()

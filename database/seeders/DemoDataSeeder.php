@@ -160,6 +160,7 @@ class DemoDataSeeder extends Seeder
     private function createUsers(): void
     {
         foreach (RoleName::cases() as $role) {
+            /** @var Collection<int, User> $users */
             $users = new Collection;
 
             if ($role === RoleName::SUPER_ADMIN) {
@@ -192,9 +193,9 @@ class DemoDataSeeder extends Seeder
             }
 
             if (in_array($role, [RoleName::DEPARTMENT_HEAD, RoleName::TEAM_LEAD], true)) {
-                $users->first()->syncPermissions(Right::cases());
+                $users->first()?->syncPermissions(Right::cases());
             } elseif ($role === RoleName::CALCULATION) {
-                $users->first()->syncPermissions([Right::SEE_PRICES]);
+                $users->first()?->syncPermissions([Right::SEE_PRICES]);
             }
 
             $this->usersByRole[$role->value] = $users;
@@ -247,7 +248,7 @@ class DemoDataSeeder extends Seeder
         $tender = Tender::factory()->create([
             'service_category_id' => $category->id,
             'owner_id' => $owner->id,
-            'title' => fake()->catchPhrase().' — '.$category->name,
+            'title' => fake()->sentence(4).' — '.$category->name,
             'client_id' => fake()->boolean(75) ? $this->clients->random()->id : null,
             ...($demoContractEndDate !== null ? ['contract_end_date' => $demoContractEndDate] : []),
         ]);
@@ -540,6 +541,11 @@ class DemoDataSeeder extends Seeder
         }
 
         $targetIndex = array_search($target, self::ACTIVE_PHASES, true);
+
+        if ($targetIndex === false) {
+            return;
+        }
+
         $this->walkActivePhases($tender, $targetIndex, $actor);
     }
 
@@ -553,6 +559,9 @@ class DemoDataSeeder extends Seeder
         }
     }
 
+    /**
+     * @param  Collection<int, User>  $team
+     */
     private function createTask(Tender $tender, Collection $team, int $index, bool $forceDone = false): Task
     {
         $owner = $team->random();
@@ -621,14 +630,17 @@ class DemoDataSeeder extends Seeder
 
     private function advanceTaskStatus(Task $task, User $actor, ?TaskStatus $target = null): void
     {
-        $target ??= fake()->randomElement([
-            TaskStatus::OPEN,
-            TaskStatus::IN_PROGRESS,
-            TaskStatus::WAITING_ON_ANOTHER_TASK,
-            TaskStatus::IN_REVIEW,
-            TaskStatus::CORRECTION_REQUIRED,
-            TaskStatus::DONE,
-        ]);
+        if ($target === null) {
+            /** @var TaskStatus $target */
+            $target = fake()->randomElement([
+                TaskStatus::OPEN,
+                TaskStatus::IN_PROGRESS,
+                TaskStatus::WAITING_ON_ANOTHER_TASK,
+                TaskStatus::IN_REVIEW,
+                TaskStatus::CORRECTION_REQUIRED,
+                TaskStatus::DONE,
+            ]);
+        }
 
         $path = match ($target) {
             TaskStatus::OPEN => [],
@@ -645,14 +657,18 @@ class DemoDataSeeder extends Seeder
     }
 
     /**
+     * @param  Collection<int, User>  $team
      * @param  array<int, DocumentCategory>  $categories
      */
     private function createDocuments(Tender $tender, Collection $team, array $categories): void
     {
         foreach ($categories as $category) {
+            $words = fake()->words(3);
+            $titleSuffix = is_array($words) ? implode(' ', $words) : $words;
+
             $document = $tender->documents()->create([
                 'category' => $category,
-                'title' => $category->getLabel().' – '.ucfirst(fake()->words(3, true)),
+                'title' => $category->getLabel().' – '.ucfirst($titleSuffix),
                 'created_by' => $team->random()->id,
             ]);
 
@@ -665,11 +681,15 @@ class DemoDataSeeder extends Seeder
         }
     }
 
+    /**
+     * @param  Collection<int, User>  $team
+     */
     private function createDocumentVersion(TenderDocument $document, Collection $team, int $versionNumber): void
     {
         $filename = fake()->slug(3).'.txt';
         $path = 'tender-documents/'.fake()->uuid().'.txt';
-        $content = fake()->paragraphs(fake()->numberBetween(1, 3), true);
+        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 3));
+        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
 
@@ -687,7 +707,8 @@ class DemoDataSeeder extends Seeder
     {
         $filename = fake()->slug(3).'.txt';
         $path = 'task-attachments/'.fake()->uuid().'.txt';
-        $content = fake()->paragraphs(fake()->numberBetween(1, 3), true);
+        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 3));
+        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
 
@@ -755,7 +776,8 @@ class DemoDataSeeder extends Seeder
     {
         $filename = fake()->slug(3).'.txt';
         $path = 'tender-site-visit-photos/'.fake()->uuid().'.txt';
-        $content = fake()->paragraphs(fake()->numberBetween(1, 2), true);
+        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 2));
+        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
 
@@ -815,7 +837,8 @@ class DemoDataSeeder extends Seeder
     {
         $filename = fake()->slug(3).'.txt';
         $path = 'tender-document-request-files/'.fake()->uuid().'.txt';
-        $content = fake()->paragraphs(fake()->numberBetween(1, 2), true);
+        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 2));
+        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
 
@@ -859,7 +882,8 @@ class DemoDataSeeder extends Seeder
     {
         $filename = fake()->slug(3).'.txt';
         $path = 'tender-submission-files/'.fake()->uuid().'.txt';
-        $content = fake()->paragraphs(fake()->numberBetween(1, 2), true);
+        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 2));
+        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
 
@@ -981,7 +1005,8 @@ class DemoDataSeeder extends Seeder
     {
         $filename = fake()->slug(3).'.txt';
         $path = 'reference-attachments/'.fake()->uuid().'.txt';
-        $content = fake()->paragraphs(fake()->numberBetween(1, 3), true);
+        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 3));
+        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
 

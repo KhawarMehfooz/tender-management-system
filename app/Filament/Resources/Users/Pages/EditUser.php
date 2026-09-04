@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Exceptions\Halt;
+use Spatie\Permission\Models\Role;
 
 class EditUser extends EditRecord
 {
@@ -34,7 +35,10 @@ class EditUser extends EditRecord
     {
         $data = $this->form->getState();
 
-        if (! $this->getRecord()->hasRole(RoleName::SUPER_ADMIN)) {
+        /** @var User $record */
+        $record = $this->getRecord();
+
+        if (! $record->hasRole(RoleName::SUPER_ADMIN)) {
             return;
         }
 
@@ -56,9 +60,15 @@ class EditUser extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $data['role'] = $this->getRecord()->roles->first()?->name;
+        /** @var User $record */
+        $record = $this->getRecord();
 
-        $directRights = $this->getRecord()->getDirectPermissions()->pluck('name');
+        /** @var Role|null $role */
+        $role = $record->roles->first();
+
+        $data['role'] = $role?->name;
+
+        $directRights = $record->getDirectPermissions()->pluck('name');
 
         foreach (Right::cases() as $right) {
             $data[$right->value] = $directRights->contains($right->value);
@@ -87,7 +97,10 @@ class EditUser extends EditRecord
     {
         $data = $this->form->getState();
 
-        $this->getRecord()->syncRoles([RoleName::from($data['role'])->value]);
-        $this->getRecord()->syncPermissions(UserForm::selectedRights($data));
+        /** @var User $record */
+        $record = $this->getRecord();
+
+        $record->syncRoles([RoleName::from($data['role'])->value]);
+        $record->syncPermissions(UserForm::selectedRights($data));
     }
 }

@@ -6,6 +6,7 @@ use App\Enums\DeadlineType;
 use App\Enums\Right;
 use App\Filament\Resources\Tenders\Schemas\TenderForm;
 use App\Filament\Resources\Tenders\TenderResource;
+use App\Models\Tender;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -41,6 +42,7 @@ class EditTender extends EditRecord
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        /** @var Tender $record */
         $record = $this->getRecord();
 
         $data['submission_deadline'] = $record->latestDeadlineOfType(DeadlineType::SUBMISSION)?->due_at;
@@ -72,7 +74,10 @@ class EditTender extends EditRecord
          * alone — force it back to the record's existing owner regardless of what was submitted.
          */
         if (! TenderForm::canManageTeam()) {
-            $data['owner_id'] = $this->getRecord()->owner_id;
+            /** @var Tender $record */
+            $record = $this->getRecord();
+
+            $data['owner_id'] = $record->owner_id;
         }
 
         /**
@@ -92,6 +97,7 @@ class EditTender extends EditRecord
 
     protected function afterSave(): void
     {
+        /** @var Tender $tender */
         $tender = $this->getRecord();
 
         $tender->upsertDeadline(DeadlineType::SUBMISSION, $this->deadlineData['submission_deadline']);

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Tasks\Pages;
 
 use App\Filament\Resources\Tasks\Schemas\TaskForm;
 use App\Filament\Resources\Tasks\TaskResource;
+use App\Models\Task;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -30,8 +31,11 @@ class EditTask extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         if (! TaskForm::canManageTask()) {
-            $data['owner_id'] = $this->getRecord()->owner_id;
-            $data['reviewer_id'] = $this->getRecord()->reviewer_id;
+            /** @var Task $record */
+            $record = $this->getRecord();
+
+            $data['owner_id'] = $record->owner_id;
+            $data['reviewer_id'] = $record->reviewer_id;
         }
 
         return $data;

@@ -55,27 +55,27 @@ class CompetitorResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return static::canManage();
+        return self::canManage();
     }
 
     public static function canCreate(): bool
     {
-        return static::canManage();
+        return self::canManage();
     }
 
     public static function canEdit(Model $record): bool
     {
-        return static::canManage();
+        return self::canManage();
     }
 
     public static function canDelete(Model $record): bool
     {
-        return static::canManage();
+        return self::canManage();
     }
 
     public static function canDeleteAny(): bool
     {
-        return static::canManage();
+        return self::canManage();
     }
 
     public static function form(Schema $schema): Schema

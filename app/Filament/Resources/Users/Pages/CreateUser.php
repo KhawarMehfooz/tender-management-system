@@ -6,6 +6,7 @@ use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Filament\Resources\Users\Schemas\UserForm;
 use App\Filament\Resources\Users\UserResource;
+use App\Models\User;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateUser extends CreateRecord
@@ -32,7 +33,10 @@ class CreateUser extends CreateRecord
     {
         $data = $this->form->getState();
 
-        $this->getRecord()->assignRole(RoleName::from($data['role'])->value);
-        $this->getRecord()->givePermissionTo(UserForm::selectedRights($data));
+        /** @var User $record */
+        $record = $this->getRecord();
+
+        $record->assignRole(RoleName::from($data['role'])->value);
+        $record->givePermissionTo(UserForm::selectedRights($data));
     }
 }
