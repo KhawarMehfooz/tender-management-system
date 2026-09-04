@@ -4,6 +4,7 @@ use App\Enums\RoleName;
 use App\Enums\TenderStatus;
 use App\Filament\Pages\Reports;
 use App\Models\Competitor;
+use App\Models\ScheduledReport;
 use App\Models\Tender;
 use App\Models\TenderCompetitor;
 use App\Models\User;
@@ -108,5 +109,25 @@ it('includes price columns in the management export for a user with see-prices',
         $rows = collect($export->array());
 
         return $rows->contains(fn (array $row): bool => $row[0] === 'Average contract value (EUR)');
+    });
+});
+
+describe('report history table', function () {
+    it('lists past scheduled reports for a user holding view-employee-statistics', function () {
+        $departmentHead = tap(User::factory()->create())->assignRole(RoleName::DEPARTMENT_HEAD);
+        $this->actingAs($departmentHead);
+
+        $report = ScheduledReport::factory()->create();
+
+        Livewire::test(Reports::class)->assertCanSeeTableRecords([$report]);
+    });
+
+    it('shows no rows to a user lacking view-employee-statistics even though reports exist', function () {
+        $staff = tap(User::factory()->create())->assignRole(RoleName::STAFF);
+        $this->actingAs($staff);
+
+        $report = ScheduledReport::factory()->create();
+
+        Livewire::test(Reports::class)->assertCanNotSeeTableRecords([$report]);
     });
 });

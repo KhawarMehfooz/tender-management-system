@@ -7,6 +7,7 @@ use App\Filament\Resources\Tenders\TenderResource;
 use App\Models\Tender;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -59,6 +60,8 @@ class ArchivedTenders extends ListRecords
                     ->sortable(),
             ])
             ->filters(static::tenderReportFilters())
+            ->filtersFormColumns(['sm' => 1, 'lg' => 2, 'xl' => 3])
+            ->filtersFormWidth(Width::FourExtraLarge)
             ->recordActions([
                 ViewAction::make()
                     ->url(fn (Tender $record): string => TenderResource::getUrl('view', ['record' => $record])),

@@ -1,6 +1,6 @@
 # Managing Tenders
 
-_Last updated: 03/09/2026_
+_Last updated: 04/09/2026_
 
 ## Creating a tender
 
@@ -85,7 +85,7 @@ Each of these notifications only fires once per task or tender, so you won't be 
 
 Tenders are never deleted outright. If a tender is no longer active or relevant, it's archived instead, and archiving keeps the full record intact. A tender can be archived at any point in its lifecycle, including after it's already been won or lost, since archiving is separate from the status flow above.
 
-Use the **Archive** action on a tender to archive it, and **Unarchive** to bring it back.
+Use the **Archive** action on a tender to archive it, and **Unarchive** to bring it back. Archived tenders keep their own lifecycle status visible and are listed together in a dedicated, filterable Archive view, see [Dashboards, Search, Statistics, Archive & Reporting](17-dashboards-search-statistics-reporting.md#archive).
 
 If a tender turns out to be invalid, for example a duplicate or a listing that was withdrawn, it can be flagged as invalid instead. Flagging a tender invalid requires a reason, and the flag can be cleared later with **Clear invalid flag** if it turns out the tender is valid after all.
 
@@ -101,6 +101,7 @@ In rare cases, such as a tender created by mistake with no real data attached to
 - [Team assignment](04-team-assignment.md), covering assigning an owner and team members to a tender.
 - [Tasks](05-tasks.md), covering breaking a tender's work into tracked, assignable tasks.
 - [Tender Documents](09-tender-documents.md), covering each tender's versioned document library.
+- [Dashboards, Search, Statistics, Archive & Reporting](17-dashboards-search-statistics-reporting.md), covering the Archive view and the combinable tender filters shared between it and this list.
 - [Calculations & Approvals](10-calculations-approvals.md), covering pricing calculations and the 6-step approval chain that gates final submission.
 - [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering the participation score and recording a decision to pursue a tender or not.
 - [References, Certificates & Concept Library](12-references-certificates-concepts.md), covering the tender's Reference Library tab, where company-wide references, certificates, and concept blocks are linked to a specific bid.

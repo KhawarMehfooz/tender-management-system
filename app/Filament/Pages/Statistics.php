@@ -65,16 +65,30 @@ class Statistics extends Page
     }
 
     /**
+     * Applies an optional [$from, $to] window to a query's created_at, used to scope every
+     * period-aware KPI below to a closed reporting period (GenerateScheduledReports) while
+     * leaving every interactive Statistics-page call (no args) computing all-time as before.
+     *
+     * @return Builder<Tender>
+     */
+    private static function scopePeriod(Builder $query, ?CarbonInterface $from, ?CarbonInterface $to): Builder
+    {
+        return $query
+            ->when($from !== null, fn (Builder $q): Builder => $q->where('created_at', '>=', $from))
+            ->when($to !== null, fn (Builder $q): Builder => $q->where('created_at', '<=', $to));
+    }
+
+    /**
      * Headline KPI, target value zero per idea.md — a bid thrown out on a technicality is pure
      * wasted effort. Rate is against every tender ever created (not just decided ones), since an
      * exclusion can happen at any phase.
      *
      * @return array{count: int, rate: ?float}
      */
-    public static function formalExclusions(): array
+    public static function formalExclusions(?CarbonInterface $from = null, ?CarbonInterface $to = null): array
     {
-        $total = Tender::query()->count();
-        $excluded = Tender::query()->where('status', TenderStatus::EXCLUDED)->count();
+        $total = static::scopePeriod(Tender::query(), $from, $to)->count();
+        $excluded = static::scopePeriod(Tender::query()->where('status', TenderStatus::EXCLUDED), $from, $to)->count();
 
         return [
             'count' => $excluded,
@@ -86,10 +100,10 @@ class Statistics extends Page
      * WON / (WON + LOST) — decided tenders only, mirrors User::winRate()'s exact definition
      * applied at the whole-portfolio level instead of per employee.
      */
-    public static function winRate(): ?float
+    public static function winRate(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $won = Tender::query()->where('status', TenderStatus::WON)->count();
-        $lost = Tender::query()->where('status', TenderStatus::LOST)->count();
+        $won = static::scopePeriod(Tender::query()->where('status', TenderStatus::WON), $from, $to)->count();
+        $lost = static::scopePeriod(Tender::query()->where('status', TenderStatus::LOST), $from, $to)->count();
         $decided = $won + $lost;
 
         return $decided === 0 ? null : $won / $decided;
@@ -100,12 +114,14 @@ class Statistics extends Page
      * "has a current bid decision recorded" since a tender without one hasn't reached that gate
      * yet.
      */
-    public static function participationRate(): ?float
+    public static function participationRate(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $decided = Tender::query()->whereHas('currentBidDecision')->count();
-        $bid = Tender::query()
-            ->whereHas('currentBidDecision', fn (Builder $query) => $query->where('decision', BidDecision::BID))
-            ->count();
+        $decided = static::scopePeriod(Tender::query()->whereHas('currentBidDecision'), $from, $to)->count();
+        $bid = static::scopePeriod(
+            Tender::query()->whereHas('currentBidDecision', fn (Builder $query) => $query->where('decision', BidDecision::BID)),
+            $from,
+            $to,
+        )->count();
 
         return $decided === 0 ? null : $bid / $decided;
     }
@@ -128,15 +144,17 @@ class Statistics extends Page
     /**
      * @return array{wonVolume: ?float, lostVolume: ?float}
      */
-    public static function wonLostVolume(): array
+    public static function wonLostVolume(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?bool $includePrices = null): array
     {
-        if (! static::canSeePrices()) {
+        $includePrices ??= static::canSeePrices();
+
+        if (! $includePrices) {
             return ['wonVolume' => null, 'lostVolume' => null];
         }
 
-        $won = Tender::query()->where('status', TenderStatus::WON)
+        $won = static::scopePeriod(Tender::query()->where('status', TenderStatus::WON), $from, $to)
             ->get(['id', 'estimated_contract_volume', 'estimated_contract_volume_unknown']);
-        $lost = Tender::query()->where('status', TenderStatus::LOST)
+        $lost = static::scopePeriod(Tender::query()->where('status', TenderStatus::LOST), $from, $to)
             ->get(['id', 'estimated_contract_volume', 'estimated_contract_volume_unknown']);
 
         return [
@@ -155,12 +173,15 @@ class Statistics extends Page
             ->sum(fn (Tender $tender): float => (float) $tender->estimated_contract_volume);
     }
 
-    public static function averageContractValue(): ?float
+    public static function averageContractValue(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $tenders = Tender::query()
-            ->where('estimated_contract_volume_unknown', false)
-            ->whereNotNull('estimated_contract_volume')
-            ->get(['estimated_contract_volume']);
+        $tenders = static::scopePeriod(
+            Tender::query()
+                ->where('estimated_contract_volume_unknown', false)
+                ->whereNotNull('estimated_contract_volume'),
+            $from,
+            $to,
+        )->get(['estimated_contract_volume']);
 
         return $tenders->isEmpty() ? null : (float) $tenders->avg(fn (Tender $tender): float => (float) $tender->estimated_contract_volume);
     }
@@ -171,10 +192,9 @@ class Statistics extends Page
      * rather than the separate, currently-unused Right::SEE_MARGINS case — kept consistent with
      * established convention, not introducing a second gate for the same data.
      */
-    public static function averageMargin(): ?float
+    public static function averageMargin(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $margins = Tender::query()
-            ->with('currentCalculation')
+        $margins = static::scopePeriod(Tender::query()->with('currentCalculation'), $from, $to)
             ->get()
             ->map(fn (Tender $tender): ?float => $tender->currentCalculation?->actual_margin === null
                 ? null
@@ -188,10 +208,13 @@ class Statistics extends Page
      * Average days between a tender's creation and it reaching a terminal status, across every
      * closed tender.
      */
-    public static function averageHandlingTimeDays(): ?float
+    public static function averageHandlingTimeDays(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $closed = Tender::query()
-            ->whereIn('status', static::terminalStatuses())
+        $closed = static::scopePeriod(
+            Tender::query()->whereIn('status', static::terminalStatuses()),
+            $from,
+            $to,
+        )
             ->with(['statusChanges' => fn ($query) => $query->latest('changed_at')->limit(1)])
             ->get();
 

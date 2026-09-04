@@ -1,6 +1,6 @@
 # Competitors, Market Intelligence, Client History & Pipeline
 
-_Last updated: 02/09/2026_
+_Last updated: 04/09/2026_
 
 This page covers everything TMS tracks beyond a single tender: known clients and their history across multiple tenders, known competitors and what's been observed about them, and two reporting pages that roll all of that up into a market view and a forward-looking pipeline forecast.
 
@@ -100,3 +100,4 @@ The estimated contract volume and weighted value columns, along with the totals 
 - [Administration](08-administration.md), covering the Clients reference-data table and how rights like "see competitor data" are granted.
 - [Bid / No-Bid Decision](11-bid-no-bid-decision.md), covering the participation score that the Pipeline & Forecast page's win probability is drawn from.
 - [Result & Lessons Learned](14-result-lessons-learned.md), covering the Result tab whose recorded winner feeds a client's history table.
+- [Dashboards, Search, Statistics, Archive & Reporting](17-dashboards-search-statistics-reporting.md), covering the Reports page's competitors and pipeline exports, which reuse the Competitor Intelligence and Pipeline & Forecast pages covered here.

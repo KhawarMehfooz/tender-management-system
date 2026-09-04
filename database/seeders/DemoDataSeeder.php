@@ -13,6 +13,7 @@ use App\Enums\ConceptBlockCategory;
 use App\Enums\DeadlineType;
 use App\Enums\DocumentCategory;
 use App\Enums\DocumentRequestStatus;
+use App\Enums\ReportPeriod;
 use App\Enums\Right;
 use App\Enums\RoleName;
 use App\Enums\SkillCategory;
@@ -21,12 +22,14 @@ use App\Enums\TaskStatus;
 use App\Enums\TeamRole;
 use App\Enums\TenderStatus;
 use App\Enums\WinLossReason;
+use App\Filament\Pages\Reports;
 use App\Models\Certificate;
 use App\Models\Client;
 use App\Models\Competitor;
 use App\Models\CompetitorPriceEntry;
 use App\Models\ConceptBlock;
 use App\Models\Reference;
+use App\Models\ScheduledReport;
 use App\Models\ServiceCategory;
 use App\Models\Skill;
 use App\Models\Task;
@@ -41,6 +44,7 @@ use App\Models\TenderSiteVisit;
 use App\Models\TenderSubmission;
 use App\Models\User;
 use App\Models\UserAbsence;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
@@ -134,10 +138,23 @@ class DemoDataSeeder extends Seeder
             }
         }
 
+        // M12: pickTeam() deliberately excludes every MANAGEMENT_ROLES member, including
+        // SUPER_ADMIN, from every tender's team (see pickTeam()'s docblock), so admin@example.com
+        // — the headline demo login docs/02-getting-started.md points users to first — otherwise
+        // never owns a single task, and the Dashboard's "My open tasks" widget renders empty when
+        // logged in as that account. Reassign a few already-seeded open tasks to admin rather than
+        // create new ones from scratch.
+        $this->assignAdminOpenTasks();
+
         // M11: absences are user-level, not per-tender, so they're seeded once at the end —
         // one is deliberately pinned onto an existing task's due date so the absence-aware
         // warning/escalation logic has real overlapping data to demonstrate.
         $this->createAbsenceLibrary();
+
+        // M12: past GenerateScheduledReports runs, so the Reports page's "Report history" table
+        // and download action have something to show on a fresh seed rather than only after the
+        // scheduler has actually fired once.
+        $this->createScheduledReportHistory();
     }
 
     private function createUsers(): void
@@ -358,6 +375,24 @@ class DemoDataSeeder extends Seeder
         } elseif ($variant === 2 && in_array($status, [TenderStatus::REVIEW, TenderStatus::CANCELLED], true)) {
             $tender->markInvalid($owner, fake()->sentence(fake()->numberBetween(6, 12)));
         }
+    }
+
+    /**
+     * Reassigns a handful of already-seeded, not-yet-done tasks to the SUPER_ADMIN demo account
+     * so its Dashboard has something to show on the "My open tasks" widget — pickTeam() below
+     * never draws SUPER_ADMIN onto any tender's team, so without this the account would own zero
+     * tasks despite being the account TMS's own getting-started docs log in as first.
+     */
+    private function assignAdminOpenTasks(): void
+    {
+        $admin = $this->usersByRole[RoleName::SUPER_ADMIN->value]->first();
+
+        Task::query()
+            ->where('status', '!=', TaskStatus::DONE)
+            ->inRandomOrder()
+            ->limit(3)
+            ->get()
+            ->each(fn (Task $task) => $task->forceFill(['owner_id' => $admin->id])->save());
     }
 
     /**
@@ -1106,6 +1141,43 @@ class DemoDataSeeder extends Seeder
     private function createClientLibrary(): Collection
     {
         return Client::factory()->count(10)->create();
+    }
+
+    /**
+     * One past run per ReportPeriod (monthly/quarterly/annual), each rendering a real PDF via
+     * the same Pdf::loadView('reports.management', ...) path GenerateScheduledReports itself
+     * uses (not a placeholder string with a .pdf extension — that isn't valid PDF content and
+     * every PDF viewer refuses to open it) so the download link on the Reports page's "Report
+     * history" table actually works, mirroring createDocuments()'s "every seeded document
+     * writes a real file" rule.
+     */
+    private function createScheduledReportHistory(): void
+    {
+        foreach (ReportPeriod::cases() as $period) {
+            [$from, $to] = match ($period) {
+                ReportPeriod::MONTHLY => [now()->subMonthNoOverflow()->startOfMonth(), now()->subMonthNoOverflow()->endOfMonth()],
+                ReportPeriod::QUARTERLY => [now()->subQuarter()->startOfQuarter(), now()->subQuarter()->endOfQuarter()],
+                ReportPeriod::ANNUAL => [now()->subYear()->startOfYear(), now()->subYear()->endOfYear()],
+            };
+
+            $pdf = Pdf::loadView('reports.management', [
+                'headings' => ['Metric', 'Value'],
+                'rows' => Reports::managementRows($from, $to, true),
+                'title' => __('reports.types.management.label').' — '.$period->getLabel().' ('.$from->toFormattedDateString().' – '.$to->toFormattedDateString().')',
+            ]);
+
+            $filePath = 'scheduled-reports/'.Str::uuid().'.pdf';
+            Storage::disk('local')->put($filePath, $pdf->output());
+
+            ScheduledReport::query()->create([
+                'report_type' => 'management',
+                'period_type' => $period,
+                'period_start' => $from,
+                'period_end' => $to,
+                'file_path' => $filePath,
+                'generated_at' => $to->copy()->addDay(),
+            ]);
+        }
     }
 
     /**

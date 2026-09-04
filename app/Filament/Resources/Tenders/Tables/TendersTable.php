@@ -92,6 +92,8 @@ class TendersTable
                         false: fn (Builder $query) => $query->whereNull('invalidated_at'),
                     ),
             ])
+            ->filtersFormColumns(['sm' => 1, 'lg' => 2, 'xl' => 3])
+            ->filtersFormWidth(Width::FourExtraLarge)
             ->recordActions([
                 ActionGroup::make([
                     Action::make('changeStatus')

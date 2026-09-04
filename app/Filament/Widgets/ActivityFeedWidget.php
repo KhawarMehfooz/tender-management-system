@@ -18,7 +18,7 @@ use Illuminate\Support\Collection;
  */
 class ActivityFeedWidget extends Widget
 {
-    protected static ?int $sort = 3;
+    protected static ?int $sort = 5;
 
     protected string $view = 'filament.widgets.activity-feed-widget';
 

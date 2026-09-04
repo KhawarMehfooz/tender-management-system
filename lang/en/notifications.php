@@ -17,12 +17,14 @@ return [
         'tender-escalated-management' => 'Submission deadline critical (management)',
         'certificate-expiring' => 'Certificate expiring or expired',
         'client-contract-renewal' => 'Client contract nearing renewal',
+        'scheduled-report-generated' => 'Scheduled report generated',
     ],
 
     'actions' => [
         'view_task' => 'View task',
         'view_tender' => 'View tender',
         'view_certificate' => 'View certificate',
+        'view_report' => 'View report',
     ],
 
     'task_status_changed' => [
@@ -88,5 +90,12 @@ return [
         'body' => 'The contract for ":client" ends in about :months month(s).',
         'mail_subject' => 'Contract renewal approaching: :tender',
         'mail_line' => 'The contract on tender ":tender" for client ":client" ends around :date — about :months month(s) from now.',
+    ],
+
+    'scheduled_report_generated' => [
+        'title' => ':period management report generated',
+        'body' => 'Covers :from to :to.',
+        'mail_subject' => ':period management report generated',
+        'mail_line' => 'The :period management-reporting PDF covering :from to :to is ready to download.',
     ],
 ];

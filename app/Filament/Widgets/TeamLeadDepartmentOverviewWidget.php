@@ -17,7 +17,9 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
  */
 class TeamLeadDepartmentOverviewWidget extends StatsOverviewWidget
 {
-    protected static ?int $sort = 4;
+    protected static ?int $sort = 2;
+
+    protected int|string|array $columnSpan = 1;
 
     protected ?string $heading = null;
 

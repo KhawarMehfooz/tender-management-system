@@ -15,7 +15,9 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class EmployeeOpenTasksWidget extends TableWidget
 {
-    protected static ?int $sort = 1;
+    protected static ?int $sort = 3;
+
+    protected int|string|array $columnSpan = 'full';
 
     public function getTableHeading(): string
     {

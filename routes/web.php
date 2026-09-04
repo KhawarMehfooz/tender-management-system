@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CertificateDownloadController;
 use App\Http\Controllers\ReferenceAttachmentDownloadController;
+use App\Http\Controllers\ScheduledReportDownloadController;
 use App\Http\Controllers\TaskAttachmentDownloadController;
 use App\Http\Controllers\TenderDocumentDownloadController;
 use App\Http\Controllers\TenderDocumentRequestFileDownloadController;
@@ -38,3 +39,7 @@ Route::get('/tender-submission-files/{tenderSubmissionFile}/download', TenderSub
 Route::get('/tender-document-request-files/{tenderDocumentRequestFile}/download', TenderDocumentRequestFileDownloadController::class)
     ->middleware(['auth', 'signed'])
     ->name('tender-document-request-files.download');
+
+Route::get('/scheduled-reports/{scheduledReport}/download', ScheduledReportDownloadController::class)
+    ->middleware(['auth', 'signed'])
+    ->name('scheduled-reports.download');

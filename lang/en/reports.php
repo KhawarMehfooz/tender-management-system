@@ -34,4 +34,12 @@ return [
             'description' => 'Portfolio-wide headline KPIs from the Statistics page.',
         ],
     ],
+    'history' => [
+        'heading' => 'Report history',
+        'report_type' => 'Report',
+        'period' => 'Period',
+        'range' => 'Covers',
+        'generated_at' => 'Generated',
+        'download' => 'Download',
+    ],
 ];

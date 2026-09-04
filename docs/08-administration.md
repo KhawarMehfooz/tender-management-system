@@ -66,3 +66,4 @@ This is reserved for true mistakes. A tender that's simply no longer active shou
 - [References, Certificates & Concept Library](12-references-certificates-concepts.md), covering the right to manage certificates and the three company-wide libraries.
 - [Competitors, Market Intelligence, Client History & Pipeline](15-competitors-market-intelligence.md), covering the Clients reference-data table in more depth and the "see competitor data" right.
 - [People, Teams & Cover](16-people-teams-cover.md), covering the Skills reference-data table in more depth, employee profiles, team performance, and the "view employee statistics" right.
+- [Dashboards, Search, Statistics, Archive & Reporting](17-dashboards-search-statistics-reporting.md), covering the Dashboard, Statistics, Archive, and Reports pages that draw on the rights described above.

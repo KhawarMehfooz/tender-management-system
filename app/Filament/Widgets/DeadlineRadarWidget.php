@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class DeadlineRadarWidget extends TableWidget
 {
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 4;
 
     public function getTableHeading(): string
     {

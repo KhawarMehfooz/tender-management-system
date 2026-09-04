@@ -390,28 +390,160 @@ Planned tasks for M12:
   file: only the same pre-existing `staticClassAccess.privateMethod` baseline every other
   `static::`-calling page already carries (confirmed via `git diff` that `Statistics.php`/
   `TeamPerformance.php`'s diffs are visibility-keyword-only).
-- [ ] **Task 7 — Scheduled reports**: `App\Enums\ReportPeriod` (`MONTHLY`/`QUARTERLY`/`ANNUAL`,
-  `HasLabel`). Migration + model `ScheduledReport` (never hard-deleted). `GenerateScheduledReports`
-  command (`--period=` option), three `Schedule::command(...)` entries in `routes/console.php`
-  (`->monthly()`, `->quarterly()`, `->yearly()`). `NotificationType::SCHEDULED_REPORT_GENERATED`
-  case + `ScheduledReportGeneratedNotification`, sent to every `SUPER_ADMIN`/`DEPARTMENT_HEAD`.
-  Download route/controller mirroring `TenderDocumentDownloadController`'s auth+stream shape,
-  gated on holding at least one of the management rights (confirm exact gate once building — likely
-  `Right::VIEW_EMPLOYEE_STATISTICS` or a new dedicated right, decide with the user if genuinely
-  ambiguous). `Reports` page (task 6) gains a "Report history" table.
+- [x] **Task 7 — Scheduled reports**: `App\Enums\ReportPeriod` (`MONTHLY`/`QUARTERLY`/`ANNUAL`,
+  `HasLabel`, values used verbatim as the `--period=` option's accepted strings). Migration +
+  model `ScheduledReport` (UUID PK, `report_type`/`period_type` (enum cast)/`period_start`/
+  `period_end`/`file_path`/`generated_at`, standard timestamps, never hard-deleted — same
+  precedent as `Certificate`/`TenderDocumentVersion`). `GenerateScheduledReports` command
+  (`#[Signature('reports:generate-scheduled {--period=monthly}')]`), three `Schedule::command(...)`
+  entries in `routes/console.php` (`->monthly()`, `->quarterly()`, `->yearly()`, each passing its
+  own `--period=` value — one command, three schedule entries, not three commands).
+  `NotificationType::SCHEDULED_REPORT_GENERATED` case + dual-channel
+  `ScheduledReportGeneratedNotification`, sent via `User::role([SUPER_ADMIN, DEPARTMENT_HEAD])` to
+  every holder of either role. Download route/controller
+  (`ScheduledReportDownloadController`/`scheduled-reports.download`) mirrors
+  `TenderDocumentDownloadController`'s signed-URL shape but gates on `Right::VIEW_EMPLOYEE_STATISTICS`
+  instead of re-deriving a category scope — a scheduled report spans every category by nature (a
+  portfolio-wide summary), and `VIEW_EMPLOYEE_STATISTICS` is the same right already gating the
+  interactive "management reporting" export row and the Statistics page's cross-employee figures,
+  so this reuses the existing gate rather than inventing a new one. `Reports` page (task 6) gains a
+  "Report history" table (`implements HasTable`, `use InteractsWithTable`, alongside its existing
+  `getViewData()`-driven report-type cards) listing every `ScheduledReport`, gated the same way as
+  the download route itself (an empty query for a non-`VIEW_EMPLOYEE_STATISTICS` holder, since
+  showing the row to someone who'd only get a 403 clicking download serves no purpose) with a
+  per-row download action.
 
-  Tests: `GenerateScheduledReportsTest` — running the command creates a `ScheduledReport` row +
-  file + notifications for the right users, for each `--period` value; the download route 403s for
-  a user without the gating right and streams correctly for one who has it.
-- [ ] **Task 8 — Demo seeding & docs**: extend `DemoDataSeeder` only if any new task's acceptance
-  point needs seeded data it doesn't already have (e.g. enough closed tenders across statuses to
-  make Statistics/Archive/Reports non-empty on a fresh seed — check after tasks 1-7 land, this may
-  already be satisfied by existing seeding). New `docs/17-dashboards-search-reporting.md`
-  (general/public audience, matching pages 14-16's precedent, HTML-comment screenshot placeholders
-  per [[docs]]) covering the three dashboard widgets, global search, Statistics, Archive, and the
-  Reports page including scheduled reports. Cross-link from wherever an earlier docs page already
-  touches the same surface (e.g. `03-managing-tenders.md`'s archive/invalidation section, if one
-  exists) per [[docs]]'s sync rule.
+  **Design decision confirmed with the user before building**: idea.md's "closed period" framing
+  (a monthly/quarterly/annual report) was resolved as **true period-filtered KPIs**, not a
+  same-numbers-different-label snapshot — the user explicitly chose accuracy over reusing
+  `Statistics`'s all-time methods unchanged. This meant threading optional `?CarbonInterface
+  $from = null, ?CarbonInterface $to = null` params through every `Statistics` method the
+  management report actually uses (`formalExclusions()`, `winRate()`, `participationRate()`,
+  `averageHandlingTimeDays()`, `wonLostVolume()`, `averageContractValue()`, `averageMargin()`),
+  each scoping its underlying `Tender` query to `created_at` between the range via a new private
+  `scopePeriod()` helper — defaulting to `null` (no filter) so every existing interactive
+  Statistics-page call site keeps computing all-time figures exactly as before, unchanged. Methods
+  not used by the management report (`bidVolume()`, `deadlineReliability()`,
+  `priceCompetitorDevelopment()`, `lossReasonBreakdown()`) were deliberately left untouched — no
+  speculative period-scoping for report types this task doesn't cover.
+
+  `wonLostVolume()` additionally gained an optional `?bool $includePrices = null` param
+  (defaulting to `Statistics::canSeePrices()`, i.e. unchanged for interactive use): the console
+  command has no acting Filament user, so `auth()->user()` is `null` and `canSeePrices()` would
+  otherwise always evaluate false, silently stripping every price figure from the automatic
+  report even for recipients who hold `SEE_PRICES`. Since the *download* route is already the
+  privileged gate (only `VIEW_EMPLOYEE_STATISTICS` holders reach the file at all), the command
+  passes `includePrices: true` explicitly rather than have a redaction check with no user to
+  check against. `Reports::managementRows()` (already `public static` from task 6) gained the
+  matching `$from`/`$to`/`$includePrices` passthrough and is called unchanged (no args) by the
+  interactive Reports page, and with an explicit range + `includePrices: true` by the new command.
+
+  Two phpstan findings fixed during cleanup (not baseline): `closedPeriodRange()`'s return type
+  was declared `array{Carbon, Carbon}` but this app's `now()` resolves to `CarbonImmutable`
+  (a global date-class override elsewhere in the app, not this task's concern) — changed to
+  `Carbon\CarbonInterface` to match every other period param already using that type in
+  `Statistics.php`. `ScheduledReport::downloadUrl()`'s route name showed as "not found" during
+  editing only because the route hadn't been added yet at that point in the build — resolved once
+  `routes/web.php` was updated.
+
+  Tests: `tests/Feature/Console/GenerateScheduledReportsTest.php` — running the command with each
+  of the three `--period` values creates one `ScheduledReport` row (matching `period_type`) and a
+  stored PDF file; notifies every `SUPER_ADMIN`/`DEPARTMENT_HEAD` and not a plain staff user; an
+  invalid `--period` fails the command without creating anything; the download route 403s for a
+  user lacking `VIEW_EMPLOYEE_STATISTICS`, streams for one who holds it, and rejects an unsigned
+  link. 8 tests passing. `ReportsPageTest.php` gained a "report history table" group — a
+  `VIEW_EMPLOYEE_STATISTICS` holder sees a seeded `ScheduledReport` row via
+  `assertCanSeeTableRecords()`, a plain staff user does not (`assertCanNotSeeTableRecords()` —
+  the initial version used `assertCanSeeTableRecords([])`, which performs no assertion against an
+  empty expectation and was flagged "risky" by Pest; fixed to assert against the actual excluded
+  record instead). 19 tests passing (up from 17). Full re-run of
+  `tests/Feature/Filament/Pages`, `tests/Feature/Console`, and `CertificateTest.php`: 98 passing.
+  Pint clean; `phpstan --memory-limit=1G` on every touched/new file: 0 new findings beyond the
+  same pre-existing `staticClassAccess.privateMethod` baseline every other `static::`-calling page
+  in this app already carries (confirmed the diff introduces no new category).
+- [x] **Task 8 — Demo seeding & docs**: checked `DemoDataSeeder` against every M12 task's data
+  needs first, rather than assuming an extension was required. `createTender()`'s existing
+  `foreach (TenderStatus::cases())` loop (3 variants each) already produces tenders across every
+  status, including `WON`/`LOST`/`EXCLUDED`, with calculations, bid decisions, submissions, and
+  results, so Statistics's win rate/participation rate/formal exclusions/handling time/deadline
+  reliability/win-loss-reason breakdowns are all non-empty on a fresh seed with no seeder change
+  needed. Archiving was also already seeded (`$tender->archive($owner)` for every terminal-status
+  tender at variant 0), so the Archive list is non-empty too. The one genuine gap: nothing seeded
+  a `ScheduledReport` row, since those are normally only created by `GenerateScheduledReports`
+  actually running, so the Reports page's new "Report history" table (task 7) would render empty
+  on a fresh seed. Added `createScheduledReportHistory()` (one row per `ReportPeriod` case),
+  called once at the end of `run()` alongside `createAbsenceLibrary()`.
+
+  **Real bug found and fixed same session, after the user reported "failed to open report" on a
+  seeded download**: the first version of `createScheduledReportHistory()` wrote a plain string,
+  `Storage::put($filePath, '%PDF-1.4 demo scheduled report content')`, not an actual rendered
+  PDF — a text string that merely starts with the bytes `%PDF-` is not valid PDF content (a real
+  PDF needs a full object/xref/trailer structure), so every PDF viewer refused to open it, even
+  though a naive `str_starts_with($contents, '%PDF-')` check (used during initial verification)
+  passed and masked the bug. Fixed by rendering a real PDF the same way
+  `GenerateScheduledReports` itself does — `Pdf::loadView('reports.management', ['headings' =>
+  ['Metric', 'Value'], 'rows' => Reports::managementRows($from, $to, true), 'title' => ...])`,
+  storing `$pdf->output()` instead of a literal string — matching `createDocuments()`'s "every
+  seeded document writes a real file so its download link actually works" rule from
+  [[database-seeders]], which this task's first pass had cited but not actually followed for the
+  PDF case. The 3 already-bad rows sitting in the real dev Postgres DB (created by an earlier
+  `db:seed` run before this fix) were repaired in place via `php artisan tinker`, re-rendering
+  each one's PDF from its own `period_start`/`period_end`/`period_type` and overwriting the same
+  `file_path` — a targeted content fix on demo rows, not a destructive `migrate:fresh`. Verified
+  with `pdfinfo`/`pdftotext` against a copy of one repaired file (not just the crude byte-prefix
+  check that missed the bug the first time): valid single-page A4 PDF, `dompdf 3.1.6`, correct
+  rendered title and metric table.
+
+  Verified the corrected seeder via a throwaway Pest test invoking the full `DatabaseSeeder`
+  against the sqlite testing DB (per [[database-seeders]]'s standing rule: never run
+  `migrate:fresh --seed` against the real dev Postgres DB to check this kind of thing) — seeded
+  cleanly, exactly 3 `ScheduledReport` rows created, each file starting with `%PDF-` and ending
+  `%%EOF`, then the throwaway test file was deleted, nothing left behind. Pint clean;
+  `phpstan --memory-limit=1G` on `DemoDataSeeder.php`: the file's pre-existing 21-finding baseline
+  (fake()->paragraphs()'s `array|string` return type tripping `Storage::put()`/`strlen()`/
+  `ucfirst()` argument-type checks throughout the file, present before this task) is unchanged —
+  none of the findings fall anywhere near `createScheduledReportHistory()`'s lines, confirmed by
+  isolating the grep to that line range.
+
+  New `docs/17-dashboards-search-statistics-reporting.md` (general/public audience per pages
+  14-16's established precedent, HTML-comment screenshot placeholders per [[docs]]), covering the
+  single adaptive Dashboard page and its 5 widgets, global search's cross-resource coverage, the
+  Statistics page's KPI cards and breakdown tables, the Archive view, the 12 combinable tender
+  filters shared between the main list and the Archive, the Reports page's 6 report types, and
+  automatic scheduled reports including the gated Report history table. Cross-linked from
+  `03-managing-tenders.md` (archiving section now points to the Archive view, "Where to go next"
+  gained an entry), `08-administration.md` ("Where to go next", since 17 draws on every right
+  described there), `15-competitors-market-intelligence.md` ("Where to go next", the competitors/
+  pipeline report exports reuse those pages) and `16-people-teams-cover.md` ("Where to go next",
+  the employee & department performance report reuses Team Performance) — each per [[docs]]'s
+  sync rule, timestamps bumped to 04/09/2026 on every page actually edited.
+
+  **Second real bug found and fixed same session, after the user reported the Dashboard's "My
+  open tasks" widget empty**: `pickTeam()` (used by every `createTender()` call) deliberately
+  excludes every `MANAGEMENT_ROLES` member — `SUPER_ADMIN` included — from every tender's team,
+  so `createTask()`'s `$owner = $team->random()` can never land on `admin@example.com`. That
+  account is the exact one `docs/02-getting-started.md`'s own screenshots log in as first, so on
+  a fresh seed the headline demo login owned zero tasks and `EmployeeOpenTasksWidget`
+  (`WHERE owner_id = auth()->id() AND status != DONE`) always rendered empty for it, even though
+  every other demo account (team lead, department head, staff) already had open tasks via their
+  normal team membership. Fixed with a new `assignAdminOpenTasks()`, called once at the end of
+  the main tender-seeding loop: reassigns 3 already-seeded, not-done tasks' `owner_id` to the
+  `SUPER_ADMIN` demo user via `forceFill()->save()`, rather than fabricating new standalone Task
+  rows or changing `pickTeam()`'s team-composition rule itself (which is correct — a real
+  super-admin realistically doesn't sit on individual tender teams; this is purely a "the demo
+  login needs something to show" fix, not a real-world modeling change).
+
+  Verified via a throwaway Pest test invoking the full `DatabaseSeeder` against the sqlite testing
+  DB (same standing rule as above, never against the real dev DB): `admin@example.com` owns at
+  least one open task after seeding. Then applied the equivalent fix directly to the real dev
+  Postgres DB via `artisan tinker` (a targeted `UPDATE`-equivalent reassigning 3 existing tasks'
+  `owner_id`, not a destructive `migrate:fresh`), so the already-seeded environment the user was
+  testing against is fixed immediately rather than only on a future reseed. Pint clean;
+  `phpstan --memory-limit=1G` on `DemoDataSeeder.php`: `assignAdminOpenTasks()`'s own lines carry
+  no findings (confirmed by isolating the grep to that line range) — the file's pre-existing
+  baseline findings elsewhere are unchanged.
+
+M12 — Dashboards, Search, Statistics, Archive, Reporting is now complete.
 
 Execute one task at a time, confirming with the user before moving to the next, per
 [[general]]'s milestone workflow.

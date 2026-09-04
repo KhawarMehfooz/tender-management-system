@@ -15,6 +15,7 @@ enum NotificationType: string implements HasLabel
     case TENDER_ESCALATED_MANAGEMENT = 'tender-escalated-management';
     case CERTIFICATE_EXPIRING = 'certificate-expiring';
     case CLIENT_CONTRACT_RENEWAL = 'client-contract-renewal';
+    case SCHEDULED_REPORT_GENERATED = 'scheduled-report-generated';
 
     public function getLabel(): string
     {

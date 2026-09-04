@@ -1,6 +1,6 @@
 # People, Teams & Cover
 
-_Last updated: 03/09/2026_
+_Last updated: 04/09/2026_
 
 This page covers everything TMS tracks about the people doing the work, beyond simply assigning them to a tender or task: what skills they have, a profile of their own activity and performance, how the team is doing as a whole, and how absences and cover are recorded.
 
@@ -90,3 +90,4 @@ The escalation notifications described in [Managing tenders](03-managing-tenders
 - [Tasks](05-tasks.md), covering the rest of the task assignment form the workload indicator appears on.
 - [Administration](08-administration.md), covering the Skills reference-data table and the "view employee statistics" right.
 - [Managing tenders](03-managing-tenders.md), covering the shared calendar that absences and tender deadlines both appear on.
+- [Dashboards, Search, Statistics, Archive & Reporting](17-dashboards-search-statistics-reporting.md), covering the Reports page's employee & department performance export, which reuses the Team Performance breakdowns covered here.

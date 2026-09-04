@@ -3,24 +3,33 @@
 namespace App\Filament\Pages;
 
 use App\Enums\CompetitorOutcome;
+use App\Enums\ReportPeriod;
 use App\Enums\Right;
 use App\Enums\TenderStatus;
 use App\Exports\ArrayExport;
 use App\Models\Competitor;
+use App\Models\ScheduledReport;
 use App\Models\Tender;
 use App\Models\TenderCompetitor;
 use BackedEnum;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class Reports extends Page
+class Reports extends Page implements HasTable
 {
+    use InteractsWithTable;
+
     protected string $view = 'filament.pages.reports';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentChartBar;
@@ -48,6 +57,42 @@ class Reports extends Page
         return [
             'reports' => static::reportDefinitions(),
         ];
+    }
+
+    /**
+     * "Report history" — past GenerateScheduledReports runs. Gated the same as the download
+     * route itself (Right::VIEW_EMPLOYEE_STATISTICS), since a plain staff member could see the
+     * table row but would only ever get a 403 clicking download.
+     */
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(static::canViewEmployeeStatistics() ? ScheduledReport::query() : ScheduledReport::query()->whereRaw('1 = 0'))
+            ->heading(__('reports.history.heading'))
+            ->defaultSort('generated_at', 'desc')
+            ->columns([
+                TextColumn::make('report_type')
+                    ->label(__('reports.history.report_type'))
+                    ->formatStateUsing(fn (string $state): string => __('reports.types.'.$state.'.label')),
+                TextColumn::make('period_type')
+                    ->label(__('reports.history.period'))
+                    ->badge()
+                    ->formatStateUsing(fn (ReportPeriod $state): string => $state->getLabel()),
+                TextColumn::make('period_start')
+                    ->label(__('reports.history.range'))
+                    ->date()
+                    ->formatStateUsing(fn (ScheduledReport $record): string => $record->period_start->toFormattedDateString().' – '.$record->period_end->toFormattedDateString()),
+                TextColumn::make('generated_at')
+                    ->label(__('reports.history.generated_at'))
+                    ->dateTime(),
+            ])
+            ->recordActions([
+                Action::make('download')
+                    ->label(__('reports.history.download'))
+                    ->icon(Heroicon::OutlinedArrowDownTray)
+                    ->url(fn (ScheduledReport $record): string => $record->downloadUrl())
+                    ->openUrlInNewTab(),
+            ]);
     }
 
     /**
@@ -304,24 +349,32 @@ class Reports extends Page
     }
 
     /**
+     * $from/$to/$includePrices are only passed by GenerateScheduledReports, which renders this
+     * same report for a closed period with no acting Filament user (hence the explicit
+     * $includePrices override — auth()->user() is null in that console context, so
+     * Statistics::canSeePrices() would otherwise always come back false). The interactive
+     * Reports page keeps calling this with no args, computing all-time figures exactly as
+     * before.
+     *
      * @return array<int, array<int, mixed>>
      */
-    private static function managementRows(): array
+    public static function managementRows(?CarbonInterface $from = null, ?CarbonInterface $to = null, ?bool $includePrices = null): array
     {
-        $formalExclusions = Statistics::formalExclusions();
+        $includePrices ??= static::canSeePrices();
+        $formalExclusions = Statistics::formalExclusions($from, $to);
 
         $rows = [
             ['Formal exclusions', $formalExclusions['count']],
-            ['Win rate (%)', static::percent(Statistics::winRate())],
-            ['Participation rate (%)', static::percent(Statistics::participationRate())],
-            ['Average handling time (days)', static::round1(Statistics::averageHandlingTimeDays())],
+            ['Win rate (%)', static::percent(Statistics::winRate($from, $to))],
+            ['Participation rate (%)', static::percent(Statistics::participationRate($from, $to))],
+            ['Average handling time (days)', static::round1(Statistics::averageHandlingTimeDays($from, $to))],
         ];
 
-        if (static::canSeePrices()) {
-            $wonLostVolume = Statistics::wonLostVolume();
+        if ($includePrices) {
+            $wonLostVolume = Statistics::wonLostVolume($from, $to, true);
 
-            $rows[] = ['Average contract value (EUR)', static::round2(Statistics::averageContractValue())];
-            $rows[] = ['Average margin (%)', static::round1(Statistics::averageMargin())];
+            $rows[] = ['Average contract value (EUR)', static::round2(Statistics::averageContractValue($from, $to))];
+            $rows[] = ['Average margin (%)', static::round1(Statistics::averageMargin($from, $to))];
             $rows[] = ['Won volume (EUR)', static::round2($wonLostVolume['wonVolume'])];
             $rows[] = ['Lost volume (EUR)', static::round2($wonLostVolume['lostVolume'])];
         }
