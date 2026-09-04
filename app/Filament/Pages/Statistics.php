@@ -54,8 +54,8 @@ class Statistics extends Page
             'averageMargin' => static::canSeePrices() ? static::averageMargin() : null,
             'averageHandlingTimeDays' => static::averageHandlingTimeDays(),
             'deadlineReliability' => static::deadlineReliability(),
-            'lossReasons' => static::lossReasonBreakdown(),
-            'priceCompetitorDevelopment' => static::priceCompetitorDevelopment(),
+            'lossReasons' => self::lossReasonBreakdown(),
+            'priceCompetitorDevelopment' => self::priceCompetitorDevelopment(),
         ];
     }
 
@@ -69,6 +69,7 @@ class Statistics extends Page
      * period-aware KPI below to a closed reporting period (GenerateScheduledReports) while
      * leaving every interactive Statistics-page call (no args) computing all-time as before.
      *
+     * @param  Builder<Tender>  $query
      * @return Builder<Tender>
      */
     private static function scopePeriod(Builder $query, ?CarbonInterface $from, ?CarbonInterface $to): Builder
@@ -87,8 +88,8 @@ class Statistics extends Page
      */
     public static function formalExclusions(?CarbonInterface $from = null, ?CarbonInterface $to = null): array
     {
-        $total = static::scopePeriod(Tender::query(), $from, $to)->count();
-        $excluded = static::scopePeriod(Tender::query()->where('status', TenderStatus::EXCLUDED), $from, $to)->count();
+        $total = self::scopePeriod(Tender::query(), $from, $to)->count();
+        $excluded = self::scopePeriod(Tender::query()->where('status', TenderStatus::EXCLUDED), $from, $to)->count();
 
         return [
             'count' => $excluded,
@@ -102,8 +103,8 @@ class Statistics extends Page
      */
     public static function winRate(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $won = static::scopePeriod(Tender::query()->where('status', TenderStatus::WON), $from, $to)->count();
-        $lost = static::scopePeriod(Tender::query()->where('status', TenderStatus::LOST), $from, $to)->count();
+        $won = self::scopePeriod(Tender::query()->where('status', TenderStatus::WON), $from, $to)->count();
+        $lost = self::scopePeriod(Tender::query()->where('status', TenderStatus::LOST), $from, $to)->count();
         $decided = $won + $lost;
 
         return $decided === 0 ? null : $won / $decided;
@@ -116,8 +117,8 @@ class Statistics extends Page
      */
     public static function participationRate(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $decided = static::scopePeriod(Tender::query()->whereHas('currentBidDecision'), $from, $to)->count();
-        $bid = static::scopePeriod(
+        $decided = self::scopePeriod(Tender::query()->whereHas('currentBidDecision'), $from, $to)->count();
+        $bid = self::scopePeriod(
             Tender::query()->whereHas('currentBidDecision', fn (Builder $query) => $query->where('decision', BidDecision::BID)),
             $from,
             $to,
@@ -137,7 +138,7 @@ class Statistics extends Page
 
         return [
             'count' => $bidTenders->count(),
-            'volume' => static::canSeePrices() ? static::sumKnownVolume($bidTenders) : null,
+            'volume' => static::canSeePrices() ? self::sumKnownVolume($bidTenders) : null,
         ];
     }
 
@@ -152,14 +153,14 @@ class Statistics extends Page
             return ['wonVolume' => null, 'lostVolume' => null];
         }
 
-        $won = static::scopePeriod(Tender::query()->where('status', TenderStatus::WON), $from, $to)
+        $won = self::scopePeriod(Tender::query()->where('status', TenderStatus::WON), $from, $to)
             ->get(['id', 'estimated_contract_volume', 'estimated_contract_volume_unknown']);
-        $lost = static::scopePeriod(Tender::query()->where('status', TenderStatus::LOST), $from, $to)
+        $lost = self::scopePeriod(Tender::query()->where('status', TenderStatus::LOST), $from, $to)
             ->get(['id', 'estimated_contract_volume', 'estimated_contract_volume_unknown']);
 
         return [
-            'wonVolume' => static::sumKnownVolume($won),
-            'lostVolume' => static::sumKnownVolume($lost),
+            'wonVolume' => self::sumKnownVolume($won),
+            'lostVolume' => self::sumKnownVolume($lost),
         ];
     }
 
@@ -175,7 +176,7 @@ class Statistics extends Page
 
     public static function averageContractValue(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $tenders = static::scopePeriod(
+        $tenders = self::scopePeriod(
             Tender::query()
                 ->where('estimated_contract_volume_unknown', false)
                 ->whereNotNull('estimated_contract_volume'),
@@ -194,7 +195,7 @@ class Statistics extends Page
      */
     public static function averageMargin(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $margins = static::scopePeriod(Tender::query()->with('currentCalculation'), $from, $to)
+        $margins = self::scopePeriod(Tender::query()->with('currentCalculation'), $from, $to)
             ->get()
             ->map(fn (Tender $tender): ?float => $tender->currentCalculation?->actual_margin === null
                 ? null
@@ -210,8 +211,8 @@ class Statistics extends Page
      */
     public static function averageHandlingTimeDays(?CarbonInterface $from = null, ?CarbonInterface $to = null): ?float
     {
-        $closed = static::scopePeriod(
-            Tender::query()->whereIn('status', static::terminalStatuses()),
+        $closed = self::scopePeriod(
+            Tender::query()->whereIn('status', self::terminalStatuses()),
             $from,
             $to,
         )

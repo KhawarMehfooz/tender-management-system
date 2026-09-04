@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Scope;
  * its parent Tender, the same way TaskTenderCategoryScope does for Task. Needed once a
  * standalone query surface exists (the M3 tender calendar page queries TenderDeadline
  * directly), not just relation-manager access through an already-scoped Tender.
+ *
+ * @implements Scope<Model>
  */
 class TenderDeadlineCategoryScope implements Scope
 {

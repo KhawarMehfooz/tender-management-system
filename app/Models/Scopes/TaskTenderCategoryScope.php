@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Scope;
  * standalone TaskResource queries Task directly, so this scope re-derives the same
  * restriction via the tender relationship. Same no-op-for-management-users/no-op-outside-web-
  * auth behavior as ServiceCategoryScope.
+ *
+ * @implements Scope<Model>
  */
 class TaskTenderCategoryScope implements Scope
 {

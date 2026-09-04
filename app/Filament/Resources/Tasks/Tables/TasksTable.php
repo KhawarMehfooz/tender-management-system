@@ -135,7 +135,7 @@ class TasksTable
             ->label(__('tasks.actions.add_comment'))
             ->icon(Heroicon::OutlinedChatBubbleLeft)
             ->color('gray')
-            ->visible(fn (Task $record): bool => static::canCommentOrAttach($record))
+            ->visible(fn (Task $record): bool => self::canCommentOrAttach($record))
             ->modalWidth(Width::Medium)
             ->schema([
                 Textarea::make('body')
@@ -145,7 +145,7 @@ class TasksTable
                     ->columnSpanFull(),
             ])
             ->action(function (Task $record, array $data): void {
-                if (! static::canCommentOrAttach($record)) {
+                if (! self::canCommentOrAttach($record)) {
                     return;
                 }
 
@@ -167,7 +167,7 @@ class TasksTable
             ->label(__('tasks.actions.add_attachment'))
             ->icon(Heroicon::OutlinedPaperClip)
             ->color('gray')
-            ->visible(fn (Task $record): bool => static::canCommentOrAttach($record))
+            ->visible(fn (Task $record): bool => self::canCommentOrAttach($record))
             ->modalWidth(Width::Medium)
             ->schema([
                 FileUpload::make('file')
@@ -179,7 +179,7 @@ class TasksTable
                     ->preventFilePathTampering(),
             ])
             ->action(function (Task $record, array $data): void {
-                if (! static::canCommentOrAttach($record)) {
+                if (! self::canCommentOrAttach($record)) {
                     return;
                 }
 

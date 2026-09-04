@@ -57,7 +57,7 @@ class TeamPerformance extends Page
     {
         return [
             'departmentBreakdown' => static::departmentBreakdown(),
-            'bottleneckBreakdown' => static::bottleneckBreakdown(),
+            'bottleneckBreakdown' => self::bottleneckBreakdown(),
             'rankings' => static::rankings(),
         ];
     }
@@ -76,7 +76,7 @@ class TeamPerformance extends Page
             ->get()
             ->map(fn (User $user): array => [
                 'name' => $user->name,
-                'department' => $user->serviceCategory?->name ?? __('users.infolist.no_service_category'),
+                'department' => $user->serviceCategory->name ?? __('users.infolist.no_service_category'),
                 'score' => $user->performanceScore(),
                 'winRate' => $user->winRate(),
             ])
@@ -98,8 +98,8 @@ class TeamPerformance extends Page
         $rows = ServiceCategory::query()
             ->orderBy('name')
             ->get()
-            ->map(fn (ServiceCategory $category): array => static::departmentRow($category->name, $category->id))
-            ->push(static::departmentRow(__('users.infolist.no_service_category'), null));
+            ->map(fn (ServiceCategory $category): array => self::departmentRow($category->name, $category->id))
+            ->push(self::departmentRow(__('users.infolist.no_service_category'), null));
 
         return $rows->filter(fn (array $row): bool => $row['total'] > 0)->values()->all();
     }
@@ -152,7 +152,7 @@ class TeamPerformance extends Page
     private static function bottleneckBreakdown(): array
     {
         $rows = collect(CalculationApprovalStep::cases())
-            ->map(fn (CalculationApprovalStep $step): array => static::bottleneckRow($step));
+            ->map(fn (CalculationApprovalStep $step): array => self::bottleneckRow($step));
 
         return $rows->filter(fn (array $row): bool => $row['sampleSize'] > 0)->values()->all();
     }

@@ -6,6 +6,7 @@ use App\Enums\DeadlineType;
 use App\Enums\Right;
 use App\Filament\Resources\Tenders\Schemas\TenderForm;
 use App\Filament\Resources\Tenders\TenderResource;
+use App\Models\Tender;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateTender extends CreateRecord
@@ -64,6 +65,7 @@ class CreateTender extends CreateRecord
 
     protected function afterCreate(): void
     {
+        /** @var Tender $tender */
         $tender = $this->getRecord();
 
         $tender->upsertDeadline(DeadlineType::SUBMISSION, $this->deadlineData['submission_deadline']);

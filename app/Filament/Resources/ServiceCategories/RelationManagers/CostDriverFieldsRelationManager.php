@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ServiceCategories\RelationManagers;
 
 use App\Enums\CostDriverFieldType;
+use App\Models\ServiceCategory;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -23,6 +24,9 @@ class CostDriverFieldsRelationManager extends RelationManager
 
     public function form(Schema $schema): Schema
     {
+        /** @var ServiceCategory $serviceCategory */
+        $serviceCategory = $this->getOwnerRecord();
+
         return $schema
             ->components([
                 TextInput::make('field_key')
@@ -31,7 +35,7 @@ class CostDriverFieldsRelationManager extends RelationManager
                     ->required()
                     ->maxLength(255)
                     ->unique(
-                        modifyRuleUsing: fn (Unique $rule): Unique => $rule->where('service_category_id', $this->getOwnerRecord()->id),
+                        modifyRuleUsing: fn (Unique $rule): Unique => $rule->where('service_category_id', $serviceCategory->id),
                         ignoreRecord: true,
                     ),
                 TextInput::make('label')

@@ -80,17 +80,17 @@ class UserResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return static::canManage() || static::canViewStatistics();
+        return self::canManage() || self::canViewStatistics();
     }
 
     public static function canCreate(): bool
     {
-        return static::canManage();
+        return self::canManage();
     }
 
     public static function canEdit(Model $record): bool
     {
-        return static::canManage();
+        return self::canManage();
     }
 
     /**
@@ -106,7 +106,7 @@ class UserResource extends Resource
             return false;
         }
 
-        return $user->is($record) || static::canManage() || static::canViewStatistics();
+        return $user->is($record) || self::canManage() || self::canViewStatistics();
     }
 
     /**

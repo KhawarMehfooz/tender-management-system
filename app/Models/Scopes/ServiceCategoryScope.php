@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Scope;
  * scope is a no-op for them — this mirrors the nullable FK already on
  * `users.service_category_id`. No-ops entirely outside a web-authenticated
  * request (console commands, seeders, queued jobs).
+ *
+ * @implements Scope<Model>
  */
 class ServiceCategoryScope implements Scope
 {

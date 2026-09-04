@@ -46,9 +46,9 @@ class TaskForm
      */
     private static function scopedUserOptions(): array
     {
-        return static::scopedUserQuery(User::query())
+        return self::scopedUserQuery(User::query())
             ->get()
-            ->mapWithKeys(fn (User $user): array => [$user->id => static::workloadLabel($user)])
+            ->mapWithKeys(fn (User $user): array => [$user->id => self::workloadLabel($user)])
             ->all();
     }
 
@@ -93,6 +93,7 @@ class TaskForm
     }
 
     /**
+     * @param  Builder<User>  $query
      * @return Builder<User>
      */
     private static function scopedUserQuery(Builder $query): Builder
@@ -162,25 +163,25 @@ class TaskForm
                         Select::make('owner_id')
                             ->label(__('tasks.fields.owner_id'))
                             ->prefixIcon(Heroicon::OutlinedUser)
-                            ->options(fn (): array => static::scopedUserOptions())
-                            ->default(fn (): ?string => static::canManageTask() ? null : auth()->id())
+                            ->options(fn (): array => self::scopedUserOptions())
+                            ->default(fn (): ?string => self::canManageTask() ? null : (auth()->id() === null ? null : (string) auth()->id()))
                             ->required()
                             ->searchable()
                             ->live()
-                            ->disabled(fn (): bool => ! static::canManageTask())
+                            ->disabled(fn (): bool => ! self::canManageTask())
                             ->dehydrated(),
                         Select::make('reviewer_id')
                             ->label(__('tasks.fields.reviewer_id'))
                             ->prefixIcon(Heroicon::OutlinedShieldCheck)
-                            ->options(fn (): array => static::scopedUserOptions())
+                            ->options(fn (): array => self::scopedUserOptions())
                             ->searchable()
-                            ->disabled(fn (): bool => ! static::canManageTask())
+                            ->disabled(fn (): bool => ! self::canManageTask())
                             ->dehydrated(),
                         Select::make('participants')
                             ->label(__('tasks.fields.participants'))
                             ->prefixIcon(Heroicon::OutlinedUserGroup)
-                            ->relationship('participants', 'name', fn (Builder $query) => static::scopedUserQuery($query))
-                            ->getOptionLabelFromRecordUsing(fn (User $record): string => static::workloadLabel($record))
+                            ->relationship('participants', 'name', fn (Builder $query) => self::scopedUserQuery($query))
+                            ->getOptionLabelFromRecordUsing(fn (User $record): string => self::workloadLabel($record))
                             ->multiple()
                             ->searchable()
                             ->columnSpanFull()
@@ -228,7 +229,7 @@ class TaskForm
                             ->label(__('tasks.fields.due_date'))
                             ->prefixIcon(Heroicon::OutlinedCalendarDays)
                             ->live()
-                            ->helperText(fn (Get $get): ?string => static::dueDateAbsenceWarning($get('owner_id'), $get('due_date'))),
+                            ->helperText(fn (Get $get): ?string => self::dueDateAbsenceWarning($get('owner_id'), $get('due_date'))),
                     ])
                     ->columns(2),
 
@@ -250,7 +251,8 @@ class TaskForm
                             ->columnSpanFull()
                             ->defaultItems(0)
                             ->addActionLabel(__('tasks.actions.add_checklist_item'))
-                            ->reorderable('position'),
+                            ->orderColumn('position')
+                            ->reorderable(),
                     ]),
             ]);
     }
