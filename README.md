@@ -22,10 +22,6 @@ tender lifecycle: intake, team assignment, deadlines, documents, cost calculatio
 approvals, bid/no-bid decisions, submission and follow-up, results, and the market/competitor
 intelligence that accumulates from them over time.
 
-## Status
-
-Early: foundation stage. Not yet usable end to end.
-
 ## Documentation
 
 User-facing documentation, with screenshots, starts at [docs/01-overview.md](docs/01-overview.md).
