@@ -57,6 +57,8 @@ class ReferenceForm
                                 ->disabled(fn (Get $get): bool => (bool) $get('contract_volume_unknown')),
                             Toggle::make('contract_volume_unknown')
                                 ->label(__('references.fields.contract_volume_unknown'))
+                                ->onIcon(Heroicon::OutlinedCheck)
+                                ->offIcon(Heroicon::OutlinedXMark)
                                 ->inline(false)
                                 ->live()
                                 ->afterStateUpdated(function (Set $set, ?bool $state): void {

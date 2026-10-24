@@ -50,6 +50,8 @@ class NutsCodeForm
                             ->preload(),
                         Toggle::make('active')
                             ->label(__('nuts_codes.fields.active'))
+                            ->onIcon(Heroicon::OutlinedCheck)
+                            ->offIcon(Heroicon::OutlinedXMark)
                             ->helperText(__('nuts_codes.fields.active_helper'))
                             ->required()
                             ->columnSpanFull(),

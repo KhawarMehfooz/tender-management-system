@@ -61,6 +61,8 @@ class NotificationPreferences extends Page implements HasTable
 
                 ToggleColumn::make('email_enabled')
                     ->label(__('notifications.email_column'))
+                    ->onIcon(Heroicon::OutlinedCheck)
+                    ->offIcon(Heroicon::OutlinedXMark)
                     ->alignCenter(),
             ]);
     }

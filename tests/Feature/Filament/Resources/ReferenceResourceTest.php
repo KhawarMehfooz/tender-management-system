@@ -9,6 +9,8 @@ use App\Models\ReferenceAttachment;
 use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\User;
+use Filament\Forms\Components\Toggle;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -123,4 +125,14 @@ describe('attachment download', function () {
 
         $this->get($attachment->downloadUrl())->assertNotFound();
     });
+});
+
+it('shows check and cross icons for the unknown contract volume toggle', function () {
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateReference::class)
+        ->assertFormFieldExists('contract_volume_unknown', function (Toggle $field): bool {
+            return $field->getOnIcon() === Heroicon::OutlinedCheck
+                && $field->getOffIcon() === Heroicon::OutlinedXMark;
+        });
 });
