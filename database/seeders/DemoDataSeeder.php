@@ -28,10 +28,14 @@ use App\Models\Client;
 use App\Models\Competitor;
 use App\Models\CompetitorPriceEntry;
 use App\Models\ConceptBlock;
+use App\Models\NutsCode;
+use App\Models\ProcurementProcedure;
 use App\Models\Reference;
 use App\Models\ScheduledReport;
+use App\Models\Sector;
 use App\Models\ServiceCategory;
 use App\Models\Skill;
+use App\Models\Source;
 use App\Models\Task;
 use App\Models\Tender;
 use App\Models\TenderBidDecision;
@@ -55,6 +59,24 @@ use Illuminate\Support\Str;
 
 class DemoDataSeeder extends Seeder
 {
+    /**
+     * Fictional organisations for demo screenshots; these are not customer records.
+     *
+     * @var array<int, array{name: string, region: string, nuts: string, city: string, sector: string}>
+     */
+    private const array DEMO_CLIENTS = [
+        ['name' => 'Spreeblick Housing Association', 'region' => 'Berlin', 'nuts' => 'DE3', 'city' => 'Berlin', 'sector' => 'Facility Services'],
+        ['name' => 'Elbpark Medical Centre', 'region' => 'Hamburg', 'nuts' => 'DE6', 'city' => 'Hamburg', 'sector' => 'Healthcare'],
+        ['name' => 'Isar Valley Education Trust', 'region' => 'Bavaria', 'nuts' => 'DE2', 'city' => 'Munich', 'sector' => 'Education'],
+        ['name' => 'Rheinbogen Business Park', 'region' => 'North Rhine-Westphalia', 'nuts' => 'DEA', 'city' => 'Cologne', 'sector' => 'Industrial'],
+        ['name' => 'Mainufer Civic Services', 'region' => 'Hessen', 'nuts' => 'DE7', 'city' => 'Frankfurt', 'sector' => 'Public Administration'],
+        ['name' => 'Elbtor Logistics Campus', 'region' => 'Hamburg', 'nuts' => 'DE6', 'city' => 'Hamburg', 'sector' => 'Industrial'],
+        ['name' => 'Havelblick Community Hospital', 'region' => 'Berlin', 'nuts' => 'DE3', 'city' => 'Berlin', 'sector' => 'Healthcare'],
+        ['name' => 'Isarpark Office Campus', 'region' => 'Bavaria', 'nuts' => 'DE2', 'city' => 'Munich', 'sector' => 'Facility Services'],
+        ['name' => 'Rheinblick Learning Campus', 'region' => 'North Rhine-Westphalia', 'nuts' => 'DEA', 'city' => 'Dusseldorf', 'sector' => 'Education'],
+        ['name' => 'Taunus Community Services', 'region' => 'Hessen', 'nuts' => 'DE7', 'city' => 'Wiesbaden', 'sector' => 'Public Administration'],
+    ];
+
     /**
      * Roles whose users span all service categories (mirrors
      * TenderForm::canManageTeam()'s management role set — see [[scopes-models]]).
@@ -166,7 +188,7 @@ class DemoDataSeeder extends Seeder
             if ($role === RoleName::SUPER_ADMIN) {
                 $admin = User::query()->updateOrCreate(
                     ['email' => 'admin@example.com'],
-                    ['name' => 'Admin', 'password' => Hash::make('password'), 'email_verified_at' => now()],
+                    ['name' => 'Alexander Weber', 'password' => Hash::make('password'), 'email_verified_at' => now()],
                 );
                 $admin->syncRoles($role);
                 $users->push($admin);
@@ -174,7 +196,16 @@ class DemoDataSeeder extends Seeder
                 $demo = User::query()->updateOrCreate(
                     ['email' => $role->value.'@example.com'],
                     [
-                        'name' => ucwords(str_replace('-', ' ', $role->value)).' Demo',
+                        'name' => match ($role) {
+                            RoleName::DEPARTMENT_HEAD => 'Julia Schneider',
+                            RoleName::TEAM_LEAD => 'Markus Hoffmann',
+                            RoleName::CALCULATION => 'Lena Fischer',
+                            RoleName::CONCEPT_WRITER => 'Daniel Wagner',
+                            RoleName::DOCUMENTATION => 'Sophie Becker',
+                            RoleName::QUALITY_CONTROL => 'Thomas Keller',
+                            RoleName::STAFF => 'Anna Richter',
+                            default => 'Felix Braun',
+                        },
                         'password' => Hash::make('password'),
                         'email_verified_at' => now(),
                         'service_category_id' => $this->categoryFor($role, 0),
@@ -186,6 +217,7 @@ class DemoDataSeeder extends Seeder
 
             for ($i = 0; $i < 2; $i++) {
                 $extra = User::factory()->create([
+                    'name' => fake('de_DE')->name(),
                     'service_category_id' => $this->categoryFor($role, $i + 1),
                 ]);
                 $extra->syncRoles($role);
@@ -237,19 +269,32 @@ class DemoDataSeeder extends Seeder
         $team = $reachesSubmission ? $this->pickTeam($category, 6, 7) : $this->pickTeam($category);
         $owner = $team->first();
 
-        // M10: most tenders link to a company client (a minority stay unlinked, to demo the
-        // "Unknown" grouping in MarketAnalysis's client breakdown). A handful get their
-        // contract_end_date pinned into the 12/9/6-month reminder windows instead of the
-        // factory's own wide random range, so tenders:check-client-renewals has something to
-        // fire on once seeding is done — including one LOST tender, per idea.md's "reminders
-        // fire on lost tenders too" requirement.
+        // Cycle through the fictional client profiles so every chart has populated,
+        // coherent region/sector/client data, independent of random factory defaults.
+        $profileIndex = (array_search($status, TenderStatus::cases(), true) * 3 + $variant) % count(self::DEMO_CLIENTS);
+        $profile = self::DEMO_CLIENTS[$profileIndex];
+        $client = $this->clients->firstWhere('name', $profile['name']);
         $demoContractEndDate = $this->demoClientRenewalDate($status, $variant);
 
         $tender = Tender::factory()->create([
             'service_category_id' => $category->id,
             'owner_id' => $owner->id,
-            'title' => fake()->sentence(4).' — '.$category->name,
-            'client_id' => fake()->boolean(75) ? $this->clients->random()->id : null,
+            'title' => $category->name.' — '.$profile['name'],
+            'client_id' => $client->id,
+            'contracting_authority' => $profile['name'],
+            'city' => $profile['city'],
+            'nuts_code_id' => NutsCode::query()->where('code', $profile['nuts'])->firstOrFail()->id,
+            'sector_id' => Sector::query()->where('name', $profile['sector'])->firstOrFail()->id,
+            'source_id' => Source::query()->where('name', '!=', 'Unknown')->inRandomOrder()->firstOrFail()->id,
+            'procurement_procedure_id' => ProcurementProcedure::query()->where('name', '!=', 'Unknown')->inRandomOrder()->firstOrFail()->id,
+            'procurement_office' => $profile['name'].' — Procurement Team',
+            'contact_person' => fake('de_DE')->name(),
+            'contact_email' => 'procurement.'.($profileIndex + 1).'@example.com',
+            'contact_phone' => '+49 30 5550 '.str_pad((string) ($profileIndex + 1), 4, '0', STR_PAD_LEFT),
+            'contract_term' => '36 months',
+            'extension_options' => 'Option to extend for a further 12 months by mutual agreement.',
+            'portal_link' => 'https://example.com/demo-tenders',
+            'notes' => 'Demo tender covering scheduled services, cover arrangements, and monthly performance reporting.',
             ...($demoContractEndDate !== null ? ['contract_end_date' => $demoContractEndDate] : []),
         ]);
 
@@ -374,7 +419,7 @@ class DemoDataSeeder extends Seeder
         if ($status->isTerminal() && $variant === 0) {
             $tender->archive($owner);
         } elseif ($variant === 2 && in_array($status, [TenderStatus::REVIEW, TenderStatus::CANCELLED], true)) {
-            $tender->markInvalid($owner, fake()->sentence(fake()->numberBetween(6, 12)));
+            $tender->markInvalid($owner, 'Closed after reviewing the procurement requirements and eligibility criteria.');
         }
     }
 
@@ -478,7 +523,7 @@ class DemoDataSeeder extends Seeder
                 break;
             }
 
-            $calculation->approve($step, $actor, fake()->optional(0.4)->sentence());
+            $calculation->approve($step, $actor, $step->getLabel().' completed; supporting evidence reviewed.');
         }
     }
 
@@ -512,7 +557,7 @@ class DemoDataSeeder extends Seeder
         TenderBidDecision::create([
             'tender_id' => $tender->id,
             'decision' => $variant === 1 ? BidDecision::NO_BID : BidDecision::BID,
-            'reason' => $variant === 1 ? fake()->sentence(fake()->numberBetween(8, 15)) : null,
+            'reason' => $variant === 1 ? 'Available staffing and expected margin do not meet the requirements for this contract.' : null,
             'score' => $score->score(),
             'decided_by' => $decisionMaker->id,
             'decided_at' => fake()->dateTimeBetween('-2 months', 'now'),
@@ -527,7 +572,7 @@ class DemoDataSeeder extends Seeder
         if (in_array($target, $earlyExits, true)) {
             // Vary how far into the active phases a tender got before exiting.
             $this->walkActivePhases($tender, min($variant, count(self::ACTIVE_PHASES) - 1), $actor);
-            $tender->changeStatusTo($target, $actor, fake()->sentence(fake()->numberBetween(6, 12)));
+            $tender->changeStatusTo($target, $actor, 'Closed after reviewing the procurement requirements and eligibility criteria.');
 
             return;
         }
@@ -571,6 +616,8 @@ class DemoDataSeeder extends Seeder
 
         $task = Task::factory()->create([
             'tender_id' => $tender->id,
+            'title' => ['Review tender requirements', 'Prepare cost calculation', 'Collect compliance documents', 'Draft service delivery concept', 'Complete final bid review'][$index % 5],
+            'description' => 'Review the requirements for '.$tender->title.' and attach the supporting evidence before requesting approval.',
             'owner_id' => $owner->id,
             'creator_id' => $team->first()->id,
             'reviewer_id' => $reviewer?->id,
@@ -602,7 +649,7 @@ class DemoDataSeeder extends Seeder
 
         foreach (range(1, fake()->numberBetween(2, 4)) as $position) {
             $task->checklistItems()->create([
-                'description' => fake()->sentence(4),
+                'description' => ['Check the latest tender specification', 'Confirm required supporting evidence', 'Record outstanding clarification questions', 'Request a peer review'][$position - 1],
                 'is_done' => fake()->boolean(50),
                 'position' => $position,
             ]);
@@ -617,7 +664,7 @@ class DemoDataSeeder extends Seeder
         for ($i = 0, $commentCount = fake()->numberBetween(1, 3); $i < $commentCount; $i++) {
             $task->comments()->create([
                 'user_id' => $task->linkedUsers()->random()->id,
-                'body' => fake()->paragraph(),
+                'body' => fake()->randomElement(['The latest specification has been reviewed. Please check the attached notes before the next review.', 'The supporting documents are ready for review. Outstanding questions are recorded in the checklist.', 'Please confirm the staffing assumptions before we finalise the submission.']),
             ]);
         }
 
@@ -663,12 +710,9 @@ class DemoDataSeeder extends Seeder
     private function createDocuments(Tender $tender, Collection $team, array $categories): void
     {
         foreach ($categories as $category) {
-            $words = fake()->words(3);
-            $titleSuffix = is_array($words) ? implode(' ', $words) : $words;
-
             $document = $tender->documents()->create([
                 'category' => $category,
-                'title' => $category->getLabel().' – '.ucfirst($titleSuffix),
+                'title' => $category->getLabel().' — '.$tender->contracting_authority,
                 'created_by' => $team->random()->id,
             ]);
 
@@ -686,9 +730,9 @@ class DemoDataSeeder extends Seeder
      */
     private function createDocumentVersion(TenderDocument $document, Collection $team, int $versionNumber): void
     {
-        $filename = fake()->slug(3).'.txt';
+        $filename = Str::slug($document->title).'-v'.$versionNumber.'.txt';
         $path = 'tender-documents/'.fake()->uuid().'.txt';
-        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 3));
+        $paragraphs = ['Demo supporting document. Prepared for the tender review; includes service requirements, staffing assumptions, and compliance checks.'];
         $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
@@ -705,9 +749,9 @@ class DemoDataSeeder extends Seeder
 
     private function createAttachment(Task $task): void
     {
-        $filename = fake()->slug(3).'.txt';
+        $filename = Str::slug($task->title).'-review-notes.txt';
         $path = 'task-attachments/'.fake()->uuid().'.txt';
-        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 3));
+        $paragraphs = ['Demo supporting document. Prepared for the tender review; includes service requirements, staffing assumptions, and compliance checks.'];
         $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
@@ -729,9 +773,9 @@ class DemoDataSeeder extends Seeder
         foreach (range(1, fake()->numberBetween(2, 4)) as $ignored) {
             $tender->communications()->create([
                 'type' => fake()->randomElement(CommunicationType::cases()),
-                'subject' => fake()->sentence(4),
-                'content' => fake()->paragraph(),
-                'contact_person' => fake()->boolean(50) ? fake()->name() : null,
+                'subject' => 'Clarification of service scope and submission requirements',
+                'content' => 'Requested confirmation of service hours, access arrangements, and the evidence required with the final bid.',
+                'contact_person' => fake()->boolean(50) ? fake('de_DE')->name() : null,
                 'occurred_at' => fake()->dateTimeBetween('-2 months', 'now'),
                 'logged_by' => $team->random()->id,
             ]);
@@ -749,17 +793,17 @@ class DemoDataSeeder extends Seeder
         foreach (range(1, fake()->numberBetween(0, 2)) as $ignored) {
             $visit = $tender->siteVisits()->create([
                 'visit_date' => fake()->dateTimeBetween('-2 months', '+1 month'),
-                'attendees' => fake()->name().', '.fake()->name(),
-                'contact_person' => fake()->boolean(50) ? fake()->name() : null,
-                'access_routes' => fake()->boolean(50) ? fake()->sentence() : null,
-                'parking' => fake()->boolean(50) ? fake()->sentence() : null,
-                'areas' => fake()->boolean(50) ? fake()->sentence() : null,
-                'risks' => fake()->boolean(30) ? fake()->sentence() : null,
-                'technical_particularities' => fake()->boolean(30) ? fake()->sentence() : null,
-                'staffing_requirement' => fake()->boolean(30) ? fake()->sentence() : null,
-                'competitors_spotted' => fake()->boolean(30) ? fake()->sentence() : null,
-                'open_questions' => fake()->boolean(30) ? fake()->sentence() : null,
-                'notes' => fake()->boolean(40) ? fake()->paragraph() : null,
+                'attendees' => fake('de_DE')->name().', '.fake('de_DE')->name(),
+                'contact_person' => fake()->boolean(50) ? fake('de_DE')->name() : null,
+                'access_routes' => 'Use the main reception entrance; sign in with the facilities team.',
+                'parking' => 'Visitor parking is available beside the service entrance.',
+                'areas' => 'Reception, office floors, shared facilities, and external access areas.',
+                'risks' => 'Maintain public access and follow the site induction requirements.',
+                'technical_particularities' => 'Access-controlled doors require coordination with the on-site facilities team.',
+                'staffing_requirement' => 'Provide a named site supervisor and trained cover staff.',
+                'competitors_spotted' => 'Two other bidders attended the scheduled site visit.',
+                'open_questions' => 'Confirm out-of-hours access and responsibility for consumables.',
+                'notes' => fake()->boolean(40) ? 'Confirm the next review date with the procurement contact and update the tender record.' : null,
                 'created_by' => $team->random()->id,
             ]);
 
@@ -774,9 +818,9 @@ class DemoDataSeeder extends Seeder
      */
     private function createSiteVisitPhoto(TenderSiteVisit $visit, Collection $team): void
     {
-        $filename = fake()->slug(3).'.txt';
+        $filename = 'supporting-evidence-'.fake()->numberBetween(1000, 9999).'.txt';
         $path = 'tender-site-visit-photos/'.fake()->uuid().'.txt';
-        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 2));
+        $paragraphs = ['Demo submission record. Supporting evidence has been collected for internal review.'];
         $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
@@ -805,7 +849,7 @@ class DemoDataSeeder extends Seeder
 
             $request = $tender->documentRequests()->create([
                 'tender_communication_id' => $communication?->id,
-                'description' => fake()->sentence(8),
+                'description' => 'Please provide the current insurance schedule and signed compliance declaration.',
                 'owner_id' => $team->random()->id,
                 'deadline' => fake()->boolean(60) ? fake()->dateTimeBetween('now', '+1 month') : null,
                 'status' => DocumentRequestStatus::OPEN,
@@ -820,7 +864,7 @@ class DemoDataSeeder extends Seeder
                 }
 
                 if ($request->status !== $targetStatus) {
-                    $request->changeStatusTo($targetStatus, $team->random(), fake()->boolean(50) ? fake()->sentence() : null);
+                    $request->changeStatusTo($targetStatus, $team->random(), fake()->boolean(50) ? 'Supporting evidence reviewed and request status updated.' : null);
                 }
             }
 
@@ -835,9 +879,9 @@ class DemoDataSeeder extends Seeder
      */
     private function createDocumentRequestFile(TenderDocumentRequest $request, Collection $team): void
     {
-        $filename = fake()->slug(3).'.txt';
+        $filename = 'compliance-declaration.txt';
         $path = 'tender-document-request-files/'.fake()->uuid().'.txt';
-        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 2));
+        $paragraphs = ['Demo submission record. Supporting evidence has been collected for internal review.'];
         $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
@@ -866,7 +910,7 @@ class DemoDataSeeder extends Seeder
             'transmission_route' => fake()->randomElement(['Electronic portal upload', 'Email', 'Postal']),
             'receipt_confirmed' => $confirmed,
             'receipt_confirmed_at' => $confirmed ? fake()->dateTimeBetween('-6 weeks', 'now') : null,
-            'notes' => fake()->boolean(30) ? fake()->paragraph() : null,
+            'notes' => fake()->boolean(30) ? 'Receipt and supporting evidence recorded for the internal review.' : null,
             'created_by' => $team->random()->id,
         ]);
 
@@ -880,9 +924,9 @@ class DemoDataSeeder extends Seeder
      */
     private function createSubmissionFile(TenderSubmission $submission, Collection $team): void
     {
-        $filename = fake()->slug(3).'.txt';
+        $filename = 'final-bid-submission.txt';
         $path = 'tender-submission-files/'.fake()->uuid().'.txt';
-        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 2));
+        $paragraphs = ['Demo submission record. Supporting evidence has been collected for internal review.'];
         $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
@@ -903,11 +947,11 @@ class DemoDataSeeder extends Seeder
     {
         $tender->followUp()->create([
             'presentation_scheduled_at' => fake()->boolean(50) ? fake()->dateTimeBetween('now', '+3 weeks') : null,
-            'presentation_notes' => fake()->boolean(40) ? fake()->paragraph() : null,
-            'negotiation_notes' => fake()->boolean(40) ? fake()->paragraph() : null,
+            'presentation_notes' => fake()->boolean(40) ? 'Confirm the next review date with the procurement contact and update the tender record.' : null,
+            'negotiation_notes' => fake()->boolean(40) ? 'Confirm the next review date with the procurement contact and update the tender record.' : null,
             'bid_validity_until' => fake()->boolean(50) ? fake()->dateTimeBetween('now', '+3 months') : null,
             'expected_result_date' => fake()->boolean(50) ? fake()->dateTimeBetween('now', '+2 months') : null,
-            'expected_result_notes' => fake()->boolean(40) ? fake()->paragraph() : null,
+            'expected_result_notes' => fake()->boolean(40) ? 'Confirm the next review date with the procurement contact and update the tender record.' : null,
             'created_by' => $team->random()->id,
         ]);
     }
@@ -934,7 +978,7 @@ class DemoDataSeeder extends Seeder
         };
 
         $tender->result()->create([
-            'winner' => $othersWon ? fake()->company() : null,
+            'winner' => $othersWon ? $this->competitors->random()->name : null,
             'our_rank' => match (true) {
                 $isWon => 1,
                 $othersWon => fake()->numberBetween(2, 5),
@@ -944,9 +988,9 @@ class DemoDataSeeder extends Seeder
             'our_price' => $ourPrice,
             'price_gap' => $winningPrice !== null && $ourPrice !== null ? round($winningPrice - $ourPrice, 2) : null,
             'award_date' => $isCancelled ? null : fake()->dateTimeBetween('-4 weeks', 'now'),
-            'known_evaluation' => fake()->boolean(50) ? fake()->paragraph() : null,
-            'reasoning' => fake()->paragraph(),
-            'award_decision' => fake()->boolean(40) ? fake()->paragraph() : null,
+            'known_evaluation' => 'Evaluation considered service quality, staffing, and the submitted price.',
+            'reasoning' => 'Outcome recorded from the demo award notice for internal review.',
+            'award_decision' => 'Award notice reviewed; the outcome has been added to the tender history.',
             'win_loss_reasons' => $othersWon
                 ? fake()->randomElements(array_column(WinLossReason::cases(), 'value'), fake()->numberBetween(1, 3))
                 : [],
@@ -960,9 +1004,9 @@ class DemoDataSeeder extends Seeder
     private function createLessonsLearned(Tender $tender, Collection $team): void
     {
         $tender->lessonsLearned()->create([
-            'went_well' => fake()->paragraph(),
-            'differently_next_time' => fake()->paragraph(),
-            'process_changes' => fake()->paragraph(),
+            'went_well' => 'The team collected the required evidence early and completed the internal review on time.',
+            'differently_next_time' => 'Validate staffing assumptions with operations before preparing the first calculation.',
+            'process_changes' => 'Add an operations review checkpoint before the calculation is sent for approval.',
             'created_by' => $team->random()->id,
         ]);
     }
@@ -984,9 +1028,15 @@ class DemoDataSeeder extends Seeder
         return collect(range(1, 12))->map(function (): Reference {
             $category = $this->categories->random();
             $author = $this->randomLibraryAuthor();
+            $profile = fake()->randomElement(self::DEMO_CLIENTS);
 
             $factory = Reference::factory()->state([
                 'service_category_id' => $category->id,
+                'client' => $profile['name'],
+                'sector_id' => Sector::query()->where('name', $profile['sector'])->firstOrFail()->id,
+                'location' => $profile['city'],
+                'description' => 'Delivery of '.$category->name.' with a dedicated site supervisor, planned cover, and monthly quality reviews.',
+                'contact_person_name' => fake('de_DE')->name(),
                 'created_by' => $author->id,
             ]);
 
@@ -1003,9 +1053,9 @@ class DemoDataSeeder extends Seeder
 
     private function createReferenceAttachment(Reference $reference, User $uploader): void
     {
-        $filename = fake()->slug(3).'.txt';
+        $filename = Str::slug($reference->client).'-service-reference.txt';
         $path = 'reference-attachments/'.fake()->uuid().'.txt';
-        $paragraphs = fake()->paragraphs(fake()->numberBetween(1, 3));
+        $paragraphs = ['Demo supporting document. Prepared for the tender review; includes service requirements, staffing assumptions, and compliance checks.'];
         $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
 
         Storage::disk('local')->put($path, $content);
@@ -1031,6 +1081,9 @@ class DemoDataSeeder extends Seeder
         return collect(CertificateType::cases())->map(function (CertificateType $type): Certificate {
             $factory = Certificate::factory()->state([
                 'type' => $type,
+                'name' => $type->getLabel().' — Company Evidence',
+                'issuing_body' => 'Demo Compliance Office',
+                'notes' => 'Fictional certificate for demonstrating the evidence library.',
                 'created_by' => $this->randomLibraryAuthor()->id,
             ]);
 
@@ -1041,7 +1094,7 @@ class DemoDataSeeder extends Seeder
             };
 
             if (fake()->boolean(60)) {
-                $factory = $factory->withFile();
+                $factory = $factory->withFile()->state(['original_filename' => $type->value.'-company-evidence.pdf']);
             }
 
             return $factory->create();
@@ -1108,6 +1161,7 @@ class DemoDataSeeder extends Seeder
             UserAbsence::factory()->create([
                 'user_id' => $user->id,
                 'type' => fake()->randomElement([AbsenceType::HOLIDAY, AbsenceType::SICKNESS]),
+                'notes' => 'Planned absence; handover arranged with the nominated cover.',
                 'starts_at' => fake()->dateTimeBetween('-2 weeks', '+1 week'),
                 'ends_at' => fake()->dateTimeBetween('+1 week', '+3 weeks'),
                 'cover_user_id' => $index < 2 ? $cover->id : null,
@@ -1124,6 +1178,7 @@ class DemoDataSeeder extends Seeder
             UserAbsence::factory()->create([
                 'user_id' => $overlapTask->owner_id,
                 'type' => AbsenceType::HOLIDAY,
+                'notes' => 'Annual leave; please coordinate outstanding tasks with the nominated cover.',
                 'starts_at' => $overlapTask->due_date->copy()->subDay(),
                 'ends_at' => $overlapTask->due_date->copy()->addDay(),
                 'cover_user_id' => $cover->id,
@@ -1143,6 +1198,7 @@ class DemoDataSeeder extends Seeder
         return collect(ConceptBlockCategory::cases())->map(function (ConceptBlockCategory $category): ConceptBlock {
             $block = ConceptBlock::factory()->create([
                 'category' => $category,
+                'title' => $category->getLabel().' — Service Delivery Standard',
                 'created_by' => $this->randomLibraryAuthor()->id,
             ]);
 
@@ -1151,7 +1207,7 @@ class DemoDataSeeder extends Seeder
             for ($version = 1; $version <= $versionCount; $version++) {
                 $block->versions()->create([
                     'version_number' => $version,
-                    'content' => fake()->paragraphs(fake()->numberBetween(2, 4), true),
+                    'content' => 'Our '.$category->getLabel().' approach defines responsibilities, review checkpoints, and the evidence retained for each contract. A named supervisor coordinates delivery, records exceptions, and agrees corrective actions with the client.',
                     'created_by' => $this->randomLibraryAuthor()->id,
                 ]);
             }
@@ -1165,7 +1221,11 @@ class DemoDataSeeder extends Seeder
      */
     private function createClientLibrary(): Collection
     {
-        return Client::factory()->count(10)->create();
+        return collect(self::DEMO_CLIENTS)->map(fn (array $profile): Client => Client::factory()->create([
+            'name' => $profile['name'],
+            'region' => $profile['region'],
+            'notes' => 'Fictional organisation used for demo screenshots.',
+        ]));
     }
 
     /**
@@ -1213,10 +1273,20 @@ class DemoDataSeeder extends Seeder
      */
     private function createCompetitorLibrary(): Collection
     {
-        return Competitor::factory()->count(8)->create()->each(function (Competitor $competitor): void {
+        return collect(['Nordblick Facility Services', 'Rheinwerk Security Services', 'Elbcare Cleaning Solutions', 'IsarGuard Services', 'Mainbogen Building Care', 'Havelpunkt Facility Management', 'Westhain Service Group', 'Alpenblick Property Services'])->map(fn (string $name): Competitor => Competitor::factory()->create([
+            'name' => $name,
+            'service_areas' => 'Security, cleaning, and facility management',
+            'known_clients' => 'Office campuses and public facilities',
+            'strengths' => 'Regional coverage and established site supervision',
+            'weaknesses' => 'Limited information on specialist staffing capacity',
+            'market_segments' => 'Public administration, healthcare, and education',
+            'internal_notes' => 'Fictional competitor for demo purposes; not a real market assessment.',
+        ]))->each(function (Competitor $competitor): void {
             foreach (range(1, fake()->numberBetween(1, 3)) as $ignored) {
                 CompetitorPriceEntry::factory()->create([
                     'competitor_id' => $competitor->id,
+                    'source' => 'Demo award notice',
+                    'context' => 'Illustrative price observation; not verified market data.',
                     'created_by' => $this->randomLibraryAuthor()->id,
                 ]);
             }

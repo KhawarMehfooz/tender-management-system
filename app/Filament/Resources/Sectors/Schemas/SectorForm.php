@@ -25,6 +25,8 @@ class SectorForm
                             ->unique(ignoreRecord: true),
                         Toggle::make('active')
                             ->label(__('sectors.fields.active'))
+                            ->onIcon(Heroicon::OutlinedCheck)
+                            ->offIcon(Heroicon::OutlinedXMark)
                             ->helperText(__('sectors.fields.active_helper'))
                             ->required(),
                     ]),

@@ -30,6 +30,8 @@ class CpvCodeForm
                             ->required(),
                         Toggle::make('active')
                             ->label(__('cpv_codes.fields.active'))
+                            ->onIcon(Heroicon::OutlinedCheck)
+                            ->offIcon(Heroicon::OutlinedXMark)
                             ->helperText(__('cpv_codes.fields.active_helper'))
                             ->required()
                             ->columnSpanFull(),

@@ -12,6 +12,8 @@ use App\Models\Tender;
 use App\Models\TenderCompetitor;
 use App\Models\TenderResult;
 use App\Models\User;
+use Filament\Forms\Components\Toggle;
+use Filament\Support\Icons\Heroicon;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -95,4 +97,14 @@ describe('client history', function () {
         Livewire::test(ViewClient::class, ['record' => $client->getRouteKey()])
             ->assertSuccessful();
     });
+});
+
+it('shows check and cross icons for the client active toggle', function () {
+    $this->actingAs(User::factory()->create());
+
+    Livewire::test(CreateClient::class)
+        ->assertFormFieldExists('active', function (Toggle $field): bool {
+            return $field->getOnIcon() === Heroicon::OutlinedCheck
+                && $field->getOffIcon() === Heroicon::OutlinedXMark;
+        });
 });

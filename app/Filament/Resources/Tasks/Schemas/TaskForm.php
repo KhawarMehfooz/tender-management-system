@@ -13,7 +13,10 @@ use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -123,137 +126,154 @@ class TaskForm
     {
         return $schema
             ->components([
-                Section::make(__('tasks.form.sections.details'))
-                    ->icon(Heroicon::OutlinedClipboardDocumentList)
+                Grid::make(['default' => 1, 'lg' => 5])
                     ->schema([
-                        Select::make('tender_id')
-                            ->label(__('tasks.fields.tender_id'))
-                            ->prefixIcon(Heroicon::OutlinedDocumentText)
-                            ->relationship('tender', 'title')
-                            ->required($includeTenderField)
-                            ->searchable()
-                            ->preload()
-                            ->live()
-                            ->visible($includeTenderField)
-                            ->dehydrated($includeTenderField),
-                        Select::make('priority')
-                            ->label(__('tasks.fields.priority'))
-                            ->prefixIcon(Heroicon::OutlinedFlag)
-                            ->options(TaskPriority::class)
-                            ->default(TaskPriority::MEDIUM)
-                            ->required(),
-                        Select::make('functional_role')
-                            ->label(__('tasks.fields.functional_role'))
-                            ->prefixIcon(Heroicon::OutlinedTag)
-                            ->options(TeamRole::class),
-                        TextInput::make('title')
-                            ->label(__('tasks.fields.title'))
-                            ->prefixIcon(Heroicon::OutlinedPencil)
-                            ->required()
-                            ->columnSpanFull(),
-                        TextInput::make('description')
-                            ->label(__('tasks.fields.description'))
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(2),
+                        Group::make([
+                            Section::make(__('tasks.form.sections.details'))
+                                ->icon(Heroicon::OutlinedClipboardDocumentList)
+                                ->schema([
+                                    Select::make('tender_id')
+                                        ->label(__('tasks.fields.tender_id'))
+                                        ->prefixIcon(Heroicon::OutlinedDocumentText)
+                                        ->relationship('tender', 'title')
+                                        ->required($includeTenderField)
+                                        ->searchable()
+                                        ->preload()
+                                        ->live()
+                                        ->visible($includeTenderField)
+                                        ->dehydrated($includeTenderField)
+                                        ->columnSpanFull(),
+                                    TextInput::make('title')
+                                        ->label(__('tasks.fields.title'))
+                                        ->prefixIcon(Heroicon::OutlinedPencil)
+                                        ->required()
+                                        ->columnSpanFull(),
+                                    Textarea::make('description')
+                                        ->label(__('tasks.fields.description'))
+                                        ->rows(5)
+                                        ->columnSpanFull(),
+                                ])
+                                ->columns(2)
+                                ->columnSpanFull(),
 
-                Section::make(__('tasks.form.sections.assignment'))
-                    ->icon(Heroicon::OutlinedUserGroup)
-                    ->schema([
-                        Select::make('owner_id')
-                            ->label(__('tasks.fields.owner_id'))
-                            ->prefixIcon(Heroicon::OutlinedUser)
-                            ->options(fn (): array => self::scopedUserOptions())
-                            ->default(fn (): ?string => self::canManageTask() ? null : (auth()->id() === null ? null : (string) auth()->id()))
-                            ->required()
-                            ->searchable()
-                            ->live()
-                            ->disabled(fn (): bool => ! self::canManageTask())
-                            ->dehydrated(),
-                        Select::make('reviewer_id')
-                            ->label(__('tasks.fields.reviewer_id'))
-                            ->prefixIcon(Heroicon::OutlinedShieldCheck)
-                            ->options(fn (): array => self::scopedUserOptions())
-                            ->searchable()
-                            ->disabled(fn (): bool => ! self::canManageTask())
-                            ->dehydrated(),
-                        Select::make('participants')
-                            ->label(__('tasks.fields.participants'))
-                            ->prefixIcon(Heroicon::OutlinedUserGroup)
-                            ->relationship('participants', 'name', fn (Builder $query) => self::scopedUserQuery($query))
-                            ->getOptionLabelFromRecordUsing(fn (User $record): string => self::workloadLabel($record))
-                            ->multiple()
-                            ->searchable()
-                            ->columnSpanFull()
-                            ->disabled(fn (): bool => ! static::canManageTask())
-                            ->dehydrated(fn (): bool => static::canManageTask()),
-                    ])
-                    ->columns(2),
+                            Section::make(__('tasks.form.sections.checklist'))
+                                ->icon(Heroicon::OutlinedCheckCircle)
+                                ->schema([
+                                    Repeater::make('checklistItems')
+                                        ->label(__('tasks.fields.checklist_items'))
+                                        ->relationship()
+                                        ->schema([
+                                            TextInput::make('description')
+                                                ->label(__('tasks.fields.checklist_item_description'))
+                                                ->prefixIcon(Heroicon::OutlinedPencil)
+                                                ->required()
+                                                ->columnSpan(2),
+                                            Checkbox::make('is_done')
+                                                ->label(__('tasks.fields.checklist_item_done')),
+                                        ])
+                                        ->columns(3)
+                                        ->columnSpanFull()
+                                        ->defaultItems(0)
+                                        ->addActionLabel(__('tasks.actions.add_checklist_item'))
+                                        ->orderColumn('position')
+                                        ->reorderable(),
+                                ])
+                                ->columnSpanFull(),
+                        ])
+                            ->columnSpan(['default' => 1, 'lg' => 3]),
+                        Group::make([
+                            Section::make(__('tasks.form.sections.assignment'))
+                                ->icon(Heroicon::OutlinedUserGroup)
+                                ->schema([
+                                    Select::make('owner_id')
+                                        ->label(__('tasks.fields.owner_id'))
+                                        ->prefixIcon(Heroicon::OutlinedUser)
+                                        ->options(fn (): array => self::scopedUserOptions())
+                                        ->default(fn (): ?string => self::canManageTask() ? null : (auth()->id() === null ? null : (string) auth()->id()))
+                                        ->required()
+                                        ->searchable()
+                                        ->live()
+                                        ->disabled(fn (): bool => ! self::canManageTask())
+                                        ->dehydrated(),
+                                    Select::make('reviewer_id')
+                                        ->label(__('tasks.fields.reviewer_id'))
+                                        ->prefixIcon(Heroicon::OutlinedShieldCheck)
+                                        ->options(fn (): array => self::scopedUserOptions())
+                                        ->searchable()
+                                        ->disabled(fn (): bool => ! self::canManageTask())
+                                        ->dehydrated(),
+                                    Select::make('participants')
+                                        ->label(__('tasks.fields.participants'))
+                                        ->prefixIcon(Heroicon::OutlinedUserGroup)
+                                        ->relationship('participants', 'name', fn (Builder $query) => self::scopedUserQuery($query))
+                                        ->getOptionLabelFromRecordUsing(fn (User $record): string => self::workloadLabel($record))
+                                        ->multiple()
+                                        ->searchable()
+                                        ->columnSpanFull()
+                                        ->disabled(fn (): bool => ! static::canManageTask())
+                                        ->dehydrated(fn (): bool => static::canManageTask()),
+                                ])
+                                ->columns(2)
+                                ->columnSpanFull(),
 
-                Section::make(__('tasks.form.sections.dependencies'))
-                    ->icon(Heroicon::OutlinedLink)
-                    ->schema([
-                        Select::make('dependencies')
-                            ->label(__('tasks.fields.dependencies'))
-                            ->prefixIcon(Heroicon::OutlinedLink)
-                            ->relationship(
-                                name: 'dependencies',
-                                titleAttribute: 'title',
-                                modifyQueryUsing: function (Builder $query, ?Task $record, Get $get) use ($includeTenderField, $tenderId): Builder {
-                                    $scopeTenderId = $includeTenderField ? $get('tender_id') : $tenderId;
+                            Section::make(__('tasks.form.sections.planning'))
+                                ->icon(Heroicon::OutlinedCalendarDays)
+                                ->schema([
+                                    Select::make('priority')
+                                        ->label(__('tasks.fields.priority'))
+                                        ->prefixIcon(Heroicon::OutlinedFlag)
+                                        ->options(TaskPriority::class)
+                                        ->default(TaskPriority::MEDIUM)
+                                        ->required(),
+                                    Select::make('functional_role')
+                                        ->label(__('tasks.fields.functional_role'))
+                                        ->prefixIcon(Heroicon::OutlinedTag)
+                                        ->options(TeamRole::class),
+                                    DatePicker::make('start_date')
+                                        ->label(__('tasks.fields.start_date'))
+                                        ->prefixIcon(Heroicon::OutlinedCalendarDays),
+                                    DatePicker::make('due_date')
+                                        ->label(__('tasks.fields.due_date'))
+                                        ->prefixIcon(Heroicon::OutlinedCalendarDays)
+                                        ->live()
+                                        ->helperText(fn (Get $get): ?string => self::dueDateAbsenceWarning($get('owner_id'), $get('due_date'))),
+                                ])
+                                ->columns(2)
+                                ->columnSpanFull(),
 
-                                    return $query
-                                        ->when(
-                                            $record,
-                                            fn (Builder $query) => $query->whereKeyNot([$record->id, ...$record->transitiveDependentIds()]),
+                            Section::make(__('tasks.form.sections.dependencies'))
+                                ->icon(Heroicon::OutlinedLink)
+                                ->schema([
+                                    Select::make('dependencies')
+                                        ->label(__('tasks.fields.dependencies'))
+                                        ->prefixIcon(Heroicon::OutlinedLink)
+                                        ->relationship(
+                                            name: 'dependencies',
+                                            titleAttribute: 'title',
+                                            modifyQueryUsing: function (Builder $query, ?Task $record, Get $get) use ($includeTenderField, $tenderId): Builder {
+                                                $scopeTenderId = $includeTenderField ? $get('tender_id') : $tenderId;
+
+                                                return $query
+                                                    ->when(
+                                                        $record,
+                                                        fn (Builder $query) => $query->whereKeyNot([$record->id, ...$record->transitiveDependentIds()]),
+                                                    )
+                                                    ->when(
+                                                        $scopeTenderId,
+                                                        fn (Builder $query) => $query->where('tender_id', $scopeTenderId),
+                                                        fn (Builder $query) => $query->whereRaw('1 = 0'),
+                                                    );
+                                            },
                                         )
-                                        ->when(
-                                            $scopeTenderId,
-                                            fn (Builder $query) => $query->where('tender_id', $scopeTenderId),
-                                            fn (Builder $query) => $query->whereRaw('1 = 0'),
-                                        );
-                                },
-                            )
-                            ->multiple()
-                            ->searchable()
-                            ->columnSpanFull(),
-                    ]),
-
-                Section::make(__('tasks.form.sections.dates'))
-                    ->icon(Heroicon::OutlinedCalendarDays)
-                    ->schema([
-                        DatePicker::make('start_date')
-                            ->label(__('tasks.fields.start_date'))
-                            ->prefixIcon(Heroicon::OutlinedCalendarDays),
-                        DatePicker::make('due_date')
-                            ->label(__('tasks.fields.due_date'))
-                            ->prefixIcon(Heroicon::OutlinedCalendarDays)
-                            ->live()
-                            ->helperText(fn (Get $get): ?string => self::dueDateAbsenceWarning($get('owner_id'), $get('due_date'))),
+                                        ->multiple()
+                                        ->searchable()
+                                        ->columnSpanFull(),
+                                ])
+                                ->columnSpanFull(),
+                        ])
+                            ->columnSpan(['default' => 1, 'lg' => 2]),
                     ])
-                    ->columns(2),
-
-                Section::make(__('tasks.form.sections.checklist'))
-                    ->icon(Heroicon::OutlinedCheckCircle)
-                    ->schema([
-                        Repeater::make('checklistItems')
-                            ->label(__('tasks.fields.checklist_items'))
-                            ->relationship()
-                            ->schema([
-                                TextInput::make('description')
-                                    ->label(__('tasks.fields.checklist_item_description'))
-                                    ->required()
-                                    ->columnSpan(2),
-                                Checkbox::make('is_done')
-                                    ->label(__('tasks.fields.checklist_item_done')),
-                            ])
-                            ->columns(3)
-                            ->columnSpanFull()
-                            ->defaultItems(0)
-                            ->addActionLabel(__('tasks.actions.add_checklist_item'))
-                            ->orderColumn('position')
-                            ->reorderable(),
-                    ]),
+                    ->columnSpanFull(),
             ]);
     }
 }

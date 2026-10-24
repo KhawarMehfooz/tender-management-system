@@ -25,6 +25,8 @@ class ProcurementProcedureForm
                             ->unique(ignoreRecord: true),
                         Toggle::make('active')
                             ->label(__('procurement_procedures.fields.active'))
+                            ->onIcon(Heroicon::OutlinedCheck)
+                            ->offIcon(Heroicon::OutlinedXMark)
                             ->helperText(__('procurement_procedures.fields.active_helper'))
                             ->required(),
                     ]),

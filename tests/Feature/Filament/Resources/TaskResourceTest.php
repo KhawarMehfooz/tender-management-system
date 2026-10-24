@@ -44,12 +44,26 @@ describe('creation', function () {
             ->fillForm([
                 'tender_id' => $tender->id,
                 'title' => 'Prepare cost calculation',
+                'description' => "Include labour costs.\nInclude equipment costs.",
                 'priority' => TaskPriority::HIGH->value,
+                'functional_role' => TeamRole::CALCULATION->value,
+                'start_date' => '2026-11-02',
+                'due_date' => '2026-11-06',
+                'checklistItems' => [
+                    ['description' => 'Confirm labour rates', 'is_done' => false],
+                ],
             ])
             ->call('create')
             ->assertHasNoFormErrors();
 
-        expect(Task::where('title', 'Prepare cost calculation')->exists())->toBeTrue();
+        $task = Task::where('title', 'Prepare cost calculation')->firstOrFail();
+
+        expect($task->description)->toBe("Include labour costs.\nInclude equipment costs.");
+        expect($task->priority)->toBe(TaskPriority::HIGH);
+        expect($task->functional_role)->toBe(TeamRole::CALCULATION);
+        expect($task->start_date->toDateString())->toBe('2026-11-02');
+        expect($task->due_date->toDateString())->toBe('2026-11-06');
+        expect($task->checklistItems()->sole()->description)->toBe('Confirm labour rates');
     });
 
     it('round-trips a functional_role selection through create and edit', function () {

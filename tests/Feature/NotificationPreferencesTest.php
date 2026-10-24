@@ -4,6 +4,8 @@ use App\Enums\NotificationType;
 use App\Filament\Pages\NotificationPreferences;
 use App\Models\NotificationPreference;
 use App\Models\User;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\ToggleColumn;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -43,4 +45,12 @@ describe('preference table', function () {
         Livewire::test(NotificationPreferences::class)
             ->assertCanNotSeeTableRecords([$otherPreference]);
     });
+});
+
+it('shows check and cross icons for email preference toggles', function () {
+    Livewire::test(NotificationPreferences::class)
+        ->assertTableColumnExists('email_enabled', function (ToggleColumn $column): bool {
+            return $column->getOnIcon() === Heroicon::OutlinedCheck
+                && $column->getOffIcon() === Heroicon::OutlinedXMark;
+        });
 });

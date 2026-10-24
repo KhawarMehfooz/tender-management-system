@@ -30,6 +30,8 @@ class ClientForm
                             ->prefixIcon(Heroicon::OutlinedMapPin),
                         Toggle::make('active')
                             ->label(__('clients.fields.active'))
+                            ->onIcon(Heroicon::OutlinedCheck)
+                            ->offIcon(Heroicon::OutlinedXMark)
                             ->helperText(__('clients.fields.active_helper'))
                             ->required(),
                         Textarea::make('notes')

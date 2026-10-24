@@ -25,6 +25,8 @@ class SourceForm
                             ->unique(ignoreRecord: true),
                         Toggle::make('active')
                             ->label(__('sources.fields.active'))
+                            ->onIcon(Heroicon::OutlinedCheck)
+                            ->offIcon(Heroicon::OutlinedXMark)
                             ->helperText(__('sources.fields.active_helper'))
                             ->required(),
                     ]),
