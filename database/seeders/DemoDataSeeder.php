@@ -733,7 +733,7 @@ class DemoDataSeeder extends Seeder
         $filename = Str::slug($document->title).'-v'.$versionNumber.'.txt';
         $path = 'tender-documents/'.fake()->uuid().'.txt';
         $paragraphs = ['Demo supporting document. Prepared for the tender review; includes service requirements, staffing assumptions, and compliance checks.'];
-        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
+        $content = implode("\n\n", $paragraphs);
 
         Storage::disk('local')->put($path, $content);
 
@@ -752,7 +752,7 @@ class DemoDataSeeder extends Seeder
         $filename = Str::slug($task->title).'-review-notes.txt';
         $path = 'task-attachments/'.fake()->uuid().'.txt';
         $paragraphs = ['Demo supporting document. Prepared for the tender review; includes service requirements, staffing assumptions, and compliance checks.'];
-        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
+        $content = implode("\n\n", $paragraphs);
 
         Storage::disk('local')->put($path, $content);
 
@@ -821,7 +821,7 @@ class DemoDataSeeder extends Seeder
         $filename = 'supporting-evidence-'.fake()->numberBetween(1000, 9999).'.txt';
         $path = 'tender-site-visit-photos/'.fake()->uuid().'.txt';
         $paragraphs = ['Demo submission record. Supporting evidence has been collected for internal review.'];
-        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
+        $content = implode("\n\n", $paragraphs);
 
         Storage::disk('local')->put($path, $content);
 
@@ -882,7 +882,7 @@ class DemoDataSeeder extends Seeder
         $filename = 'compliance-declaration.txt';
         $path = 'tender-document-request-files/'.fake()->uuid().'.txt';
         $paragraphs = ['Demo submission record. Supporting evidence has been collected for internal review.'];
-        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
+        $content = implode("\n\n", $paragraphs);
 
         Storage::disk('local')->put($path, $content);
 
@@ -927,7 +927,7 @@ class DemoDataSeeder extends Seeder
         $filename = 'final-bid-submission.txt';
         $path = 'tender-submission-files/'.fake()->uuid().'.txt';
         $paragraphs = ['Demo submission record. Supporting evidence has been collected for internal review.'];
-        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
+        $content = implode("\n\n", $paragraphs);
 
         Storage::disk('local')->put($path, $content);
 
@@ -1056,7 +1056,7 @@ class DemoDataSeeder extends Seeder
         $filename = Str::slug($reference->client).'-service-reference.txt';
         $path = 'reference-attachments/'.fake()->uuid().'.txt';
         $paragraphs = ['Demo supporting document. Prepared for the tender review; includes service requirements, staffing assumptions, and compliance checks.'];
-        $content = is_array($paragraphs) ? implode("\n\n", $paragraphs) : $paragraphs;
+        $content = implode("\n\n", $paragraphs);
 
         Storage::disk('local')->put($path, $content);
 
