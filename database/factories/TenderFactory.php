@@ -31,7 +31,7 @@ class TenderFactory extends Factory
             'procurement_office' => fake()->optional()->city(),
             'contact_person' => fake()->optional()->name(),
             'contact_email' => fake()->optional()->safeEmail(),
-            'contact_phone' => fake()->optional()->phoneNumber(),
+            'contact_phone' => fake()->optional()->e164PhoneNumber(),
             'city' => fake()->optional()->city(),
             'service_category_id' => ServiceCategory::factory(),
             'sector_id' => Sector::factory(),
