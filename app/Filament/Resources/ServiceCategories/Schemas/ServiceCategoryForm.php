@@ -28,6 +28,7 @@ class ServiceCategoryForm
                             ->unique(ignoreRecord: true),
                         TextInput::make('code')
                             ->label(__('service_categories.fields.code'))
+                            ->prefixIcon(Heroicon::OutlinedHashtag)
                             ->helperText(__('service_categories.fields.code_helper'))
                             ->maxLength(4)
                             ->unique(ignoreRecord: true)
@@ -38,10 +39,13 @@ class ServiceCategoryForm
                             ->rows(3),
                         Select::make('calculation_model')
                             ->label(__('service_categories.fields.calculation_model'))
+                            ->prefixIcon(Heroicon::OutlinedCalculator)
                             ->helperText(__('service_categories.fields.calculation_model_helper'))
                             ->options(CalculationModel::class),
                         Toggle::make('active')
                             ->label(__('service_categories.fields.active'))
+                            ->onIcon(Heroicon::OutlinedCheck)
+                            ->offIcon(Heroicon::OutlinedXMark)
                             ->helperText(__('service_categories.fields.active_helper'))
                             ->required(),
                     ]),

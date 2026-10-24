@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CalculationModel;
 use App\Enums\CostDriverFieldType;
 use App\Filament\Resources\ServiceCategories\Pages\CreateServiceCategory;
 use App\Filament\Resources\ServiceCategories\Pages\EditServiceCategory;
@@ -21,12 +22,19 @@ describe('creation', function () {
             ->fillForm([
                 'name' => 'Security Services',
                 'description' => 'Guarding and patrol',
+                'code' => 'sec',
+                'calculation_model' => CalculationModel::cases()[0]->value,
                 'active' => true,
             ])
             ->call('create')
             ->assertHasNoFormErrors();
 
-        expect(ServiceCategory::where('name', 'Security Services')->exists())->toBeTrue();
+        $category = ServiceCategory::where('name', 'Security Services')->firstOrFail();
+
+        expect($category->code)->toBe('SEC');
+        expect($category->description)->toBe('Guarding and patrol');
+        expect($category->calculation_model)->toBe(CalculationModel::cases()[0]);
+        expect($category->active)->toBeTrue();
     });
 
     it('rejects a name that duplicates an existing category', function () {
