@@ -9,6 +9,7 @@ return [
             'assignment' => 'Assignment',
             'dependencies' => 'Dependencies',
             'dates' => 'Dates',
+            'planning' => 'Planning',
             'checklist' => 'Checklist',
         ],
     ],
