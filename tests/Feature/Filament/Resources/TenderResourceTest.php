@@ -67,11 +67,14 @@ use App\Models\TenderSubmissionFile;
 use App\Models\TenderTeamMember;
 use App\Models\User;
 use App\Models\UserAbsence;
+use Database\Factories\TenderFactory;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\Testing\TestAction;
+use Filament\Forms\Components\TextInput;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -2425,4 +2428,22 @@ describe('reference library: concept blocks relation manager', function () {
             ->assertCanSeeTableRecords([$block])
             ->assertCanNotSeeTableRecords([$foreignBlock]);
     });
+});
+
+it('generates contact phones accepted by the tender form', function () {
+    $phoneField = TextInput::make('contact_phone')->tel();
+
+    try {
+        foreach (range(1, 30) as $seed) {
+            fake()->seed($seed);
+            $phone = TenderFactory::new()->definition()['contact_phone'];
+
+            expect(Validator::make(
+                ['contact_phone' => $phone],
+                ['contact_phone' => ['nullable', 'regex:'.$phoneField->getTelRegex()]],
+            )->passes())->toBeTrue('Factory phone rejected for seed '.$seed.': '.($phone ?? 'null'));
+        }
+    } finally {
+        fake()->seed();
+    }
 });
